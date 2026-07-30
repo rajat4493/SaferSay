@@ -1,0 +1,14 @@
+<svg width="720" height="176" viewBox="0 0 720 176" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">SaferSay logo</title>
+  <desc id="desc">SaferSay wordmark with a protected speech mark.</desc>
+  <rect width="720" height="176" rx="40" fill="#F4F1EA"/>
+  <g transform="translate(40 32)">
+    <rect width="112" height="112" rx="30" fill="#161616"/>
+    <path d="M26 38C26 26.9543 34.9543 18 46 18H76C87.0457 18 96 26.9543 96 38V62C96 73.0457 87.0457 82 76 82H57L40 97V82H46C34.9543 82 26 73.0457 26 62V38Z" fill="#F4F1EA"/>
+    <path d="M45 51H74" stroke="#161616" stroke-width="7.5" stroke-linecap="round"/>
+    <path d="M45 66H64" stroke="#161616" stroke-width="7.5" stroke-linecap="round"/>
+    <circle cx="85" cy="32" r="9" fill="#C8B6FF"/>
+  </g>
+  <text x="184" y="82" fill="#161616" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="50" font-weight="780" letter-spacing="-2.2">SaferSay</text>
+  <text x="186" y="119" fill="#6C665E" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="18" font-weight="520">Confidential employee surveys</text>
+</svg>

@@ -1,0 +1,290 @@
+# RESEARCH_FINDINGS.md — Confidential Employee Survey Platform
+
+**Date:** 30 July 2026  
+**Purpose:** Required pre-build research for the confidential employee survey platform brief. This document should inform `BUILD_PLAN.md` before implementation begins.
+
+---
+
+## Executive Findings
+
+1. The brief's core positioning is directionally right: small teams have a gap between free form tools and annual HR suites. The strongest wedge is not "better surveys"; it is a credible confidentiality architecture plus a fast, polished first run.
+2. The product must say **confidential**, not **anonymous**, unless a specific dataset has been irreversibly anonymised. EU/UK data-protection guidance distinguishes pseudonymisation from anonymisation; pseudonymised records remain personal data when additional information can re-identify a person.
+3. The severed-store architecture is necessary but not sufficient. Reporting controls, segment thresholds, retention rules, access controls, audit logs, and privacy copy are all part of the confidentiality claim.
+4. A minimum reporting threshold of 5 is defensible for v1, but it must apply to every rendered cell, export, filter, comparison, segment, chart, and open-text display. Suppression must be automatic and tested.
+5. Competitor pricing supports the anti-lock-in argument. Culture Amp is annual and sales-led; Workday Peakon/Viva Glint are enterprise/Microsoft ecosystem plays; Workleap now starts at multi-thousand annual pricing; Lattice and 15Five are per-seat annual platforms; SurveyMonkey is generic survey SaaS with paid export/analysis tiers.
+6. EU AI Act risk is real: do not build emotion recognition, psychological-state inference, deception detection, affect detection, or employee risk scoring. Even future AI summarisation should be limited to thematic summarisation of text and manager-facing playbooks, with no claims about respondents' mental or emotional states.
+
+---
+
+## 1. Onboarding UX Benchmark
+
+### Patterns To Copy
+
+**First valuable object exists immediately.** Calendly's onboarding is often analysed as effective because new users quickly land on a pre-built meeting/event object and can copy/share a booking link or view the booking flow. The lesson for this product: after SSO, create a ready survey cycle from a recommended template rather than dropping users into an empty builder.
+
+**Template-first, not blank-page-first.** Typeform and Tally both lean heavily on templates. Typeform positions its forms around a polished one-question-at-a-time experience and publishes many templates; Tally advertises simple document-like form creation plus a template gallery. For this product, the buyer's first action should be selecting from 3-4 credible survey templates, not writing questions.
+
+**Progressive disclosure.** The setup should ask only what is needed to launch: company name/logo, employee list/import, template, survey window, and sender details. Advanced settings should be hidden until after the first launch.
+
+**SSO/connect-first signup.** Calendly's core onboarding maps directly to connecting a calendar. Here, the equivalent is Google Workspace/Microsoft 365 login and directory import. The first screen after auth should show "employees found" and "recommended template" rather than account setup.
+
+**Respondent UX as trust device.** Typeform's one-question-per-screen, mobile-optimised flow matters because response quality is damaged by fatigue and distrust. The respondent flow should feel calm and single-purpose: confidentiality explanation, one question per screen, visible progress, no clutter, no manager/admin language.
+
+### Product Implications
+
+- Activation metric: "survey cycle scheduled or launched" within 10 minutes, not "account created."
+- Default path: SSO -> imported employees -> choose recommended template -> confirm confidentiality screen -> schedule/send.
+- Avoid an elaborate builder in v1. Use lightweight editing only after template selection.
+- Show a preview of the respondent confidentiality screen during setup; it helps the buyer understand the trust story they are buying.
+
+### Sources
+
+- [Calendly customer onboarding](https://calendly.com/blog/customer-onboarding)
+- [Typeform product onboarding template](https://www.typeform.com/templates/product-onboarding-form-template)
+- [Typeform homepage](https://www.typeform.com/)
+- [Tally homepage](https://tally.so/)
+- [Tally templates](https://tally.so/templates)
+- [Userpilot onboarding UX examples, Calendly analysis](https://userpilot.com/blog/onboarding-ux-examples/)
+- [Formbricks onboarding best practices](https://formbricks.com/blog/user-onboarding-best-practices)
+
+---
+
+## 2. Confidentiality Architecture
+
+### What Must Be True
+
+The system needs identity for SSO, eligibility, one-response-per-person, and reminders. But it must prevent employers and ordinary application paths from linking identity to response content.
+
+The architecture should treat this as **severance plus suppression**:
+
+1. **Identity/participation store:** tenant membership, SSO subject IDs, emails, eligibility, delivery/reminder state, and issued token metadata.
+2. **Response store:** survey cycle, answers, coarse segment labels, token hash used for deduplication, timestamps rounded or withheld from reporting.
+3. **No direct person key in responses:** no `user_id`, email, name, SSO ID, employee ID, IP address, user agent, raw token, invitation ID, or delivery event ID in response tables.
+4. **One-way token flow:** Store A issues a high-entropy random submission token. Store A keeps only a hash plus participation state. The respondent submits using the token; Store B stores only a keyed hash or digest used to prevent duplicate submission. The raw token is never persisted after issue.
+5. **Reminder isolation:** reminders operate from Store A by checking issued token hashes marked unsubmitted. They do not query Store B for answers. Submission should update Store A participation state through a narrow, audited function that receives only a token proof, never answer content.
+6. **Reporting threshold:** every report query enforces k >= 5. If a segment, filter, trend cell, export row, open-text list, or comparison has fewer than 5 responses, it is suppressed.
+7. **Time and metadata minimisation:** exact submission timestamps, IP addresses, user agents, and email open/click events can re-identify people in small teams. Do not store them in Store B; if operational logs exist, keep them isolated, short-lived, and excluded from product/admin access.
+
+### Why Pseudonymisation Is Not Enough
+
+European data-protection guidance draws a hard line between pseudonymisation and anonymisation. Pseudonymisation reduces linkability but remains personal data if additional information can attribute the data back to a person. Anonymisation requires data to be unlinkable to an individual in practice. Therefore the product should not claim "anonymous" at the system level. It should claim confidentiality with a clear explanation of what the system knows and what the employer cannot see.
+
+### Recommended v1 Technical Controls
+
+- Separate Postgres schemas: `identity` and `responses`.
+- Separate database roles:
+  - app admin role can manage Store A.
+  - response write role can insert answers but cannot read Store A.
+  - report role can read only thresholded views/functions, not raw response rows.
+- Row-level security on all tenant-owned tables.
+- No cross-schema foreign keys from `responses` to `identity`.
+- Migration/test guard that fails if a response table contains forbidden columns such as `user_id`, `email`, `employee_id`, `sso_subject`, `ip_address`, `user_agent`, `invitation_id`.
+- Report functions must require `min_n` default 5 and return suppressed cells as `null`/`protected`, not zero.
+- CSV/PDF exports use the same thresholded reporting layer, unless exporting raw cycle-level answers with no person-identifying metadata and no sub-5 segment labels.
+- Open text should not render until cycle response count is >= 5; later, consider stricter thresholds or redaction.
+
+### Architectural Risk To Flag
+
+The brief says "even by a database admin." Strictly, a superuser with unrestricted database, application log, email provider, and infrastructure access can often correlate timing, delivery logs, or raw tokens if systems are poorly configured. To make the claim credible, v1 should phrase the stronger guarantee as: **product and employer admin interfaces cannot link identity to answers; database-level design contains no person-response join path; operational access is minimised and audited.** If the marketing claim remains "even a database admin cannot," then we need stricter measures: physically separate databases/projects, separate credentials, no shared logs, hardened access controls, and possibly a one-way submission service boundary.
+
+### Sources
+
+- [EDPB: anonymisation and pseudonymisation](https://www.edpb.europa.eu/topics/ai-and-technology/anonymisation-pseudonymisation_en)
+- [EDPB Guidelines 01/2025 on Pseudonymisation](https://www.edpb.europa.eu/system/files/2025-01/edpb_guidelines_202501_pseudonymisation_en.pdf)
+- [ICO anonymisation guidance](https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/data-sharing/anonymisation/)
+- [ICO pseudonymisation guidance](https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/data-sharing/anonymisation/pseudonymisation/)
+- [ICO: ensuring anonymisation is effective](https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/data-sharing/anonymisation/how-do-we-ensure-anonymisation-is-effective/)
+- [Kultify example of k-anonymity reporting at k=5](https://kultify.de/en/datenschutz)
+
+---
+
+## 3. Competitor Feature + Pricing Teardown
+
+| Competitor | Current pricing signal | Confidentiality/anonymity signal | Contract/data concern | v1 positioning implication |
+|---|---:|---|---|---|
+| Culture Amp | Sales-led; annual billing based on employee count/product/service tier. Third-party buyer data suggests multi-thousand annual contracts. | Strong people-science/privacy positioning; enterprise security claims. | Annual basis; not self-serve for small episodic use. | Position against annual commitment and procurement friction, not against feature depth. |
+| Workday Peakon Employee Voice | Sales-led enterprise. Public marketplace references around USD 20k/year; UK G-Cloud doc references 3-year subscription assumptions. | Employee voice/sentiment platform integrated with Workday ecosystem. | Enterprise deployment and Workday ecosystem gravity. | Position as separate from HRIS and launchable in minutes, not weeks. |
+| Lattice | Public pricing: Foundations around $13/seat/month; Engagement add-on around $4/seat/month, typically annual. | Engagement includes Pulse, Surveys, eNPS, onboarding/exit, exports, AI insights. | Per-seat platform economics; broader performance suite. | For 10-60 employees, a per-cycle product is easier to buy for episodic surveys. |
+| 15Five | Public pricing: Engage $4/user/month, Perform $11, Total Platform $16. | Engagement surveys, AI analytics, action planning. | Per-user platform, annual billing commonly implied. | Similar price-per-seat issue; differentiate on confidential architecture and pay-per-cycle. |
+| SurveyMonkey | Team Premier shown at EUR 75/user/month, 3+ users, billed annually; additional responses over quota charged. | Generic survey anonymity options, not employee-confidential architecture. | Data export/advanced analysis tied to paid plans; generic tool. | "Your data always exportable, never held hostage" is a strong contrast. |
+| Microsoft Viva Glint / Viva | Viva Workplace Analytics and Employee Feedback listed at $6/user/month paid yearly; Viva Suite $12/user/month paid yearly. | Employee feedback inside Microsoft ecosystem. | Annual per-user Microsoft bundle; employer-system adjacency. | Separate-from-HR/Microsoft trust story is key. |
+| Officevibe / Workleap | Workleap pricing page shows Standard starting at $4,999 USD, Pro at $11,999 USD; Officevibe pages are demo-led. | Anonymous feedback/pulse positioning. | Multi-thousand annual package, broader employee experience suite. | Strong validation that small-company floor remains open. |
+| Google Forms | Free with Google account/workspace; exports to Sheets. | No purpose-built confidentiality architecture or safe employee segmentation. | Free, but employer/admin can design traceable forms and inspect raw data. | Beat on trust, reports, and guardrails, never on price. |
+| FormGrid | Generic/low-cost form builder positioning; not a dedicated confidential employee survey platform. | No clear evidence of provable employee confidentiality/min-k reporting as core product moat. | Form-builder category weakness: raw data collection and manual analysis. | Treat as "free/cheap but not trusted." |
+
+### Notes
+
+- Public pricing is inconsistent across regions and often sales-led. The exact competitor number is less important than the repeated pattern: annual, per-seat, suite-led, or generic form-tool pricing.
+- Be careful with "paywall collected data" claims. SurveyMonkey does offer exports, but export formats and analysis depth are plan-dependent. Use precise copy: **"we never make you upgrade to export your own completed survey data."**
+
+### Sources
+
+- [Culture Amp pricing](https://www.cultureamp.com/platform/plans-and-pricing)
+- [Vendr Culture Amp pricing data](https://www.vendr.com/marketplace/culture-amp)
+- [Workday Peakon overview](https://www.workday.com/en-au/products/employee-voice/overview.html)
+- [Capterra Workday Peakon pricing reference](https://www.capterra.com.au/software/151069/peakon)
+- [UK G-Cloud Workday Peakon pricing PDF](https://assets.applytosupply.digitalmarketplace.service.gov.uk/g-cloud-14/documents/700649/571438267625250-pricing-document-2024-05-07-0803.pdf)
+- [Lattice pricing](https://lattice.com/pricing)
+- [15Five pricing](https://www.15five.com/pricing)
+- [SurveyMonkey pricing](https://www.surveymonkey.com/pricing/)
+- [SurveyMonkey export help](https://help.surveymonkey.com/en/surveymonkey/analyze/exports/)
+- [Microsoft Viva pricing](https://www.microsoft.com/en-us/microsoft-viva/pricing)
+- [Microsoft Viva Glint licensing](https://learn.microsoft.com/en-us/viva/glint/setup/glint-order-teams)
+- [Workleap pricing](https://workleap.com/pricing)
+- [Workleap Officevibe](https://workleap.com/officevibe)
+- [Tally homepage](https://tally.so/)
+- [Google Forms](https://www.google.com/forms/about/)
+
+---
+
+## 4. Legal / Compliance Baseline
+
+### GDPR Requirements For v1
+
+This product processes employee personal data at least in Store A, and potentially in Store B if response content or segment data could identify a person. v1 should assume GDPR applies.
+
+Minimum baseline:
+
+- Define roles clearly: customer/employer is likely controller; platform is processor for survey administration, with possible independent-controller obligations for operational/security processing depending on final model.
+- Provide a Data Processing Agreement before paid launch.
+- Lawful basis: for employers, consent can be problematic in employment contexts because of power imbalance. Legitimate interests or legal/HR obligations may be more realistic, but the product should not decide this for customers. Provide configurable privacy notice text and require customer confirmation of lawful basis.
+- Data minimisation: collect only identity data needed for eligibility, delivery, deduplication, and reminders. Do not collect birthdate, gender, exact age, manager, location, or team unless needed for segmentation, and suppress small groups.
+- Transparency: respondent privacy notice before Q1 must explain identity store, response store, tokens, reminders, employer-visible outputs, retention, and rights.
+- Security: EU data residency option, encryption in transit/at rest, RLS, least-privilege roles, audit logs, separate secrets, short-lived operational logs.
+- Rights and retention: export/delete tenant data, delete participation records after retention period, retain history only for paid floor tier, define response retention by cycle.
+- Subprocessors: Stripe, Resend, hosting, database provider, auth providers must be disclosed.
+- DPIA readiness: provide documentation explaining confidentiality controls, data flow, and residual re-identification risk.
+
+### Confidential vs Anonymous
+
+Use "confidential" for the product. Use "anonymous" only for aggregated outputs or datasets that are actually anonymised under the relevant identifiability standard. The respondent screen should say plainly:
+
+> We use your sign-in only to confirm you are eligible and to prevent duplicate responses. Your answers are stored separately from your identity. Your employer sees only grouped results, and groups smaller than 5 are hidden.
+
+### EU AI Act
+
+The EU AI Act prohibits AI systems intended to infer emotions of people in workplace and educational contexts, with narrow medical/safety exceptions. For this product:
+
+- Do not classify comments by emotion, mood, sentiment-as-emotional-state, stress, burnout risk, deception, intent, mental health, personality, psychological safety of a person, or individual risk.
+- Do not infer anything about individual respondents.
+- Later AI summarisation, if built, should summarise themes at group level only, with k-thresholds, no individual-level claims, and no emotion-recognition language.
+
+### Sources
+
+- [GDPR Article 5 principles](https://gdpr-info.eu/art-5-gdpr/)
+- [EDPB SME guide: secure personal data](https://www.edpb.europa.eu/sme/be-compliant/secure-personal-data_en)
+- [EDPB: anonymisation and pseudonymisation](https://www.edpb.europa.eu/topics/ai-and-technology/anonymisation-pseudonymisation_en)
+- [ICO anonymisation guidance](https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/data-sharing/anonymisation/)
+- [EU AI Act Article 5](https://artificialintelligenceact.eu/article/5/)
+- [Future of Privacy Forum: emotion recognition prohibition in workplace and education](https://fpf.org/blog/red-lines-under-eu-ai-act-unpacking-the-prohibition-of-emotion-recognition-in-the-workplace-and-education-institutions/)
+
+---
+
+## 5. Question-Bank Sourcing
+
+### Validated Constructs To Use
+
+Do not copy proprietary question text verbatim. Build original questions around established constructs:
+
+**Engagement / Gallup Q12-style needs**
+
+- Role clarity
+- Tools/resources
+- Strengths fit
+- Recognition
+- Manager care/support
+- Growth/development
+- Voice/opinions count
+- Mission/purpose connection
+- Quality/accountability
+- Team commitment
+- Belonging/relationships
+- Progress/learning
+
+**eNPS**
+
+- One 0-10 recommendation question.
+- Scoring: promoters 9-10, passives 7-8, detractors 0-6; eNPS = % promoters - % detractors.
+- Add one open follow-up: "What is the main reason for your score?" Render only when safe threshold is met.
+
+**Pulse**
+
+- Workload sustainability
+- Priorities/clarity
+- Manager support
+- Collaboration
+- Confidence in company direction
+- Psychological safety as a team climate construct, not individual psychological inference
+- Action follow-through from previous survey
+
+**Onboarding**
+
+- Role expectations
+- Access to tools
+- Manager check-ins
+- Connection to team
+- Confidence navigating company processes
+- Early workload reasonableness
+- Understanding of success criteria
+
+### Recommended v1 Templates
+
+1. **5-Minute Engagement Check**
+   - 8 Likert questions, 1 optional open text.
+   - Constructs: clarity, resources, recognition, voice, growth, manager support, team trust, direction.
+
+2. **eNPS Pulse**
+   - 1 eNPS rating, 3 diagnostic Likert questions, 1 optional open text.
+   - Fastest buyer activation path.
+
+3. **New Starter Check-In**
+   - 8 Likert questions for employees in first 30-90 days.
+   - Requires careful segmentation threshold; small companies may not have k >= 5 new starters, so v1 should warn before use.
+
+4. **Team Health Pulse**
+   - 8 Likert questions focused on workload, collaboration, clarity, and action follow-through.
+
+### Question Design Rules
+
+- Use 5-point Likert scales for most items: Strongly disagree to Strongly agree.
+- Keep each template to 8-10 questions.
+- Avoid double-barrelled questions.
+- Avoid leading language.
+- Use plain English.
+- Include at most one optional open-text question in v1 reports, and suppress display/export if threshold is not met.
+
+### Sources
+
+- [Gallup Q12 overview](https://www.gallup.com/workplace/356063/gallup-q12-employee-engagement-survey.aspx)
+- [Gallup Q12 question summary](https://www.gallup.com/workplace/356045/q12-question-summary.aspx)
+- [Questback eNPS guide](https://www.questback.com/guides/employee-net-promoter-score-enps/)
+- [Lattice eNPS guide](https://lattice.com/articles/what-is-employee-net-promoter-score-enps)
+- [BambooHR eNPS glossary](https://www.bamboohr.com/resources/hr-glossary/employee-net-promoter-score-enps)
+
+---
+
+## Build-Relevant Decisions
+
+1. Build the confidentiality spine before UI polish.
+2. Treat `min_group_size = 5` as a system invariant, not a report preference.
+3. Put privacy/trust copy in the product from day one; it is part of the product, not marketing.
+4. Keep v1 templates original but traceable to known constructs.
+5. Avoid raw response exports that include small-group segment tags.
+6. Avoid any AI features in v1.
+7. Use exact, narrow competitive claims:
+   - "No annual lock-in."
+   - "Pay per survey cycle."
+   - "Export your data on every paid cycle."
+   - "Confidential by design; identity and answers are stored separately."
+
+---
+
+## Risks / Brief Corrections
+
+1. **"Even by a database admin" is too strong unless we use physically separate stores, strict infrastructure access, and no correlatable logs.** Separate schemas alone do not defeat a database superuser. The build plan should either strengthen architecture or soften copy.
+2. **Directory import can create setup and permissions friction.** To preserve the 10-minute promise, v1 should support CSV paste/upload as a fallback even if SSO import is the premium path.
+3. **New-starter onboarding surveys may violate k >= 5 for many 10-60 person companies.** The app should show "not enough eligible employees for confidential reporting" before launch.
+4. **Open text is high re-identification risk.** Keep optional, suppress under threshold, and consider warning respondents not to include identifying details.
+5. **Works council thresholds vary and are more nuanced than a single headcount cutoff.** The product should not make legal claims about not needing consultation.
+6. **Payment model currencies need a product choice.** The brief uses pounds while ICP is EU. Pick GBP for owner preference or EUR for EU market fit before Stripe implementation.
+
