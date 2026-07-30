@@ -22,6 +22,13 @@ export function runtimeChecks(): RuntimeCheck[] {
       purpose: "Durable severed identity/response persistence.",
     },
     {
+      key: "NEXT_PUBLIC_SUPABASE_URL",
+      label: "Supabase app client",
+      configured: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY),
+      requiredForProduction: true,
+      purpose: "Browser/server session client for the Supabase project.",
+    },
+    {
       key: "AUTH_SECRET",
       label: "Auth.js secret",
       configured: Boolean(process.env.AUTH_SECRET),
