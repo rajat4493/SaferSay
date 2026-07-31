@@ -4,6 +4,13 @@ import { useMemo, useState } from "react";
 import { Upload, FileCheck2 } from "lucide-react";
 import { parseEmployeeCsv } from "@/lib/csvEmployees";
 
+const sampleCsv = `email,name,team,location
+alex@company.com,Alex Morgan,Operations,London
+jamie@company.com,Jamie Shah,Product,London
+priya@company.com,Priya Mehta,Sales,Manchester
+sam@company.com,Sam Taylor,Engineering,Bristol
+lee@company.com,Lee Chen,Customer Success,Remote`;
+
 export function EmployeeCsvImport() {
   const [csv, setCsv] = useState("");
   const [fileName, setFileName] = useState("");
@@ -36,6 +43,12 @@ export function EmployeeCsvImport() {
     setStatus(`${result.imported ?? 0} employees imported into the secure identity store.`);
   }
 
+  function useSampleCsv() {
+    setCsv(sampleCsv);
+    setFileName("sample-employees.csv");
+    setStatus("");
+  }
+
   return (
     <div className="mt-5 rounded-3xl border border-[var(--brand-border)] bg-white/75 p-5">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
@@ -47,10 +60,15 @@ export function EmployeeCsvImport() {
           <h2 className="mt-3 text-xl font-semibold">Load employees</h2>
           <p className="mt-2 text-sm leading-6 text-[var(--brand-muted)]">Use columns: email, name, team, location.</p>
         </div>
-        <label className="inline-flex h-11 cursor-pointer items-center justify-center rounded-full bg-[var(--brand-ink)] px-5 text-sm font-semibold text-white">
-          Choose CSV
-          <input type="file" accept=".csv,text/csv" onChange={(event) => loadFile(event.target.files?.[0])} className="hidden" />
-        </label>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={useSampleCsv} className="inline-flex h-11 items-center justify-center rounded-full border border-[var(--brand-border)] bg-white px-5 text-sm font-semibold">
+            Use sample CSV
+          </button>
+          <label className="inline-flex h-11 cursor-pointer items-center justify-center rounded-full bg-[var(--brand-ink)] px-5 text-sm font-semibold text-white">
+            Choose CSV
+            <input type="file" accept=".csv,text/csv" onChange={(event) => loadFile(event.target.files?.[0])} className="hidden" />
+          </label>
+        </div>
       </div>
 
       {fileName ? (

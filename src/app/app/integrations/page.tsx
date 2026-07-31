@@ -1,5 +1,6 @@
 import { AppShell, Card } from "@/components/AppShell";
 import { InviteOutboxPanel } from "@/components/InviteOutboxPanel";
+import { PageGuide } from "@/components/PageGuide";
 import { ServerOpsPanel } from "@/components/ServerOpsPanel";
 
 const integrations = [
@@ -44,6 +45,16 @@ const integrations = [
 export default function IntegrationsPage() {
   return (
     <AppShell title="Integrations" subtitle="Connect identity, delivery, payments, and exports without making them the confidentiality source of truth.">
+      <PageGuide
+        label="Step 3"
+        title="Prepare invitations without touching survey answers"
+        body="For the first usable version, this page shows the invite queue. Real email delivery is still parked until Resend details are provided, but the queue already lives in the identity side only."
+        actions={[
+          { href: "/app/surveys/new", label: "Back: survey" },
+          { href: "/app/reports", label: "Next: reports", primary: true },
+        ]}
+      />
+      <InviteOutboxPanel />
       <div className="grid gap-4 md:grid-cols-2">
         {integrations.map((item) => (
           <Card key={item.name}>
@@ -59,7 +70,6 @@ export default function IntegrationsPage() {
           </Card>
         ))}
       </div>
-      <InviteOutboxPanel />
       <ServerOpsPanel />
     </AppShell>
   );

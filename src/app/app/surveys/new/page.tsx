@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { AppShell, Card } from "@/components/AppShell";
 import { CreateSurveyCycle } from "@/components/CreateSurveyCycle";
-import { ProductDemo } from "@/components/ProductDemo";
+import { PageGuide } from "@/components/PageGuide";
 import { surveyTemplates } from "@/lib/templates";
 
 export default function NewSurveyPage() {
@@ -12,6 +12,15 @@ export default function NewSurveyPage() {
 
   return (
     <AppShell title="New Survey" subtitle="Template first, then light editing, then launch.">
+      <PageGuide
+        label="Step 2"
+        title="Pick a template and create the survey cycle"
+        body="Choose the closest template. When you click Create, SaferSay creates a draft survey and issues one secure respondent token for each active employee."
+        actions={[
+          { href: "/app/participants", label: "Back: people" },
+          { href: "/app/integrations", label: "Next: invites", primary: true },
+        ]}
+      />
       <div className="grid gap-5 xl:grid-cols-[0.85fr_1.15fr]">
         <Card>
           <h2 className="text-xl font-semibold">Choose template</h2>
@@ -41,9 +50,6 @@ export default function NewSurveyPage() {
         </Card>
       </div>
       <CreateSurveyCycle templateSlug={template.slug} />
-      <div className="mt-5">
-        <ProductDemo />
-      </div>
     </AppShell>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ArrowRight,
   BarChart3,
   CreditCard,
   FileText,
@@ -21,18 +22,18 @@ import { BrandMark } from "@/components/BrandMark";
 import { useBrand } from "@/components/BrandProvider";
 
 const nav = [
-  { href: "/app", label: "Dashboard", icon: Home },
-  { href: "/app/pilot", label: "First run", icon: ListChecks },
-  { href: "/app/templates", label: "Templates", icon: FileText },
-  { href: "/app/surveys/new", label: "New survey", icon: Plus },
-  { href: "/app/participants", label: "Participants", icon: Users },
-  { href: "/app/reports", label: "Reports", icon: BarChart3 },
-  { href: "/app/security", label: "Security", icon: LockKeyhole },
-  { href: "/app/billing", label: "Billing", icon: CreditCard },
-  { href: "/app/integrations", label: "Integrations", icon: Plug },
-  { href: "/app/readiness", label: "Go-live", icon: Rocket },
-  { href: "/app/brand", label: "Brand Studio", icon: Palette },
-  { href: "/viewer", label: "Viewer portal", icon: UserRoundCheck },
+  { href: "/app", label: "Home", helper: "Where to start", icon: Home },
+  { href: "/app/pilot", label: "First run", helper: "Your checklist", icon: ListChecks, featured: true },
+  { href: "/app/participants", label: "People", helper: "Upload employees", icon: Users },
+  { href: "/app/templates", label: "Templates", helper: "Question sets", icon: FileText },
+  { href: "/app/surveys/new", label: "Create survey", helper: "Issue tokens", icon: Plus },
+  { href: "/app/integrations", label: "Invites", helper: "Prepare sending", icon: Plug },
+  { href: "/app/reports", label: "Reports", helper: "Safe insights", icon: BarChart3 },
+  { href: "/app/readiness", label: "Go-live", helper: "Production checks", icon: Rocket },
+  { href: "/app/security", label: "Security", helper: "Confidentiality proof", icon: LockKeyhole },
+  { href: "/app/billing", label: "Billing", helper: "Payment setup", icon: CreditCard },
+  { href: "/app/brand", label: "Brand Studio", helper: "Client styling", icon: Palette },
+  { href: "/viewer", label: "Viewer portal", helper: "Manager view", icon: UserRoundCheck },
 ];
 
 export function AppShell({ children, title, subtitle }: { children: React.ReactNode; title: string; subtitle: string }) {
@@ -61,15 +62,31 @@ export function AppShell({ children, title, subtitle }: { children: React.ReactN
                   className={`flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold transition ${
                     active
                       ? "bg-[var(--brand-accent-soft)] text-[var(--brand-accent)]"
-                      : "text-[var(--brand-muted)] hover:bg-white"
+                      : item.featured
+                        ? "bg-[var(--brand-ink)] text-white hover:opacity-90"
+                        : "text-[var(--brand-muted)] hover:bg-white"
                   }`}
                 >
                   <item.icon size={17} />
-                  {item.label}
+                  <span className="min-w-0">
+                    <span className="block">{item.label}</span>
+                    <span className={`block truncate text-xs font-medium ${active || item.featured ? "opacity-75" : "text-[var(--brand-muted)]"}`}>
+                      {item.helper}
+                    </span>
+                  </span>
                 </Link>
               );
             })}
           </nav>
+
+          <div className="mt-6 rounded-[1.5rem] border border-[var(--brand-border)] bg-white p-4">
+            <p className="text-sm font-semibold">Lost?</p>
+            <p className="mt-1 text-xs leading-5 text-[var(--brand-muted)]">Use the first-run guide. It tells you the next click based on what is already done.</p>
+            <Link href="/app/pilot" className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-[var(--brand-accent)]">
+              Open guide
+              <ArrowRight size={14} />
+            </Link>
+          </div>
         </aside>
 
         <section className="rounded-[2rem] border border-white/80 bg-white/60 p-4 shadow-[0_35px_100px_rgba(22,22,22,0.12)] backdrop-blur-2xl">
@@ -82,8 +99,8 @@ export function AppShell({ children, title, subtitle }: { children: React.ReactN
               <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em]">{title}</h1>
               <p className="mt-2 text-sm leading-6 text-[var(--brand-muted)]">{subtitle}</p>
             </div>
-            <Link href="/app/surveys/new" className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--brand-ink)] px-5 text-sm font-semibold text-white">
-              New survey
+            <Link href="/app/pilot" className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--brand-ink)] px-5 text-sm font-semibold text-white">
+              First-run guide
             </Link>
           </header>
           <div className="pt-5">{children}</div>

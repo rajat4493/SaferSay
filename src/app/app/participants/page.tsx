@@ -2,6 +2,7 @@
 
 import { AppShell, Card } from "@/components/AppShell";
 import { EmployeeCsvImport } from "@/components/EmployeeCsvImport";
+import { PageGuide } from "@/components/PageGuide";
 import { useSurveyData } from "@/components/DataProvider";
 
 export default function ParticipantsPage() {
@@ -11,6 +12,12 @@ export default function ParticipantsPage() {
 
   return (
     <AppShell title="Participants" subtitle="Participation lives here. Answers do not.">
+      <PageGuide
+        label="Step 1"
+        title="Load the people who should receive the survey"
+        body="This page is only for employee identity and participation status. It can know who received a token and who used one, but it never stores answers."
+        actions={[{ href: "/app/surveys/new", label: "Next: create survey", primary: true }]}
+      />
       <div className="grid gap-4 lg:grid-cols-3">
         <Card><h2 className="text-3xl font-semibold">{data.identity.employees.length}</h2><p className="text-sm text-[var(--brand-muted)]">Employees loaded</p></Card>
         <Card><h2 className="text-3xl font-semibold">{issued}</h2><p className="text-sm text-[var(--brand-muted)]">Reminder targets</p></Card>

@@ -1,4 +1,5 @@
 import { AppShell, Card } from "@/components/AppShell";
+import { PageGuide } from "@/components/PageGuide";
 import { getRuntimeMode, runtimeChecks } from "@/lib/runtimeConfig";
 
 export default function ReadinessPage() {
@@ -7,6 +8,12 @@ export default function ReadinessPage() {
 
   return (
     <AppShell title="Go-live Readiness" subtitle="Security first: production mode should fail closed until required integrations are configured.">
+      <PageGuide
+        label="Technical setup"
+        title="Use this page before a real customer pilot"
+        body="This is the production checklist. It tells you which secrets, services, and safety checks are configured before SaferSay is used with a real company."
+        actions={[{ href: "/app/pilot", label: "Back to first run", primary: true }]}
+      />
       <div className="grid gap-4 lg:grid-cols-3">
         <Card>
           <h2 className="text-3xl font-semibold">{getRuntimeMode()}</h2>

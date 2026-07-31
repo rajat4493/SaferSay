@@ -1,10 +1,16 @@
 import Link from "next/link";
 import { AppShell, Card } from "@/components/AppShell";
+import { PageGuide } from "@/components/PageGuide";
 import { surveyTemplates } from "@/lib/templates";
 
 export default function TemplatesPage() {
   return (
     <AppShell title="Templates" subtitle="Credible question banks, ready to launch without survey-design expertise.">
+      <PageGuide
+        title="Use templates when HR does not want to design a survey from scratch"
+        body="Templates are the starting question sets. Preview one here, then create the actual survey cycle from the Create survey page."
+        actions={[{ href: "/app/surveys/new", label: "Create from template", primary: true }]}
+      />
       <div className="grid gap-4 md:grid-cols-2">
         {surveyTemplates.map((template) => (
           <Card key={template.slug}>
