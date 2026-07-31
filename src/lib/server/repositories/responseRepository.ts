@@ -126,10 +126,11 @@ export class ResponseRepository {
     const n = Number(countResult.rows[0]?.n ?? 0);
     if (n < minGroupSize) return { protected: true, n, rows: [] };
 
-    const result = await this.db.query<{ question_id: string; n: number; average: string | null }>(
-      `select r.question_id, r.n, r.average
+    const result = await this.db.query<{ question_id: string; question_text: string; n: number; average: string | null }>(
+      `select r.question_id, q.question_text, r.n, r.average
        from responses.report_question_scores($1, $2) r
        join responses.survey_cycles c on c.id = $1
+       join responses.template_questions q on q.id = r.question_id
        where c.tenant_id = $3
          and r.protected = false`,
       [cycleId, minGroupSize, tenantId],
@@ -139,9 +140,36 @@ export class ResponseRepository {
       n,
       rows: result.rows.map((row) => ({
         questionId: row.question_id,
+        label: row.question_text,
         n: row.n,
         average: row.average === null ? null : Number(row.average),
       })),
+    };
+  }
+
+  async getLatestCycleForTenant(tenantId: string) {
+    const result = await this.db.query<{ id: string; name: string; min_group_size: number }>(
+      `select id, name, min_group_size
+       from responses.survey_cycles
+       where tenant_id = $1
+       order by created_at desc
+       limit 1`,
+      [tenantId],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  async getLatestProtectedReportForTenant(tenantId: string) {
+    const cycle = await this.getLatestCycleForTenant(tenantId);
+    if (!cycle) {
+      return {
+        cycle: null,
+        report: { protected: true as const, n: 0, rows: [] },
+      };
+    }
+    return {
+      cycle: { id: cycle.id, name: cycle.name, minGroupSize: cycle.min_group_size },
+      report: await this.getProtectedReportForTenant(tenantId, cycle.id, cycle.min_group_size),
     };
   }
 }

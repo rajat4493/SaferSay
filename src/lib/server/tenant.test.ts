@@ -5,7 +5,7 @@ describe("tenant foundation", () => {
   it("requires admin report access to resolve a tenant context", () => {
     const reportRoute = readFileSync("src/app/api/report/route.ts", "utf8");
     expect(reportRoute).toContain("resolveTenantContext");
-    expect(reportRoute).toContain("getProtectedReportForTenant");
+    expect(reportRoute).toContain("getLatestProtectedReportForTenant");
   });
 
   it("adds a tenant bootstrap API and tenant database migration", () => {

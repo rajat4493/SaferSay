@@ -66,5 +66,5 @@ export type ProtectedReport =
   | {
       protected: false;
       n: number;
-      rows: Array<{ questionId: string; n: number; average: number | null }>;
+      rows: Array<{ questionId: string; label?: string; n: number; average: number | null }>;
     };
