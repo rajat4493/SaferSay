@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID } from "crypto";
 import { Pool } from "pg";
 import { hashServerToken } from "@/lib/server/tokenHashing";
-import { EmployeeImportRecord, IssuedParticipantToken, TenantRecord } from "./types";
+import { EmployeeImportRecord, InviteOutboxRow, InviteOutboxSummary, IssuedParticipantToken, TenantRecord } from "./types";
 
 export class IdentityRepository {
   constructor(private readonly db: Pool) {}
@@ -136,6 +136,145 @@ export class IdentityRepository {
       [cycleId],
     );
     return result.rows;
+  }
+
+  async getLatestCycleIdForTenant(tenantId: string) {
+    const result = await this.db.query<{ id: string }>(
+      `select cycle_id as id
+       from identity.survey_participants
+       where tenant_id = $1
+       order by issued_at desc
+       limit 1`,
+      [tenantId],
+    );
+    return result.rows[0]?.id ?? null;
+  }
+
+  async prepareInviteOutbox(tenantId: string, cycleId: string) {
+    const result = await this.db.query(
+      `insert into identity.invite_outbox (id, tenant_id, cycle_id, participant_id, delivery_type)
+       select (
+         substr(md5(p.id::text || ':invite'), 1, 8) || '-' ||
+         substr(md5(p.id::text || ':invite'), 9, 4) || '-4' ||
+         substr(md5(p.id::text || ':invite'), 14, 3) || '-8' ||
+         substr(md5(p.id::text || ':invite'), 18, 3) || '-' ||
+         substr(md5(p.id::text || ':invite'), 21, 12)
+       )::uuid, p.tenant_id, p.cycle_id, p.id, 'invite'
+       from identity.survey_participants p
+       where p.tenant_id = $1
+         and p.cycle_id = $2
+         and p.token_status = 'issued'
+       on conflict (participant_id, delivery_type) do nothing`,
+      [tenantId, cycleId],
+    );
+    return result.rowCount ?? 0;
+  }
+
+  async prepareReminderOutbox(tenantId: string, cycleId: string) {
+    const result = await this.db.query(
+      `insert into identity.invite_outbox (id, tenant_id, cycle_id, participant_id, delivery_type)
+       select (
+         substr(md5(p.id::text || ':reminder'), 1, 8) || '-' ||
+         substr(md5(p.id::text || ':reminder'), 9, 4) || '-4' ||
+         substr(md5(p.id::text || ':reminder'), 14, 3) || '-8' ||
+         substr(md5(p.id::text || ':reminder'), 18, 3) || '-' ||
+         substr(md5(p.id::text || ':reminder'), 21, 12)
+       )::uuid, p.tenant_id, p.cycle_id, p.id, 'reminder'
+       from identity.survey_participants p
+       where p.tenant_id = $1
+         and p.cycle_id = $2
+         and p.token_status = 'issued'
+         and p.reminder_count < 3
+       on conflict (participant_id, delivery_type) do nothing`,
+      [tenantId, cycleId],
+    );
+    return result.rowCount ?? 0;
+  }
+
+  async getInviteOutbox(tenantId: string, cycleId: string): Promise<{ summary: InviteOutboxSummary; rows: InviteOutboxRow[] }> {
+    const rowsResult = await this.db.query<{
+      id: string;
+      cycle_id: string;
+      delivery_type: "invite" | "reminder";
+      delivery_status: "pending" | "queued" | "sent" | "failed";
+      email: string;
+      name: string | null;
+      reminder_count: number;
+      token_status: "issued" | "spent" | "revoked";
+    }>(
+      `select o.id, o.cycle_id, o.delivery_type, o.delivery_status, e.email, e.name, p.reminder_count, p.token_status
+       from identity.invite_outbox o
+       join identity.survey_participants p on p.id = o.participant_id
+       join identity.employees e on e.id = p.employee_id
+       where o.tenant_id = $1 and o.cycle_id = $2
+       order by o.created_at desc
+       limit 50`,
+      [tenantId, cycleId],
+    );
+
+    const summaryResult = await this.db.query<{
+      pending_invites: string;
+      queued_invites: string;
+      sent_invites: string;
+      pending_reminders: string;
+      queued_reminders: string;
+      sent_reminders: string;
+    }>(
+      `select
+         count(*) filter (where delivery_type = 'invite' and delivery_status = 'pending')::text as pending_invites,
+         count(*) filter (where delivery_type = 'invite' and delivery_status = 'queued')::text as queued_invites,
+         count(*) filter (where delivery_type = 'invite' and delivery_status = 'sent')::text as sent_invites,
+         count(*) filter (where delivery_type = 'reminder' and delivery_status = 'pending')::text as pending_reminders,
+         count(*) filter (where delivery_type = 'reminder' and delivery_status = 'queued')::text as queued_reminders,
+         count(*) filter (where delivery_type = 'reminder' and delivery_status = 'sent')::text as sent_reminders
+       from identity.invite_outbox
+       where tenant_id = $1 and cycle_id = $2`,
+      [tenantId, cycleId],
+    );
+    const summaryRow = summaryResult.rows[0];
+    return {
+      summary: {
+        cycleId,
+        pendingInvites: Number(summaryRow?.pending_invites ?? 0),
+        queuedInvites: Number(summaryRow?.queued_invites ?? 0),
+        sentInvites: Number(summaryRow?.sent_invites ?? 0),
+        pendingReminders: Number(summaryRow?.pending_reminders ?? 0),
+        queuedReminders: Number(summaryRow?.queued_reminders ?? 0),
+        sentReminders: Number(summaryRow?.sent_reminders ?? 0),
+      },
+      rows: rowsResult.rows.map((row) => ({
+        id: row.id,
+        cycleId: row.cycle_id,
+        deliveryType: row.delivery_type,
+        deliveryStatus: row.delivery_status,
+        email: row.email,
+        name: row.name,
+        reminderCount: row.reminder_count,
+        tokenStatus: row.token_status,
+      })),
+    };
+  }
+
+  async markOutboxQueued(tenantId: string, cycleId: string, deliveryType: "invite" | "reminder") {
+    const result = await this.db.query<{ participant_id: string }>(
+      `update identity.invite_outbox
+       set delivery_status = 'queued', queued_at = now(), updated_at = now()
+       where tenant_id = $1
+         and cycle_id = $2
+         and delivery_type = $3
+         and delivery_status = 'pending'
+       returning participant_id`,
+      [tenantId, cycleId, deliveryType],
+    );
+    if (deliveryType === "reminder" && result.rowCount && result.rowCount > 0) {
+      await this.db.query(
+        `update identity.survey_participants p
+         set reminder_count = reminder_count + 1, last_reminded_at = now()
+         where p.id = any($1::uuid[])`,
+        [result.rows.map((row) => row.participant_id)],
+      );
+    }
+    return result.rowCount ?? 0;
   }
 }
 

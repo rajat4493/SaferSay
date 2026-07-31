@@ -18,6 +18,27 @@ export type IssuedParticipantToken = {
   rawToken: string;
 };
 
+export type InviteOutboxSummary = {
+  cycleId: string;
+  pendingInvites: number;
+  queuedInvites: number;
+  sentInvites: number;
+  pendingReminders: number;
+  queuedReminders: number;
+  sentReminders: number;
+};
+
+export type InviteOutboxRow = {
+  id: string;
+  cycleId: string;
+  deliveryType: "invite" | "reminder";
+  deliveryStatus: "pending" | "queued" | "sent" | "failed";
+  email: string;
+  name: string | null;
+  reminderCount: number;
+  tokenStatus: "issued" | "spent" | "revoked";
+};
+
 export type ResponseAnswerInput = {
   questionId: string;
   numberValue?: number;

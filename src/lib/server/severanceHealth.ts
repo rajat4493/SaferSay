@@ -42,6 +42,7 @@ const rlsTables = [
   ["identity", "users"],
   ["identity", "employees"],
   ["identity", "survey_participants"],
+  ["identity", "invite_outbox"],
   ["identity", "billing_accounts"],
   ["identity", "cycle_payments"],
   ["identity", "tenant_settings"],

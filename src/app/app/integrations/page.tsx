@@ -1,4 +1,5 @@
 import { AppShell, Card } from "@/components/AppShell";
+import { InviteOutboxPanel } from "@/components/InviteOutboxPanel";
 import { ServerOpsPanel } from "@/components/ServerOpsPanel";
 
 const integrations = [
@@ -58,6 +59,7 @@ export default function IntegrationsPage() {
           </Card>
         ))}
       </div>
+      <InviteOutboxPanel />
       <ServerOpsPanel />
     </AppShell>
   );
