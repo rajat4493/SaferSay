@@ -1,6 +1,7 @@
 export type TenantRecord = {
   id: string;
   name: string;
+  slug: string;
 };
 
 export type EmployeeImportRecord = {

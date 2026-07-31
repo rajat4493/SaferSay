@@ -6,10 +6,45 @@ import { EmployeeImportRecord, IssuedParticipantToken, TenantRecord } from "./ty
 export class IdentityRepository {
   constructor(private readonly db: Pool) {}
 
-  async createTenant(name: string): Promise<TenantRecord> {
+  async createTenant(name: string, slug = toTenantSlug(name)): Promise<TenantRecord> {
     const id = randomUUID();
-    await this.db.query("insert into identity.tenants (id, name) values ($1, $2)", [id, name]);
-    return { id, name };
+    const result = await this.db.query<{ id: string; name: string; slug: string }>(
+      `insert into identity.tenants (id, name, slug)
+       values ($1, $2, $3)
+       on conflict (slug) do update set updated_at = now()
+       returning id, name, slug`,
+      [id, name, slug],
+    );
+    const tenant = result.rows[0];
+    await this.db.query(
+      `insert into identity.tenant_settings (tenant_id)
+       values ($1)
+       on conflict (tenant_id) do nothing`,
+      [tenant.id],
+    );
+    return tenant;
+  }
+
+  async findTenantById(id: string): Promise<TenantRecord | null> {
+    const result = await this.db.query<{ id: string; name: string; slug: string }>(
+      "select id, name, slug from identity.tenants where id = $1",
+      [id],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  async findTenantBySlug(slug: string): Promise<TenantRecord | null> {
+    const result = await this.db.query<{ id: string; name: string; slug: string }>(
+      "select id, name, slug from identity.tenants where slug = $1",
+      [slug],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  async getOrCreateTenant(name: string, slug = toTenantSlug(name)): Promise<TenantRecord> {
+    const existing = await this.findTenantBySlug(slug);
+    if (existing) return existing;
+    return this.createTenant(name, slug);
   }
 
   async importEmployees(tenantId: string, employees: EmployeeImportRecord[]) {
@@ -91,4 +126,13 @@ export class IdentityRepository {
     );
     return result.rows;
   }
+}
+
+export function toTenantSlug(value: string) {
+  const slug = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || "tenant";
 }

@@ -69,4 +69,31 @@ export class ResponseRepository {
       })),
     };
   }
+
+  async getProtectedReportForTenant(tenantId: string, cycleId: string, minGroupSize = 5): Promise<ProtectedReport> {
+    const countResult = await this.db.query<{ n: string }>(
+      "select count(*)::text as n from responses.submissions where tenant_id = $1 and cycle_id = $2",
+      [tenantId, cycleId],
+    );
+    const n = Number(countResult.rows[0]?.n ?? 0);
+    if (n < minGroupSize) return { protected: true, n, rows: [] };
+
+    const result = await this.db.query<{ question_id: string; n: number; average: string | null }>(
+      `select r.question_id, r.n, r.average
+       from responses.report_question_scores($1, $2) r
+       join responses.survey_cycles c on c.id = $1
+       where c.tenant_id = $3
+         and r.protected = false`,
+      [cycleId, minGroupSize, tenantId],
+    );
+    return {
+      protected: false,
+      n,
+      rows: result.rows.map((row) => ({
+        questionId: row.question_id,
+        n: row.n,
+        average: row.average === null ? null : Number(row.average),
+      })),
+    };
+  }
 }
