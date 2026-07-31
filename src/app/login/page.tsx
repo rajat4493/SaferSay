@@ -1,8 +1,9 @@
 "use client";
 
-import Link from "next/link";
+import { Suspense } from "react";
 import { BrandMark } from "@/components/BrandMark";
 import { useBrand } from "@/components/BrandProvider";
+import { AdminAccessForm } from "@/components/AdminAccessForm";
 
 export default function LoginPage() {
   const { brand } = useBrand();
@@ -13,9 +14,11 @@ export default function LoginPage() {
           <BrandMark />
           <div><h1 className="text-xl font-semibold">{brand.name}</h1><p className="text-sm text-[var(--brand-muted)]">Sign in to launch a survey</p></div>
         </div>
-        <div className="mt-8 grid gap-3">
-          <Link href="/app" className="rounded-full bg-[var(--brand-ink)] px-5 py-3 text-center text-sm font-semibold text-white">Continue with Google</Link>
-          <Link href="/app" className="rounded-full border border-[var(--brand-border)] bg-white px-5 py-3 text-center text-sm font-semibold">Continue with Microsoft</Link>
+        <Suspense fallback={<div className="mt-8 h-28 rounded-3xl bg-[var(--brand-bg)]" />}>
+          <AdminAccessForm />
+        </Suspense>
+        <div className="mt-5 rounded-3xl border border-[var(--brand-border)] bg-[var(--brand-bg)] p-4 text-sm leading-6 text-[var(--brand-muted)]">
+          Google and Microsoft login are next. This access gate protects admin pages while those providers are being wired.
         </div>
       </section>
     </main>

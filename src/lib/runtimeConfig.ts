@@ -19,6 +19,7 @@ export function runtimeChecks(): RuntimeCheck[] {
       process.env.TOKEN_SECRET !== "local-development-token-secret" &&
       process.env.TOKEN_SECRET.length >= 32,
   );
+  const adminAccessConfigured = Boolean(process.env.ADMIN_ACCESS_SECRET && process.env.ADMIN_ACCESS_SECRET.length >= 32);
 
   return [
     {
@@ -41,6 +42,13 @@ export function runtimeChecks(): RuntimeCheck[] {
       configured: Boolean(process.env.AUTH_SECRET),
       requiredForProduction: true,
       purpose: "Secure session signing.",
+    },
+    {
+      key: "ADMIN_ACCESS_SECRET",
+      label: "Temporary admin gate",
+      configured: adminAccessConfigured,
+      requiredForProduction: true,
+      purpose: "Protects admin and viewer pages until SSO is wired.",
     },
     {
       key: "GOOGLE_CLIENT_ID",
