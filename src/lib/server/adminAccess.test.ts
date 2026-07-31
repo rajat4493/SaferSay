@@ -23,4 +23,10 @@ describe("temporary admin access gate", () => {
     expect(adminLayout).toContain("requireAdminAccess");
     expect(viewerLayout).toContain("requireAdminAccess");
   });
+
+  it("protects the employee import API with the admin access cookie", () => {
+    const route = readFileSync("src/app/api/employees/import/route.ts", "utf8");
+    expect(route).toContain("verifyAdminAccessToken");
+    expect(route).toContain("Unauthorized employee import.");
+  });
 });

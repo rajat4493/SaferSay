@@ -1,6 +1,7 @@
 "use client";
 
 import { AppShell, Card } from "@/components/AppShell";
+import { EmployeeCsvImport } from "@/components/EmployeeCsvImport";
 import { useSurveyData } from "@/components/DataProvider";
 
 export default function ParticipantsPage() {
@@ -15,6 +16,7 @@ export default function ParticipantsPage() {
         <Card><h2 className="text-3xl font-semibold">{issued}</h2><p className="text-sm text-[var(--brand-muted)]">Reminder targets</p></Card>
         <Card><h2 className="text-3xl font-semibold">{spent}</h2><p className="text-sm text-[var(--brand-muted)]">Submitted tokens</p></Card>
       </div>
+      <EmployeeCsvImport />
       <Card className="mt-4">
         <h2 className="text-xl font-semibold">Identity/participation store</h2>
         <p className="mt-2 text-sm text-[var(--brand-muted)]">This table can know who has participated. It never contains answer content.</p>
