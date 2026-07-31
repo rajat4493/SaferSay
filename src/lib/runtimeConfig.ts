@@ -13,6 +13,13 @@ export function getRuntimeMode(): RuntimeMode {
 }
 
 export function runtimeChecks(): RuntimeCheck[] {
+  const tokenSecretConfigured = Boolean(
+    process.env.TOKEN_SECRET &&
+      process.env.TOKEN_SECRET !== "replace-with-a-long-random-secret" &&
+      process.env.TOKEN_SECRET !== "local-development-token-secret" &&
+      process.env.TOKEN_SECRET.length >= 32,
+  );
+
   return [
     {
       key: "DATABASE_URL",
@@ -52,7 +59,7 @@ export function runtimeChecks(): RuntimeCheck[] {
     {
       key: "TOKEN_SECRET",
       label: "Token signing secret",
-      configured: Boolean(process.env.TOKEN_SECRET && process.env.TOKEN_SECRET !== "replace-with-a-long-random-secret"),
+      configured: tokenSecretConfigured,
       requiredForProduction: true,
       purpose: "Server-issued respondent token hashing.",
     },

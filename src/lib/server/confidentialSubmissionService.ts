@@ -1,5 +1,5 @@
 import { Pool } from "pg";
-import { hashServerToken } from "@/lib/serverStore";
+import { hashServerToken } from "@/lib/server/tokenHashing";
 import { IdentityRepository } from "./repositories/identityRepository";
 import { ResponseRepository } from "./repositories/responseRepository";
 import { ResponseAnswerInput } from "./repositories/types";

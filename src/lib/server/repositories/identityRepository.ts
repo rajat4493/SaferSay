@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from "crypto";
 import { Pool } from "pg";
-import { hashServerToken } from "@/lib/serverStore";
+import { hashServerToken } from "@/lib/server/tokenHashing";
 import { EmployeeImportRecord, IssuedParticipantToken, TenantRecord } from "./types";
 
 export class IdentityRepository {

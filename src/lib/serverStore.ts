@@ -1,8 +1,8 @@
-import { createHash, randomBytes, randomUUID } from "crypto";
+import { randomBytes, randomUUID } from "crypto";
 import { Pool } from "pg";
+import { hashServerToken } from "./server/tokenHashing";
 
 export const SERVER_MIN_GROUP_SIZE = 5;
-const TOKEN_SECRET = process.env.TOKEN_SECRET ?? "local-development-token-secret";
 
 export type ServerEmployee = {
   id: string;
@@ -80,10 +80,6 @@ function getPool() {
   if (!process.env.DATABASE_URL) return null;
   pool ??= new Pool({ connectionString: process.env.DATABASE_URL });
   return pool;
-}
-
-export function hashServerToken(rawToken: string) {
-  return createHash("sha256").update(`${TOKEN_SECRET}:${rawToken}`).digest("hex");
 }
 
 export function getDefaultCycle() {
