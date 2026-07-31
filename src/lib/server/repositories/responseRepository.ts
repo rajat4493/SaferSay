@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { Pool } from "pg";
-import { ResponseAnswerInput, ProtectedReport } from "./types";
+import { ResponseAnswerInput, ProtectedReport, RespondentSurveySession } from "./types";
 
 export class ResponseRepository {
   constructor(private readonly db: Pool) {}
@@ -43,6 +43,54 @@ export class ResponseRepository {
       );
     }
     return { submissionId };
+  }
+
+  async getRespondentSurveySession(cycleId: string): Promise<RespondentSurveySession | null> {
+    const cycleResult = await this.db.query<{
+      cycle_id: string;
+      cycle_name: string;
+      template_name: string;
+    }>(
+      `select c.id as cycle_id, c.name as cycle_name, t.name as template_name
+       from responses.survey_cycles c
+       join responses.survey_templates t on t.id = c.template_id
+       where c.id = $1
+       limit 1`,
+      [cycleId],
+    );
+    const cycle = cycleResult.rows[0];
+    if (!cycle) return null;
+
+    const questions = await this.db.query<{
+      id: string;
+      position: number;
+      question_text: string;
+      question_type: "likert_5" | "enps_0_10" | "open_text";
+      construct: string | null;
+      is_optional: boolean;
+    }>(
+      `select id, position, question_text, question_type, construct, is_optional
+       from responses.template_questions
+       where template_id = (
+         select template_id from responses.survey_cycles where id = $1
+       )
+       order by position`,
+      [cycleId],
+    );
+
+    return {
+      cycleId: cycle.cycle_id,
+      cycleName: cycle.cycle_name,
+      templateName: cycle.template_name,
+      questions: questions.rows.map((question) => ({
+        id: question.id,
+        position: question.position,
+        text: question.question_text,
+        type: question.question_type,
+        construct: question.construct,
+        optional: question.is_optional,
+      })),
+    };
   }
 
   async getProtectedReport(cycleId: string, minGroupSize = 5): Promise<ProtectedReport> {

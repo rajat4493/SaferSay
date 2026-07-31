@@ -113,6 +113,22 @@ export class IdentityRepository {
     return result.rows[0] ?? null;
   }
 
+  async findIssuedTokenForRespondentSession(tokenHash: string) {
+    const result = await this.db.query<{
+      tenant_id: string;
+      cycle_id: string;
+      token_status: "issued" | "spent" | "revoked";
+    }>(
+      `select tenant_id, cycle_id, token_status
+       from identity.survey_participants
+       where token_hash = $1`,
+      [tokenHash],
+    );
+    const participant = result.rows[0];
+    if (!participant || participant.token_status !== "issued") return null;
+    return participant;
+  }
+
   async markTokenSpent(tokenHash: string) {
     const result = await this.db.query(
       `update identity.survey_participants

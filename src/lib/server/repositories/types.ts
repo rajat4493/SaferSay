@@ -45,6 +45,22 @@ export type ResponseAnswerInput = {
   textValue?: string;
 };
 
+export type RespondentSurveyQuestion = {
+  id: string;
+  position: number;
+  text: string;
+  type: "likert_5" | "enps_0_10" | "open_text";
+  construct: string | null;
+  optional: boolean;
+};
+
+export type RespondentSurveySession = {
+  cycleId: string;
+  cycleName: string;
+  templateName: string;
+  questions: RespondentSurveyQuestion[];
+};
+
 export type ProtectedReport =
   | { protected: true; n: number; rows: [] }
   | {
