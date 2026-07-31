@@ -26,4 +26,15 @@ describe("invite outbox foundation", () => {
     expect(outboxRoute).toContain("Unauthorized invite outbox access.");
     expect(queueRoute).toContain("Unauthorized invite queue access.");
   });
+
+  it("sends Resend delivery only from queued identity outbox rows", () => {
+    const queueRoute = readFileSync("src/app/api/invites/queue/route.ts", "utf8");
+    const delivery = readFileSync("src/lib/server/resendDelivery.ts", "utf8");
+    expect(queueRoute).toContain("getQueuedOutboxDeliveries");
+    expect(queueRoute).toContain("sendQueuedInviteDeliveries");
+    expect(queueRoute).toContain("markOutboxSent");
+    expect(delivery).toContain("onboarding@resend.dev");
+    expect(delivery).not.toContain("responses.answers");
+    expect(delivery).not.toContain("responses.submissions");
+  });
 });

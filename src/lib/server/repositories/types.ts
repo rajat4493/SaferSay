@@ -39,6 +39,10 @@ export type InviteOutboxRow = {
   tokenStatus: "issued" | "spent" | "revoked";
 };
 
+export type QueuedInviteDelivery = InviteOutboxRow & {
+  outboxId: string;
+};
+
 export type PilotIdentitySummary = {
   employees: number;
   participants: number;

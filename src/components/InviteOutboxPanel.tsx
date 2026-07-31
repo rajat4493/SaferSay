@@ -11,6 +11,7 @@ type OutboxResult = {
   invitesPrepared?: number;
   remindersPrepared?: number;
   queued?: number;
+  delivery?: { sent: number; failed: number; errors: string[] };
   summary?: {
     pendingInvites: number;
     queuedInvites: number;
@@ -57,7 +58,7 @@ export function InviteOutboxPanel() {
           </div>
           <h2 className="mt-3 text-xl font-semibold">Invite outbox</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--brand-muted)]">
-            Prepares invitation and reminder work from participant tokens only. Email sending stays parked until Resend is connected.
+            Prepares invitation and reminder work from participant tokens only. Test-mode sending uses Resend and updates this identity-side outbox.
           </p>
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
@@ -74,11 +75,21 @@ export function InviteOutboxPanel() {
             <Send size={14} />
             Queue invites
           </button>
+          <button onClick={() => call("/api/invites/queue", { deliveryType: "invite", sendNow: true }, "Sending")} className="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--brand-ink)] px-4 py-2 text-sm font-semibold text-white sm:col-span-2">
+            <Send size={14} />
+            Send test invites
+          </button>
         </div>
       </div>
 
       {loading ? <p className="mt-4 text-sm font-semibold text-[var(--brand-muted)]">{loading}...</p> : null}
       {result?.error ? <p className="mt-4 text-sm font-semibold text-[#9a392d]">{result.error}</p> : null}
+      {result?.delivery ? (
+        <p className="mt-4 rounded-2xl bg-[var(--brand-bg)] p-3 text-sm font-semibold text-[var(--brand-muted)]">
+          Resend test delivery: {result.delivery.sent} sent, {result.delivery.failed} failed.
+          {result.delivery.errors.length > 0 ? ` ${result.delivery.errors[0]}` : ""}
+        </p>
+      ) : null}
 
       {summary ? (
         <div className="mt-5 grid gap-3 md:grid-cols-3">

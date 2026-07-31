@@ -19,8 +19,8 @@ const integrations = [
   {
     name: "Resend",
     type: "Email delivery",
-    status: "Planned",
-    text: "Send invitations and reminders from the participation store only.",
+    status: "Test mode",
+    text: "Send invitations and reminders from the participation store only. Verified-domain sending comes after domain DNS setup.",
   },
   {
     name: "Stripe",
@@ -48,7 +48,7 @@ export default function IntegrationsPage() {
       <PageGuide
         label="Step 3"
         title="Prepare invitations without touching survey answers"
-        body="For the first usable version, this page shows the invite queue. Real email delivery is still parked until Resend details are provided, but the queue already lives in the identity side only."
+        body="For the first usable version, this page shows the invite queue and can send Resend test-mode emails. The queue lives in the identity side only."
         actions={[
           { href: "/app/surveys/new", label: "Back: survey" },
           { href: "/app/reports", label: "Next: reports", primary: true },

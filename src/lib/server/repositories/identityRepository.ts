@@ -1,7 +1,15 @@
 import { randomBytes, randomUUID } from "crypto";
 import { Pool } from "pg";
 import { hashServerToken } from "@/lib/server/tokenHashing";
-import { EmployeeImportRecord, InviteOutboxRow, InviteOutboxSummary, IssuedParticipantToken, PilotIdentitySummary, TenantRecord } from "./types";
+import {
+  EmployeeImportRecord,
+  InviteOutboxRow,
+  InviteOutboxSummary,
+  IssuedParticipantToken,
+  PilotIdentitySummary,
+  QueuedInviteDelivery,
+  TenantRecord,
+} from "./types";
 
 export class IdentityRepository {
   constructor(private readonly db: Pool) {}
@@ -291,6 +299,62 @@ export class IdentityRepository {
       );
     }
     return result.rowCount ?? 0;
+  }
+
+  async getQueuedOutboxDeliveries(tenantId: string, cycleId: string, deliveryType: "invite" | "reminder", limit = 25): Promise<QueuedInviteDelivery[]> {
+    const result = await this.db.query<{
+      id: string;
+      cycle_id: string;
+      delivery_type: "invite" | "reminder";
+      delivery_status: "pending" | "queued" | "sent" | "failed";
+      email: string;
+      name: string | null;
+      reminder_count: number;
+      token_status: "issued" | "spent" | "revoked";
+    }>(
+      `select o.id, o.cycle_id, o.delivery_type, o.delivery_status, e.email, e.name, p.reminder_count, p.token_status
+       from identity.invite_outbox o
+       join identity.survey_participants p on p.id = o.participant_id
+       join identity.employees e on e.id = p.employee_id
+       where o.tenant_id = $1
+         and o.cycle_id = $2
+         and o.delivery_type = $3
+         and o.delivery_status = 'queued'
+         and p.token_status = 'issued'
+       order by o.queued_at asc nulls last, o.created_at asc
+       limit $4`,
+      [tenantId, cycleId, deliveryType, limit],
+    );
+
+    return result.rows.map((row) => ({
+      id: row.id,
+      outboxId: row.id,
+      cycleId: row.cycle_id,
+      deliveryType: row.delivery_type,
+      deliveryStatus: row.delivery_status,
+      email: row.email,
+      name: row.name,
+      reminderCount: row.reminder_count,
+      tokenStatus: row.token_status,
+    }));
+  }
+
+  async markOutboxSent(outboxId: string) {
+    await this.db.query(
+      `update identity.invite_outbox
+       set delivery_status = 'sent', sent_at = now(), updated_at = now()
+       where id = $1`,
+      [outboxId],
+    );
+  }
+
+  async markOutboxFailed(outboxId: string) {
+    await this.db.query(
+      `update identity.invite_outbox
+       set delivery_status = 'failed', updated_at = now()
+       where id = $1`,
+      [outboxId],
+    );
   }
 
   async getPilotIdentitySummary(tenantId: string, cycleId: string | null): Promise<PilotIdentitySummary> {
