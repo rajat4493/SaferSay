@@ -21,15 +21,15 @@ export function ServerOpsPanel() {
     <Card className="mt-5">
       <h2 className="text-xl font-semibold">Server-side validation flow</h2>
       <p className="mt-2 text-sm leading-6 text-[var(--brand-muted)]">
-        These actions use server APIs, not browser-local demo state. Without external keys,
-        payment and email run in safe mock mode.
+        These actions use server APIs, not browser-local demo state. Email delivery is intentionally parked;
+        invite work is prepared and queued in the identity-side outbox.
       </p>
       <div className="mt-4 grid gap-2 sm:grid-cols-3">
         <Action label="Seed participants" onClick={() => callApi("/api/cycles/seed")} />
         <Action label="Mock payment" onClick={() => callApi("/api/cycles/pay", { mockSuccess: true })} />
         <Action label="Launch paid cycle" onClick={() => callApi("/api/cycles/launch")} />
-        <Action label="Send invites" onClick={() => callApi("/api/emails/invites")} />
-        <Action label="Send reminders" onClick={() => callApi("/api/emails/reminders")} />
+        <Action label="Prepare invites" onClick={() => callApi("/api/invites/outbox", {})} />
+        <Action label="Queue invites" onClick={() => callApi("/api/invites/queue", { deliveryType: "invite" })} />
         <Action label="Read report" onClick={() => callApi("/api/report")} />
       </div>
       {result && (
