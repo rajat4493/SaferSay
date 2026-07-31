@@ -16,4 +16,11 @@ describe("temporary admin access gate", () => {
     expect(route).toContain('sameSite: "lax"');
     expect(route).toContain("ADMIN_ACCESS_SECRET");
   });
+
+  it("adds route-level guards around admin and viewer app trees", () => {
+    const adminLayout = readFileSync("src/app/app/layout.tsx", "utf8");
+    const viewerLayout = readFileSync("src/app/viewer/layout.tsx", "utf8");
+    expect(adminLayout).toContain("requireAdminAccess");
+    expect(viewerLayout).toContain("requireAdminAccess");
+  });
 });
