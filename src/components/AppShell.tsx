@@ -8,6 +8,7 @@ import {
   Plug,
   LockKeyhole,
   Palette,
+  ListChecks,
   Plus,
   Rocket,
   ShieldCheck,
@@ -21,6 +22,7 @@ import { useBrand } from "@/components/BrandProvider";
 
 const nav = [
   { href: "/app", label: "Dashboard", icon: Home },
+  { href: "/app/pilot", label: "First run", icon: ListChecks },
   { href: "/app/templates", label: "Templates", icon: FileText },
   { href: "/app/surveys/new", label: "New survey", icon: Plus },
   { href: "/app/participants", label: "Participants", icon: Users },

@@ -39,6 +39,16 @@ export type InviteOutboxRow = {
   tokenStatus: "issued" | "spent" | "revoked";
 };
 
+export type PilotIdentitySummary = {
+  employees: number;
+  participants: number;
+  issuedTokens: number;
+  spentTokens: number;
+  pendingInvites: number;
+  queuedInvites: number;
+  sentInvites: number;
+};
+
 export type ResponseAnswerInput = {
   questionId: string;
   numberValue?: number;

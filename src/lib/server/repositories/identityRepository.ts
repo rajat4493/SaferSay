@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID } from "crypto";
 import { Pool } from "pg";
 import { hashServerToken } from "@/lib/server/tokenHashing";
-import { EmployeeImportRecord, InviteOutboxRow, InviteOutboxSummary, IssuedParticipantToken, TenantRecord } from "./types";
+import { EmployeeImportRecord, InviteOutboxRow, InviteOutboxSummary, IssuedParticipantToken, PilotIdentitySummary, TenantRecord } from "./types";
 
 export class IdentityRepository {
   constructor(private readonly db: Pool) {}
@@ -291,6 +291,64 @@ export class IdentityRepository {
       );
     }
     return result.rowCount ?? 0;
+  }
+
+  async getPilotIdentitySummary(tenantId: string, cycleId: string | null): Promise<PilotIdentitySummary> {
+    const employeeResult = await this.db.query<{ count: string }>(
+      "select count(*)::text from identity.employees where tenant_id = $1 and employment_status = 'active'",
+      [tenantId],
+    );
+
+    if (!cycleId) {
+      return {
+        employees: Number(employeeResult.rows[0]?.count ?? 0),
+        participants: 0,
+        issuedTokens: 0,
+        spentTokens: 0,
+        pendingInvites: 0,
+        queuedInvites: 0,
+        sentInvites: 0,
+      };
+    }
+
+    const tokenResult = await this.db.query<{
+      participants: string;
+      issued_tokens: string;
+      spent_tokens: string;
+    }>(
+      `select
+         count(*)::text as participants,
+         count(*) filter (where token_status = 'issued')::text as issued_tokens,
+         count(*) filter (where token_status = 'spent')::text as spent_tokens
+       from identity.survey_participants
+       where tenant_id = $1 and cycle_id = $2`,
+      [tenantId, cycleId],
+    );
+    const outboxResult = await this.db.query<{
+      pending_invites: string;
+      queued_invites: string;
+      sent_invites: string;
+    }>(
+      `select
+         count(*) filter (where delivery_type = 'invite' and delivery_status = 'pending')::text as pending_invites,
+         count(*) filter (where delivery_type = 'invite' and delivery_status = 'queued')::text as queued_invites,
+         count(*) filter (where delivery_type = 'invite' and delivery_status = 'sent')::text as sent_invites
+       from identity.invite_outbox
+       where tenant_id = $1 and cycle_id = $2`,
+      [tenantId, cycleId],
+    );
+    const tokenRow = tokenResult.rows[0];
+    const outboxRow = outboxResult.rows[0];
+
+    return {
+      employees: Number(employeeResult.rows[0]?.count ?? 0),
+      participants: Number(tokenRow?.participants ?? 0),
+      issuedTokens: Number(tokenRow?.issued_tokens ?? 0),
+      spentTokens: Number(tokenRow?.spent_tokens ?? 0),
+      pendingInvites: Number(outboxRow?.pending_invites ?? 0),
+      queuedInvites: Number(outboxRow?.queued_invites ?? 0),
+      sentInvites: Number(outboxRow?.sent_invites ?? 0),
+    };
   }
 }
 
