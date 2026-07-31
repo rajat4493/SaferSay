@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { AppShell, Card } from "@/components/AppShell";
+import { CreateSurveyCycle } from "@/components/CreateSurveyCycle";
 import { ProductDemo } from "@/components/ProductDemo";
 import { surveyTemplates } from "@/lib/templates";
 
@@ -39,6 +40,7 @@ export default function NewSurveyPage() {
           </div>
         </Card>
       </div>
+      <CreateSurveyCycle templateSlug={template.slug} />
       <div className="mt-5">
         <ProductDemo />
       </div>

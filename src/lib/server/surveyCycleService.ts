@@ -1,0 +1,85 @@
+import { createHash, randomUUID } from "crypto";
+import type { Pool } from "pg";
+import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
+import { surveyTemplates, type SurveyTemplate } from "@/lib/templates";
+
+export async function createTenantSurveyCycle(params: {
+  db: Pool;
+  tenantId: string;
+  tenantName: string;
+  templateSlug: string;
+  cycleName?: string;
+}) {
+  const template = surveyTemplates.find((item) => item.slug === params.templateSlug);
+  if (!template) throw new Error("Template was not found.");
+
+  const identity = new IdentityRepository(params.db);
+  const employeeCount = await identity.countActiveEmployees(params.tenantId);
+  if (employeeCount < 1) throw new Error("Upload employees before creating a survey cycle.");
+
+  const templateId = await upsertTemplate(params.db, template);
+  const cycleId = randomUUID();
+  await params.db.query(
+    `insert into responses.survey_cycles
+      (id, tenant_id, template_id, name, status, payment_status)
+     values ($1, $2, $3, $4, 'draft', 'free_preview')`,
+    [cycleId, params.tenantId, templateId, params.cycleName?.trim() || `${params.tenantName} ${template.name}`],
+  );
+
+  const tokens = await identity.issueTokens(params.tenantId, cycleId);
+
+  return {
+    cycleId,
+    template: { slug: template.slug, name: template.name },
+    employees: employeeCount,
+    tokensIssued: tokens.length,
+  };
+}
+
+async function upsertTemplate(db: Pool, template: SurveyTemplate) {
+  const templateId = stableUuidFromSlug(`template:${template.slug}`);
+  await db.query(
+    `insert into responses.survey_templates (id, slug, name, description, category, estimated_minutes)
+     values ($1, $2, $3, $4, $5, $6)
+     on conflict (slug) do update
+     set name = excluded.name,
+         description = excluded.description,
+         category = excluded.category,
+         estimated_minutes = excluded.estimated_minutes`,
+    [templateId, template.slug, template.name, template.description, template.category, estimateMinutes(template.duration)],
+  );
+
+  for (const [index, question] of template.questions.entries()) {
+    await db.query(
+      `insert into responses.template_questions
+        (id, template_id, position, question_text, question_type, construct, is_optional)
+       values ($1, $2, $3, $4, $5, $6, $7)
+       on conflict (template_id, position) do update
+       set question_text = excluded.question_text,
+           question_type = excluded.question_type,
+           construct = excluded.construct,
+           is_optional = excluded.is_optional`,
+      [
+        stableUuidFromSlug(`question:${template.slug}:${question.id}`),
+        templateId,
+        index + 1,
+        question.text,
+        question.type,
+        question.construct,
+        Boolean(question.optional),
+      ],
+    );
+  }
+
+  return templateId;
+}
+
+function estimateMinutes(duration: string) {
+  const match = duration.match(/(\d+)\s+minutes?/i);
+  return match ? Number(match[1]) : 5;
+}
+
+function stableUuidFromSlug(value: string) {
+  const hex = createHash("sha256").update(value).digest("hex").slice(0, 32);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}

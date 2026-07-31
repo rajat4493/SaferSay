@@ -64,6 +64,14 @@ export class IdentityRepository {
     return imported.length;
   }
 
+  async countActiveEmployees(tenantId: string) {
+    const result = await this.db.query<{ count: string }>(
+      "select count(*)::text from identity.employees where tenant_id = $1 and employment_status = 'active'",
+      [tenantId],
+    );
+    return Number(result.rows[0]?.count ?? 0);
+  }
+
   async issueTokens(tenantId: string, cycleId: string): Promise<IssuedParticipantToken[]> {
     const employees = await this.db.query<{
       id: string;
@@ -76,14 +84,17 @@ export class IdentityRepository {
     const issued: IssuedParticipantToken[] = [];
     for (const employee of employees.rows) {
       const rawToken = randomBytes(32).toString("base64url");
-      await this.db.query(
+      const result = await this.db.query(
         `insert into identity.survey_participants
           (id, tenant_id, cycle_id, employee_id, token_hash, token_status, issued_at)
          values ($1, $2, $3, $4, $5, 'issued', now())
-         on conflict (token_hash) do nothing`,
+         on conflict (cycle_id, employee_id) do nothing
+         returning id`,
         [randomUUID(), tenantId, cycleId, employee.id, hashServerToken(rawToken)],
       );
-      issued.push({ employeeId: employee.id, email: employee.email, name: employee.name ?? undefined, rawToken });
+      if (result.rowCount === 1) {
+        issued.push({ employeeId: employee.id, email: employee.email, name: employee.name ?? undefined, rawToken });
+      }
     }
     return issued;
   }
