@@ -19,7 +19,7 @@ export function CreateSurveyCycle({ templateSlug }: { templateSlug: string }) {
       body: JSON.stringify({ templateSlug, cycleName }),
     });
     const result = (await response.json().catch(() => ({}))) as {
-      cycle?: { cycleId: string; employees: number; tokensIssued: number };
+      cycle?: { cycleId: string; employees: number; tokensIssued: number; invitesPrepared?: number };
       error?: string;
     };
     setSubmitting(false);
@@ -30,7 +30,7 @@ export function CreateSurveyCycle({ templateSlug }: { templateSlug: string }) {
     }
 
     setStatus(
-      `Draft cycle created. ${result.cycle.tokensIssued} secure respondent tokens issued for ${result.cycle.employees} employees.`,
+      `Draft cycle created. ${result.cycle.tokensIssued} secure respondent tokens issued and ${result.cycle.invitesPrepared ?? 0} delivery-safe invite links prepared.`,
     );
   }
 

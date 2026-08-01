@@ -92,7 +92,7 @@ export class IdentityRepository {
     const issued: IssuedParticipantToken[] = [];
     for (const employee of employees.rows) {
       const rawToken = randomBytes(32).toString("base64url");
-      const result = await this.db.query(
+      const result = await this.db.query<{ id: string }>(
         `insert into identity.survey_participants
           (id, tenant_id, cycle_id, employee_id, token_hash, token_status, issued_at)
          values ($1, $2, $3, $4, $5, 'issued', now())
@@ -105,6 +105,32 @@ export class IdentityRepository {
       }
     }
     return issued;
+  }
+
+  async createInviteOutboxForIssuedTokens(tenantId: string, cycleId: string, issuedTokens: IssuedParticipantToken[]) {
+    let created = 0;
+    for (const token of issuedTokens) {
+      const participant = await this.db.query<{ id: string }>(
+        `select p.id
+         from identity.survey_participants p
+         where p.tenant_id = $1
+           and p.cycle_id = $2
+           and p.employee_id = $3
+           and p.token_status = 'issued'`,
+        [tenantId, cycleId, token.employeeId],
+      );
+      const participantId = participant.rows[0]?.id;
+      if (!participantId) continue;
+      const result = await this.db.query(
+        `insert into identity.invite_outbox (id, tenant_id, cycle_id, participant_id, delivery_type, respondent_path)
+         values ($1, $2, $3, $4, 'invite', $5)
+         on conflict (participant_id, delivery_type)
+         do update set respondent_path = excluded.respondent_path, updated_at = now()`,
+        [randomUUID(), tenantId, cycleId, participantId, `/s/${token.rawToken}`],
+      );
+      created += result.rowCount ?? 0;
+    }
+    return created;
   }
 
   async findIssuedToken(tokenHash: string) {
@@ -225,8 +251,9 @@ export class IdentityRepository {
       name: string | null;
       reminder_count: number;
       token_status: "issued" | "spent" | "revoked";
+      respondent_path: string | null;
     }>(
-      `select o.id, o.cycle_id, o.delivery_type, o.delivery_status, e.email, e.name, p.reminder_count, p.token_status
+      `select o.id, o.cycle_id, o.delivery_type, o.delivery_status, o.respondent_path, e.email, e.name, p.reminder_count, p.token_status
        from identity.invite_outbox o
        join identity.survey_participants p on p.id = o.participant_id
        join identity.employees e on e.id = p.employee_id
@@ -275,6 +302,7 @@ export class IdentityRepository {
         name: row.name,
         reminderCount: row.reminder_count,
         tokenStatus: row.token_status,
+        respondentPath: row.respondent_path,
       })),
     };
   }
@@ -311,8 +339,9 @@ export class IdentityRepository {
       name: string | null;
       reminder_count: number;
       token_status: "issued" | "spent" | "revoked";
+      respondent_path: string | null;
     }>(
-      `select o.id, o.cycle_id, o.delivery_type, o.delivery_status, e.email, e.name, p.reminder_count, p.token_status
+      `select o.id, o.cycle_id, o.delivery_type, o.delivery_status, o.respondent_path, e.email, e.name, p.reminder_count, p.token_status
        from identity.invite_outbox o
        join identity.survey_participants p on p.id = o.participant_id
        join identity.employees e on e.id = p.employee_id
@@ -336,6 +365,7 @@ export class IdentityRepository {
       name: row.name,
       reminderCount: row.reminder_count,
       tokenStatus: row.token_status,
+      respondentPath: row.respondent_path,
     }));
   }
 

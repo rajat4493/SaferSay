@@ -60,23 +60,25 @@ function buildInviteMessage({ tenant, delivery, appUrl }: { tenant: TenantRecord
   const greeting = delivery.name ? `Hi ${delivery.name},` : "Hi,";
   const action = delivery.deliveryType === "reminder" ? "reminder" : "invitation";
   const subject = delivery.deliveryType === "reminder" ? `${tenant.name}: SaferSay survey reminder` : `${tenant.name}: confidential SaferSay survey`;
+  const surveyUrl = delivery.respondentPath ? new URL(delivery.respondentPath, appUrl).toString() : appUrl;
   const text = `${greeting}
 
 This is your SaferSay ${action} for ${tenant.name}.
 
-For this test-mode delivery, SaferSay is validating email sending from the identity-side invite outbox. Respondent links will be included for newly created cycles after the delivery-safe token handoff is enabled.
+Your survey link:
+${surveyUrl}
 
 SaferSay keeps participation tracking separate from survey answers.
 
-${appUrl}`;
+If you were not expecting this, ignore this email.`;
 
   const html = `
     <div style="font-family: Inter, Arial, sans-serif; color: #1d1b19; line-height: 1.55; max-width: 560px;">
       <p>${escapeHtml(greeting)}</p>
       <p>This is your SaferSay ${escapeHtml(action)} for <strong>${escapeHtml(tenant.name)}</strong>.</p>
-      <p>For this test-mode delivery, SaferSay is validating email sending from the identity-side invite outbox. Respondent links will be included for newly created cycles after the delivery-safe token handoff is enabled.</p>
+      <p><a href="${escapeHtml(surveyUrl)}" style="display: inline-block; background: #1d1b19; color: #ffffff; padding: 12px 18px; border-radius: 999px; text-decoration: none; font-weight: 700;">Start confidential survey</a></p>
       <p>SaferSay keeps participation tracking separate from survey answers.</p>
-      <p><a href="${escapeHtml(appUrl)}" style="color: #476552; font-weight: 700;">Open SaferSay</a></p>
+      <p style="color: #746f68; font-size: 13px;">If you were not expecting this, ignore this email.</p>
     </div>
   `;
 

@@ -27,12 +27,14 @@ export async function createTenantSurveyCycle(params: {
   );
 
   const tokens = await identity.issueTokens(params.tenantId, cycleId);
+  const invitesPrepared = await identity.createInviteOutboxForIssuedTokens(params.tenantId, cycleId, tokens);
 
   return {
     cycleId,
     template: { slug: template.slug, name: template.name },
     employees: employeeCount,
     tokensIssued: tokens.length,
+    invitesPrepared,
   };
 }
 

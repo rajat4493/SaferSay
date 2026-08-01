@@ -28,6 +28,7 @@ type OutboxResult = {
     name: string | null;
     reminderCount: number;
     tokenStatus: string;
+    respondentPath: string | null;
   }>;
 };
 
@@ -108,7 +109,9 @@ export function InviteOutboxPanel() {
             <div key={row.id} className="grid gap-3 border-b border-[var(--brand-border)] p-3 text-sm last:border-b-0 md:grid-cols-[1fr_110px_110px_90px]">
               <div>
                 <div className="font-semibold">{row.name || row.email}</div>
-                <div className="text-[var(--brand-muted)]">{row.email}</div>
+                <div className="text-[var(--brand-muted)]">
+                  {row.email} {row.respondentPath ? "- link ready" : "- no link"}
+                </div>
               </div>
               <span className="text-[var(--brand-muted)]">{row.deliveryType}</span>
               <span className="font-semibold">{row.deliveryStatus}</span>

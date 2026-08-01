@@ -37,6 +37,7 @@ export type InviteOutboxRow = {
   name: string | null;
   reminderCount: number;
   tokenStatus: "issued" | "spent" | "revoked";
+  respondentPath: string | null;
 };
 
 export type QueuedInviteDelivery = InviteOutboxRow & {
