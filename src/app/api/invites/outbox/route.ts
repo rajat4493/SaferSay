@@ -30,13 +30,18 @@ export async function POST(request: NextRequest) {
   if (!db) return NextResponse.json({ ok: false, error: "DATABASE_URL is required." }, { status: 503 });
 
   const body = (await request.json().catch(() => ({}))) as { cycleId?: string; includeReminders?: boolean };
-  const { tenant } = session;
+  const { tenant, userId } = session;
   const repo = new IdentityRepository(db);
   const cycleId = body.cycleId ?? (await repo.getLatestCycleIdForTenant(tenant.id));
   if (!cycleId) return NextResponse.json({ ok: false, error: "Create a survey cycle before preparing invites." }, { status: 400 });
 
   const invitesPrepared = await repo.prepareInviteOutbox(tenant.id, cycleId);
   const remindersPrepared = body.includeReminders ? await repo.prepareReminderOutbox(tenant.id, cycleId) : 0;
+
+  if (invitesPrepared > 0) {
+    await repo.emitOnboardingEvent(tenant.id, userId, "outbox");
+  }
+
   return NextResponse.json({
     ok: true,
     tenant,

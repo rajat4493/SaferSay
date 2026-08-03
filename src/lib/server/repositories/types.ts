@@ -16,6 +16,8 @@ export type UserRecord = {
   role: UserRole;
 };
 
+export type OnboardingEventKey = "signup" | "employees" | "cycle" | "tokens" | "outbox" | "queue" | "responses" | "report";
+
 export type EmployeeImportRecord = {
   email: string;
   name?: string;

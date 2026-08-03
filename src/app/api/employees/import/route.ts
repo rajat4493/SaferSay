@@ -21,8 +21,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, errors: preview.errors, preview }, { status: 400 });
   }
 
-  const { tenant } = session;
-  const imported = await new IdentityRepository(db).importEmployees(tenant.id, preview.employees);
+  const { tenant, userId } = session;
+  const repo = new IdentityRepository(db);
+  const imported = await repo.importEmployees(tenant.id, preview.employees);
+
+  if (imported > 0) {
+    await repo.emitOnboardingEvent(tenant.id, userId, "employees");
+  }
 
   return NextResponse.json({
     ok: true,

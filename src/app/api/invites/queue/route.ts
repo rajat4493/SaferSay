@@ -19,12 +19,16 @@ export async function POST(request: NextRequest) {
     sendNow?: boolean;
   };
   const deliveryType = body.deliveryType ?? "invite";
-  const { tenant } = session;
+  const { tenant, userId } = session;
   const repo = new IdentityRepository(db);
   const cycleId = body.cycleId ?? (await repo.getLatestCycleIdForTenant(tenant.id));
   if (!cycleId) return NextResponse.json({ ok: false, error: "No survey cycle was found." }, { status: 400 });
 
   const queued = await repo.markOutboxQueued(tenant.id, cycleId, deliveryType);
+
+  if (queued > 0 && deliveryType === "invite") {
+    await repo.emitOnboardingEvent(tenant.id, userId, "queue");
+  }
 
   if (!body.sendNow) {
     return NextResponse.json({ ok: true, tenant, cycleId, deliveryType, queued, ...(await repo.getInviteOutbox(tenant.id, cycleId)) });

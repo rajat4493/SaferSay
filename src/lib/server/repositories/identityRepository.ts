@@ -6,6 +6,7 @@ import {
   InviteOutboxRow,
   InviteOutboxSummary,
   IssuedParticipantToken,
+  OnboardingEventKey,
   PilotIdentitySummary,
   QueuedInviteDelivery,
   TenantRecord,
@@ -58,6 +59,15 @@ export class IdentityRepository {
     await this.db.query(
       `update identity.users set auth_provider = $2, provider_subject = $3 where id = $1`,
       [userId, authProvider, providerSubject],
+    );
+  }
+
+  async emitOnboardingEvent(tenantId: string, userId: string, eventKey: OnboardingEventKey) {
+    await this.db.query(
+      `insert into identity.onboarding_events (tenant_id, user_id, event_key)
+       values ($1, $2, $3)
+       on conflict (tenant_id, event_key) do nothing`,
+      [tenantId, userId, eventKey],
     );
   }
 

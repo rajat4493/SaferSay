@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSessionContext } from "@/lib/server/authSession";
 import { getDatabasePool } from "@/lib/server/db/pool";
+import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import { createTenantSurveyCycle } from "@/lib/server/surveyCycleService";
 
 export async function POST(request: NextRequest) {
@@ -15,7 +16,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = (await request.json().catch(() => ({}))) as { templateSlug?: string; cycleName?: string };
-  const { tenant } = session;
+  const { tenant, userId } = session;
 
   try {
     const cycle = await createTenantSurveyCycle({
@@ -25,6 +26,8 @@ export async function POST(request: NextRequest) {
       templateSlug: body.templateSlug ?? "engagement-check",
       cycleName: body.cycleName,
     });
+    const repo = new IdentityRepository(db);
+    await repo.emitOnboardingEvent(tenant.id, userId, "cycle");
     return NextResponse.json({ ok: true, tenant, cycle });
   } catch (error) {
     return NextResponse.json(

@@ -76,7 +76,7 @@ async function resolveUserRecord(
 
   const displayName = typeof metadata?.full_name === "string" ? (metadata.full_name as string) : null;
   const tenant = await repo.createTenant(`${displayName ?? email}'s workspace`);
-  return repo.createUser({
+  const user = await repo.createUser({
     tenantId: tenant.id,
     authProvider: "supabase",
     providerSubject,
@@ -84,6 +84,8 @@ async function resolveUserRecord(
     name: displayName,
     role: "owner",
   });
+  await repo.emitOnboardingEvent(tenant.id, user.id, "signup");
+  return user;
 }
 
 export async function requireSessionContext(nextPath: string): Promise<SessionContext> {
