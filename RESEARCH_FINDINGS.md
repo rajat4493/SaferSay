@@ -378,29 +378,25 @@ Every downstream prioritization call (should we build directory import, should w
 
 ---
 
-## 9. Prioritized Implementation Roadmap (Now/Next/Later)
+## 9. Prioritized Implementation Roadmap (P0/P1/P2)
 
-See [docs/strategy/roadmap.md](docs/strategy/roadmap.md) for the full roadmap. Highest-priority items:
+See [docs/strategy/roadmap.md](docs/strategy/roadmap.md) for the full roadmap. Re-sequenced 2026-08-03 per founder direction: the grievance channel, while strategically important, was mis-prioritized in the first pass — it adds legal complexity, new roles, and audit trails not needed to prove the core product. The real validation question comes first: can a 10–60 person company run one confidential survey, get enough responses, see useful output, and pay?
 
-**Now (launch blockers, already committed to production code):**
-- Real Supabase OAuth (✅ shipped 2026-08-03)
-- Onboarding TAT instrumentation (measure activation)
-- DB migration verification + integration tests
-- Stripe webhook + billing state
-- Verified Resend domain
-- Security hardening (rate limiting, CSP, timing-safe comparisons)
+**P0 — make one real paid confidential survey work:**
+1. Verified Resend sender domain (`survey@safersay.com`) — untrusted sandbox sender hurts response rate and trust directly.
+2. End-to-end live survey test — cycle creation → real invite links → submission → token spend → k≥5 report unlock. The product spine, proven not assumed.
+3. DB migration verification + integration tests, repeatable against Supabase.
+4. Stripe checkout + webhook + persisted billing (per-cycle pricing first).
+5. Security hardening (rate limiting, CSP, secret rotation, fail-closed production mode).
+6. CI/CD (lint/test/build/migration gates).
 
-**Next (before customer pilots):**
-- Audit-log infrastructure (prerequisite for grievance channel)
-- Grievance/lawful-disclosure channel with dual-approval (requires legal review first)
-- Role/access matrix (prerequisite for investigator role)
-- Observability (Sentry-class error tracking)
-- CI/CD pipeline (lint/test/build gates)
-- SMB billing tier ($3–5/employee/mo or fixed-per-cycle)
+**P1 — make the pilot trustworthy and measurable:**
+7. In-product confidentiality explainer — ships before grievance, not after.
+8. TAT instrumentation completion (first-response and report-unlock events still unwired).
+9. Observability (Sentry-class error tracking).
+10. Action loop / recommendations ("You said / we will / done") — likely the biggest real differentiator; build before grievance.
 
-**Later (product completeness):**
-- Org hierarchy + directory connectors
-- PDF export
-- Data retention/deletion controls
-- In-product "how this stays confidential" explainer
+**P2 — after first pilot signal:**
+11. Role/access matrix, data retention/deletion controls, real PDF export, directory connectors.
+12. Grievance/lawful-disclosure channel with legal review — deliberately deferred until core product has proven demand.
 
