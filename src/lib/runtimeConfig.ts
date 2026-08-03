@@ -58,9 +58,13 @@ export function runtimeChecks(): RuntimeCheck[] {
     {
       key: "RESEND_API_KEY",
       label: "Resend",
-      configured: Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL),
+      configured: Boolean(
+        process.env.RESEND_API_KEY &&
+          process.env.RESEND_FROM_EMAIL &&
+          !process.env.RESEND_FROM_EMAIL.includes("resend.dev"),
+      ),
       requiredForProduction: true,
-      purpose: "Invites and reminders.",
+      purpose: "Invites and reminders, sent from a verified domain — the shared resend.dev sandbox sender is rejected in production.",
     },
     {
       key: "PRIVACY_CONTACT_EMAIL",
