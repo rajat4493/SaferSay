@@ -1,6 +1,6 @@
-import { requireAdminAccess } from "@/lib/server/adminGuard";
+import { requireSessionContext } from "@/lib/server/authSession";
 
 export default async function ViewerLayout({ children }: { children: React.ReactNode }) {
-  await requireAdminAccess("/viewer");
+  await requireSessionContext("/viewer");
   return children;
 }

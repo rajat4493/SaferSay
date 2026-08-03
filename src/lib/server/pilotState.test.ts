@@ -4,7 +4,7 @@ import { readFileSync } from "fs";
 describe("first-run pilot guide", () => {
   it("exposes a protected pilot state API", () => {
     const route = readFileSync("src/app/api/pilot/state/route.ts", "utf8");
-    expect(route).toContain("hasAdminApiAccess");
+    expect(route).toContain("getSessionContext");
     expect(route).toContain("Unauthorized pilot state access.");
     expect(route).toContain("getPilotState");
   });

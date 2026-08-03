@@ -1,12 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { adminAccessCookieName } from "@/lib/adminAccessConstants";
+import { getSessionContext } from "@/lib/server/authSession";
 import { getDatabasePool } from "@/lib/server/db/pool";
-import { verifyAdminAccessToken } from "@/lib/server/adminAccess";
 import { createTenantSurveyCycle } from "@/lib/server/surveyCycleService";
-import { resolveTenantContext } from "@/lib/server/tenant";
 
 export async function POST(request: NextRequest) {
-  if (!verifyAdminAccessToken(request.cookies.get(adminAccessCookieName)?.value)) {
+  const session = await getSessionContext();
+  if (!session) {
     return NextResponse.json({ ok: false, error: "Unauthorized survey cycle creation." }, { status: 401 });
   }
 
@@ -16,7 +15,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = (await request.json().catch(() => ({}))) as { templateSlug?: string; cycleName?: string };
-  const { tenant } = await resolveTenantContext(request);
+  const { tenant } = session;
 
   try {
     const cycle = await createTenantSurveyCycle({

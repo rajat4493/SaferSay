@@ -1,9 +1,9 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
+import { getSessionContext } from "@/lib/server/authSession";
 import { getDatabasePool } from "@/lib/server/db/pool";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import { seedServerEmployees } from "@/lib/serverStore";
-import { resolveTenantContext } from "@/lib/server/tenant";
 import { surveyTemplates } from "@/lib/templates";
 
 const defaultTemplateId = "00000000-0000-4000-8000-000000000101";
@@ -13,8 +13,13 @@ const defaultQuestionIds = [
   "00000000-0000-4000-8000-000000000203",
 ];
 
-export async function POST(request: NextRequest) {
-  const { tenant } = await resolveTenantContext(request);
+export async function POST() {
+  const session = await getSessionContext();
+  if (!session) {
+    return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
+  }
+
+  const { tenant } = session;
   const db = getDatabasePool();
   if (db) {
     const template = surveyTemplates[0];

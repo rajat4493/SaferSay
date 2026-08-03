@@ -1,17 +1,17 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse } from "next/server";
+import { getSessionContext } from "@/lib/server/authSession";
 import { getDatabasePool } from "@/lib/server/db/pool";
-import { hasAdminApiAccess } from "@/lib/server/adminApi";
 import { getPilotState } from "@/lib/server/pilotStateService";
-import { resolveTenantContext } from "@/lib/server/tenant";
 
-export async function GET(request: NextRequest) {
-  if (!hasAdminApiAccess(request)) {
+export async function GET() {
+  const session = await getSessionContext();
+  if (!session) {
     return NextResponse.json({ ok: false, error: "Unauthorized pilot state access." }, { status: 401 });
   }
 
   const db = getDatabasePool();
   if (!db) return NextResponse.json({ ok: false, error: "DATABASE_URL is required." }, { status: 503 });
 
-  const { tenant } = await resolveTenantContext(request);
+  const { tenant } = session;
   return NextResponse.json({ ok: true, tenant, ...(await getPilotState({ db, tenantId: tenant.id })) });
 }

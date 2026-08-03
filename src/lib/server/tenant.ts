@@ -1,9 +1,8 @@
-import type { NextRequest } from "next/server";
 import { getDatabasePool } from "@/lib/server/db/pool";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import type { TenantRecord } from "@/lib/server/repositories/types";
 
-const localTenant: TenantRecord = {
+export const localTenant: TenantRecord = {
   id: "00000000-0000-4000-8000-000000000010",
   name: "SaferSay Demo Company",
   slug: "safersay-demo-company",
@@ -11,21 +10,20 @@ const localTenant: TenantRecord = {
 
 export type TenantContext = {
   tenant: TenantRecord;
-  source: "header" | "env" | "local-fallback";
+  source: "env" | "local-fallback";
 };
 
-export async function resolveTenantContext(request?: NextRequest): Promise<TenantContext> {
+/**
+ * System-level tenant resolver for contexts with no authenticated session
+ * (local dev without Supabase configured). Never trust client input here —
+ * authenticated routes should resolve tenant from the session via
+ * `getSessionContext` in `@/lib/server/authSession` instead.
+ */
+export async function resolveTenantContext(): Promise<TenantContext> {
   const db = getDatabasePool();
   if (!db) return { tenant: localTenant, source: "local-fallback" };
 
   const repo = new IdentityRepository(db);
-  const headerTenantId = request?.headers.get("x-safersay-tenant-id");
-  if (headerTenantId) {
-    const tenant = await repo.findTenantById(headerTenantId);
-    if (!tenant) throw new Error("Tenant header does not match an active tenant.");
-    return { tenant, source: "header" };
-  }
-
   const defaultTenantId = process.env.DEFAULT_TENANT_ID;
   if (defaultTenantId) {
     const tenant = await repo.findTenantById(defaultTenantId);

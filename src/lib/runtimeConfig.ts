@@ -19,8 +19,6 @@ export function runtimeChecks(): RuntimeCheck[] {
       process.env.TOKEN_SECRET !== "local-development-token-secret" &&
       process.env.TOKEN_SECRET.length >= 32,
   );
-  const adminAccessConfigured = Boolean(process.env.ADMIN_ACCESS_SECRET && process.env.ADMIN_ACCESS_SECRET.length >= 32);
-
   return [
     {
       key: "DATABASE_URL",
@@ -34,35 +32,14 @@ export function runtimeChecks(): RuntimeCheck[] {
       label: "Supabase app client",
       configured: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY),
       requiredForProduction: true,
-      purpose: "Browser/server session client for the Supabase project.",
+      purpose: "Browser/server session client for the Supabase project, and the basis for admin/viewer login.",
     },
     {
-      key: "AUTH_SECRET",
-      label: "Auth.js secret",
-      configured: Boolean(process.env.AUTH_SECRET),
+      key: "SUPABASE_OAUTH_PROVIDERS",
+      label: "Google + Microsoft sign-in",
+      configured: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY),
       requiredForProduction: true,
-      purpose: "Secure session signing.",
-    },
-    {
-      key: "ADMIN_ACCESS_SECRET",
-      label: "Temporary admin gate",
-      configured: adminAccessConfigured,
-      requiredForProduction: true,
-      purpose: "Protects admin and viewer pages until SSO is wired.",
-    },
-    {
-      key: "GOOGLE_CLIENT_ID",
-      label: "Google SSO",
-      configured: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
-      requiredForProduction: true,
-      purpose: "Buyer/admin login.",
-    },
-    {
-      key: "MICROSOFT_ENTRA_ID_CLIENT_ID",
-      label: "Microsoft SSO",
-      configured: Boolean(process.env.MICROSOFT_ENTRA_ID_CLIENT_ID && process.env.MICROSOFT_ENTRA_ID_CLIENT_SECRET),
-      requiredForProduction: true,
-      purpose: "Buyer/admin login and later directory import.",
+      purpose: "Google and Microsoft OAuth providers configured in the Supabase dashboard for buyer/admin login.",
     },
     {
       key: "TOKEN_SECRET",

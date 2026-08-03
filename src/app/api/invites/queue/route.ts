@@ -1,12 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { getSessionContext } from "@/lib/server/authSession";
 import { getDatabasePool } from "@/lib/server/db/pool";
-import { hasAdminApiAccess } from "@/lib/server/adminApi";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import { sendQueuedInviteDeliveries } from "@/lib/server/resendDelivery";
-import { resolveTenantContext } from "@/lib/server/tenant";
 
 export async function POST(request: NextRequest) {
-  if (!hasAdminApiAccess(request)) {
+  const session = await getSessionContext();
+  if (!session) {
     return NextResponse.json({ ok: false, error: "Unauthorized invite queue access." }, { status: 401 });
   }
 
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     sendNow?: boolean;
   };
   const deliveryType = body.deliveryType ?? "invite";
-  const { tenant } = await resolveTenantContext(request);
+  const { tenant } = session;
   const repo = new IdentityRepository(db);
   const cycleId = body.cycleId ?? (await repo.getLatestCycleIdForTenant(tenant.id));
   if (!cycleId) return NextResponse.json({ ok: false, error: "No survey cycle was found." }, { status: 400 });
