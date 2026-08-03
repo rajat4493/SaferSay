@@ -461,3 +461,115 @@ Do not copy proprietary question text verbatim. Build original questions around 
 4. **Open text is high re-identification risk.** Keep optional, suppress under threshold, and consider warning respondents not to include identifying details.
 5. **Works council thresholds vary and are more nuanced than a single headcount cutoff.** The product should not make legal claims about not needing consultation.
 6. **Payment model currencies need a product choice.** The brief uses pounds while ICP is EU. Pick GBP for owner preference or EUR for EU market fit before Stripe implementation.
+
+---
+
+## 6. Market Validation & Competitive Gap Analysis (Added 2026-08-03)
+
+### Key Finding: The SMB Price Floor Is Open
+
+Competitive pricing research confirms that no major competitor prices for 10–60 person companies as a primary segment:
+- **Lattice:** ~$13–17/seat/month, $4k/year minimum = unaffordable for target market.
+- **15Five:** ~$4–16/seat/month, annual lock-in, per-seat economics don't fit episodic survey use.
+- **Culture Amp:** Sales-led, custom pricing, annual contracts, enterprise-focused.
+- **Officevibe/Workleap:** $5k–12k/year minimum, repositioned as a suite, not pure survey tool.
+
+**Implication:** A per-survey-cycle pricing model in the $3–5/employee/month range (or fixed $50–200/cycle for SMBs) is genuinely vacant. This is not a feature differentiation; it's a business-model wedge.
+
+### Trust As The Actual Moat, Not Features
+
+Research across G2, Capterra, and industry sources shows ~25% of employees admit dishonesty on pulse surveys at large tech firms, with 50%+ fearing backlash. The reason isn't missing survey features—it's doubts about whether "anonymous" actually means anonymous. Competitors claim anonymity; SaferSay's severance architecture *proves* it structurally.
+
+**Implication:** Don't compete on features (Culture Amp has better analytics, Lattice has integration depth). Compete on "your identity and answers are stored separately by design, not by policy." Make this visible in the product, not just in marketing copy.
+
+### Competitor Ease-of-Use Gap At The High End
+
+Culture Amp users report report navigation is hard without training. Officevibe wins SMB on simplicity but feels constrained for larger orgs. SaferSay's strength is simplicity for SMB *with* a clear confidentiality explanation—this is not an accident to hide, it's a selling point.
+
+### Sources
+- [G2 Lattice, Culture Amp, 15Five reviews](https://www.g2.com/)
+- [Capterra Officevibe/Workleap pricing](https://www.capterra.com/)
+- [Blind: 25% of employees dishonest on pulse surveys](https://www.teamblind.com/blog/index.php/2019/12/19/nearly-a-quarter-of-employees-are-not-being-honest-on-employee-pulse-surveys)
+
+---
+
+## 7. Legal Disclosure Design: Resolving the Anonymity vs Legal Duty Contradiction
+
+### The Problem
+v1's core claim is "no one can link identity to answers." That's legally and functionally correct for engagement/pulse surveys (eNPS, workload, manager support). But companies have a *legal duty* to investigate reports of harassment (POSH Act in India, similar in EU/UK), discrimination, or financial misconduct—which requires identifying the reporter, at least to an investigation team, under due process.
+
+A single "anonymous" system that tries to guarantee both absolute anonymity and legal investigation is a contradiction that breaks the first time it's tested.
+
+### The Solution: Two Structurally Separate Channels
+
+**Engagement Survey (existing severance model):** identity and answers are structurally severed in `identity` and `responses` schemas. Absolute anonymity, no disclosure path ever.
+
+**Grievance Channel (new, separate system):** confidential (not anonymous-by-default), with identity known to a limited "investigator" role, protected by audit logs and dual-approval before any disclosure. Kept in a separate `grievance` schema, never mixed with engagement data.
+
+**Critical UX requirement:** these must have different entry points, different consent screens, and different visual language in-product. Users must never reasonably confuse the two.
+
+### EU Whistleblowing Directive Requirements (2023)
+Companies with 50+ workers must provide a reporting channel; receipt acknowledged within 7 days, investigation outcome within 3 months. Anonymous reporting is allowed but not mandated (member-state discretion). Identity must remain confidential even where anonymity isn't guaranteed. GDPR applies; violations carry fines up to 4% of global revenue. ([EU Whistleblowing Directive](https://whistleblowersoftware.com/en/eu-whistleblowing-directive-summary))
+
+### Before Shipping
+- [ ] Outside employment-law review of the grievance-channel spec, especially jurisdiction-specific requirements (POSH in India, Works Council in Germany/Austria, etc.).
+- [ ] Legal review of the in-product consent/privacy copy for both channels.
+- [ ] Audit-log infrastructure built as part of this feature, not deferred.
+
+### Sources
+- [docs/strategy/grievance-channel-spec.md](docs/strategy/grievance-channel-spec.md) (full design)
+- [EU Whistleblower Directive 2023](https://www.corporate complianceinsights.com/eu-whistleblower-directive-details/)
+- [GDPR + Whistleblowing data-protection tension](https://www.lawcode.eu/en/blog/whistleblowing-directive-dsgvo-data-protection-notice-system/)
+
+---
+
+## 8. Onboarding TAT Instrumentation & Activation Metrics
+
+### Current State
+"Activation metric" is currently undefined and unmeasurable. The pilot checklist in `pilotStateService.ts` models the exact funnel but never records *when* steps complete.
+
+### Proposed Instrumentation
+Track these server-side events (reusing pilotStateService step keys):
+1. `signup` — first user SSO login (single point, ~2 lines in authSession.ts)
+2. `employees` — first employee CSV import succeeds
+3. `cycle` — first survey cycle created
+4. `tokens` — first tokens issued
+5. `outbox` — first invite prepared
+6. `queue` — first invite queued
+7. `responses` — first response submitted
+8. `report` — report unlocked (>= k-threshold)
+
+Store in new `identity.onboarding_events` table (tenant_id, user_id, event_key, occurred_at). Cheap, additive, no severance-model risk.
+
+**Activation metric:** cycle created within 10 minutes of signup. **Ultimate TAT:** first response collected within 48 hours.
+
+### Why This Matters
+Every downstream prioritization call (should we build directory import, should we enforce template selection, etc.) depends on data, not guesses. Instrument this early.
+
+### Sources
+- [docs/strategy/onboarding-tat-plan.md](docs/strategy/onboarding-tat-plan.md) (full spec)
+- [pilotStateService.ts](src/lib/server/pilotStateService.ts) (existing step model)
+
+---
+
+## 9. Prioritized Implementation Roadmap (P0/P1/P2)
+
+See [docs/strategy/roadmap.md](docs/strategy/roadmap.md) for the full roadmap. Re-sequenced 2026-08-03 per founder direction: the grievance channel, while strategically important, was mis-prioritized in the first pass — it adds legal complexity, new roles, and audit trails not needed to prove the core product. The real validation question comes first: can a 10–60 person company run one confidential survey, get enough responses, see useful output, and pay?
+
+**P0 — make one real paid confidential survey work:**
+1. Verified Resend sender domain (`survey@safersay.com`) — untrusted sandbox sender hurts response rate and trust directly.
+2. End-to-end live survey test — cycle creation → real invite links → submission → token spend → k≥5 report unlock. The product spine, proven not assumed.
+3. DB migration verification + integration tests, repeatable against Supabase.
+4. Stripe checkout + webhook + persisted billing (per-cycle pricing first).
+5. Security hardening (rate limiting, CSP, secret rotation, fail-closed production mode).
+6. CI/CD (lint/test/build/migration gates).
+
+**P1 — make the pilot trustworthy and measurable:**
+7. In-product confidentiality explainer — ships before grievance, not after.
+8. TAT instrumentation completion (first-response and report-unlock events still unwired).
+9. Observability (Sentry-class error tracking).
+10. Action loop / recommendations ("You said / we will / done") — likely the biggest real differentiator; build before grievance.
+
+**P2 — after first pilot signal:**
+11. Role/access matrix, data retention/deletion controls, real PDF export, directory connectors.
+12. Grievance/lawful-disclosure channel with legal review — deliberately deferred until core product has proven demand.

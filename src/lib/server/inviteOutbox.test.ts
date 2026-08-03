@@ -18,11 +18,11 @@ describe("invite outbox foundation", () => {
     expect(repo).not.toContain("responses.answers");
   });
 
-  it("protects invite APIs with admin access", () => {
+  it("protects invite APIs with an authenticated session", () => {
     const outboxRoute = readFileSync("src/app/api/invites/outbox/route.ts", "utf8");
     const queueRoute = readFileSync("src/app/api/invites/queue/route.ts", "utf8");
-    expect(outboxRoute).toContain("hasAdminApiAccess");
-    expect(queueRoute).toContain("hasAdminApiAccess");
+    expect(outboxRoute).toContain("getSessionContext");
+    expect(queueRoute).toContain("getSessionContext");
     expect(outboxRoute).toContain("Unauthorized invite outbox access.");
     expect(queueRoute).toContain("Unauthorized invite queue access.");
   });

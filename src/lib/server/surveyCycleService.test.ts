@@ -12,11 +12,10 @@ describe("survey cycle creation foundation", () => {
     expect(service).toContain("responses.survey_cycles");
   });
 
-  it("protects the cycle creation API with admin access", () => {
+  it("protects the cycle creation API with an authenticated session", () => {
     const route = readFileSync("src/app/api/cycles/create/route.ts", "utf8");
-    expect(route).toContain("verifyAdminAccessToken");
+    expect(route).toContain("getSessionContext");
     expect(route).toContain("Unauthorized survey cycle creation.");
-    expect(route).toContain("resolveTenantContext");
   });
 
   it("prevents duplicate participant tokens per cycle employee", () => {

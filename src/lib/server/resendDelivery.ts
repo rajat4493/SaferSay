@@ -1,6 +1,7 @@
 import "server-only";
 
 import { Resend } from "resend";
+import { getRuntimeMode } from "@/lib/runtimeConfig";
 import type { QueuedInviteDelivery, TenantRecord } from "@/lib/server/repositories/types";
 
 export type DeliveryResult = {
@@ -27,6 +28,16 @@ export async function sendQueuedInviteDeliveries({
   const config = getResendConfig();
   if (!config.apiKey) {
     return { sent: 0, failed: deliveries.length, errors: ["RESEND_API_KEY is not configured."], sentIds: [], failedIds: deliveries.map((item) => item.outboxId) };
+  }
+
+  if (getRuntimeMode() === "production" && config.fromEmail.includes("resend.dev")) {
+    return {
+      sent: 0,
+      failed: deliveries.length,
+      errors: ["RESEND_FROM_EMAIL must be a verified production domain, not the resend.dev sandbox sender."],
+      sentIds: [],
+      failedIds: deliveries.map((item) => item.outboxId),
+    };
   }
 
   const resend = new Resend(config.apiKey);

@@ -4,6 +4,20 @@ export type TenantRecord = {
   slug: string;
 };
 
+export type UserRole = "owner" | "admin" | "employee";
+
+export type UserRecord = {
+  id: string;
+  tenantId: string;
+  authProvider: string;
+  providerSubject: string;
+  email: string;
+  name: string | null;
+  role: UserRole;
+};
+
+export type OnboardingEventKey = "signup" | "employees" | "cycle" | "tokens" | "outbox" | "queue" | "responses" | "report";
+
 export type EmployeeImportRecord = {
   email: string;
   name?: string;

@@ -19,8 +19,6 @@ export function runtimeChecks(): RuntimeCheck[] {
       process.env.TOKEN_SECRET !== "local-development-token-secret" &&
       process.env.TOKEN_SECRET.length >= 32,
   );
-  const adminAccessConfigured = Boolean(process.env.ADMIN_ACCESS_SECRET && process.env.ADMIN_ACCESS_SECRET.length >= 32);
-
   return [
     {
       key: "DATABASE_URL",
@@ -34,35 +32,23 @@ export function runtimeChecks(): RuntimeCheck[] {
       label: "Supabase app client",
       configured: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY),
       requiredForProduction: true,
-      purpose: "Browser/server session client for the Supabase project.",
+      purpose: "Browser/server session client for the Supabase project, and the basis for admin/viewer login.",
     },
     {
-      key: "AUTH_SECRET",
-      label: "Auth.js secret",
-      configured: Boolean(process.env.AUTH_SECRET),
+      key: "SUPABASE_OAUTH_PROVIDERS",
+      label: "Google + Microsoft sign-in",
+      // The app has no API to inspect which OAuth providers are enabled in
+      // the Supabase dashboard — that state lives entirely in the Supabase
+      // project's own settings, outside this app's env vars. Checking for
+      // NEXT_PUBLIC_SUPABASE_URL here would only prove Supabase itself is
+      // configured, not that Google/Microsoft sign-in actually works, so
+      // this requires an explicit human confirmation after enabling both
+      // providers in Authentication > Providers and test-signing-in with
+      // each one.
+      configured: process.env.SUPABASE_OAUTH_PROVIDERS_CONFIRMED === "true",
       requiredForProduction: true,
-      purpose: "Secure session signing.",
-    },
-    {
-      key: "ADMIN_ACCESS_SECRET",
-      label: "Temporary admin gate",
-      configured: adminAccessConfigured,
-      requiredForProduction: true,
-      purpose: "Protects admin and viewer pages until SSO is wired.",
-    },
-    {
-      key: "GOOGLE_CLIENT_ID",
-      label: "Google SSO",
-      configured: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
-      requiredForProduction: true,
-      purpose: "Buyer/admin login.",
-    },
-    {
-      key: "MICROSOFT_ENTRA_ID_CLIENT_ID",
-      label: "Microsoft SSO",
-      configured: Boolean(process.env.MICROSOFT_ENTRA_ID_CLIENT_ID && process.env.MICROSOFT_ENTRA_ID_CLIENT_SECRET),
-      requiredForProduction: true,
-      purpose: "Buyer/admin login and later directory import.",
+      purpose:
+        "Confirms a human has enabled and test-signed-in with Google and Microsoft OAuth in the Supabase dashboard — this cannot be verified automatically from app config alone.",
     },
     {
       key: "TOKEN_SECRET",
@@ -81,9 +67,13 @@ export function runtimeChecks(): RuntimeCheck[] {
     {
       key: "RESEND_API_KEY",
       label: "Resend",
-      configured: Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL),
+      configured: Boolean(
+        process.env.RESEND_API_KEY &&
+          process.env.RESEND_FROM_EMAIL &&
+          !process.env.RESEND_FROM_EMAIL.includes("resend.dev"),
+      ),
       requiredForProduction: true,
-      purpose: "Invites and reminders.",
+      purpose: "Invites and reminders, sent from a verified domain — the shared resend.dev sandbox sender is rejected in production.",
     },
     {
       key: "PRIVACY_CONTACT_EMAIL",

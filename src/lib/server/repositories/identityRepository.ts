@@ -6,13 +6,70 @@ import {
   InviteOutboxRow,
   InviteOutboxSummary,
   IssuedParticipantToken,
+  OnboardingEventKey,
   PilotIdentitySummary,
   QueuedInviteDelivery,
   TenantRecord,
+  UserRecord,
+  UserRole,
 } from "./types";
 
 export class IdentityRepository {
   constructor(private readonly db: Pool) {}
+
+  async findUserByAuthSubject(authProvider: string, providerSubject: string): Promise<UserRecord | null> {
+    const result = await this.db.query<UserRow>(
+      `select id, tenant_id, auth_provider, provider_subject, email, name, role
+       from identity.users
+       where auth_provider = $1 and provider_subject = $2`,
+      [authProvider, providerSubject],
+    );
+    return result.rows[0] ? mapUserRow(result.rows[0]) : null;
+  }
+
+  async findUserByEmail(email: string): Promise<UserRecord | null> {
+    const result = await this.db.query<UserRow>(
+      `select id, tenant_id, auth_provider, provider_subject, email, name, role
+       from identity.users
+       where email = $1`,
+      [email],
+    );
+    return result.rows[0] ? mapUserRow(result.rows[0]) : null;
+  }
+
+  async createUser(input: {
+    tenantId: string;
+    authProvider: string;
+    providerSubject: string;
+    email: string;
+    name: string | null;
+    role: UserRole;
+  }): Promise<UserRecord> {
+    const id = randomUUID();
+    const result = await this.db.query<UserRow>(
+      `insert into identity.users (id, tenant_id, auth_provider, provider_subject, email, name, role)
+       values ($1, $2, $3, $4, $5, $6, $7)
+       returning id, tenant_id, auth_provider, provider_subject, email, name, role`,
+      [id, input.tenantId, input.authProvider, input.providerSubject, input.email, input.name, input.role],
+    );
+    return mapUserRow(result.rows[0]);
+  }
+
+  async linkAuthSubject(userId: string, authProvider: string, providerSubject: string) {
+    await this.db.query(
+      `update identity.users set auth_provider = $2, provider_subject = $3 where id = $1`,
+      [userId, authProvider, providerSubject],
+    );
+  }
+
+  async emitOnboardingEvent(tenantId: string, userId: string, eventKey: OnboardingEventKey) {
+    await this.db.query(
+      `insert into identity.onboarding_events (tenant_id, user_id, event_key)
+       values ($1, $2, $3)
+       on conflict (tenant_id, event_key) do nothing`,
+      [tenantId, userId, eventKey],
+    );
+  }
 
   async createTenant(name: string, slug = toTenantSlug(name)): Promise<TenantRecord> {
     const id = randomUUID();
@@ -444,6 +501,28 @@ export class IdentityRepository {
       sentInvites: Number(outboxRow?.sent_invites ?? 0),
     };
   }
+}
+
+type UserRow = {
+  id: string;
+  tenant_id: string;
+  auth_provider: string;
+  provider_subject: string;
+  email: string;
+  name: string | null;
+  role: UserRole;
+};
+
+function mapUserRow(row: UserRow): UserRecord {
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    authProvider: row.auth_provider,
+    providerSubject: row.provider_subject,
+    email: row.email,
+    name: row.name,
+    role: row.role,
+  };
 }
 
 export function toTenantSlug(value: string) {

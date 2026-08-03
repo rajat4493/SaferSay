@@ -4,7 +4,7 @@ import { readFileSync } from "fs";
 describe("real protected report flow", () => {
   it("protects the report API and reads latest tenant cycle", () => {
     const route = readFileSync("src/app/api/report/route.ts", "utf8");
-    expect(route).toContain("hasAdminApiAccess");
+    expect(route).toContain("getSessionContext");
     expect(route).toContain("Unauthorized report access.");
     expect(route).toContain("getLatestProtectedReportForTenant");
   });

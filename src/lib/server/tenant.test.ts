@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "fs";
 
 describe("tenant foundation", () => {
-  it("requires admin report access to resolve a tenant context", () => {
+  it("requires an authenticated session to resolve a report's tenant", () => {
     const reportRoute = readFileSync("src/app/api/report/route.ts", "utf8");
-    expect(reportRoute).toContain("resolveTenantContext");
+    expect(reportRoute).toContain("getSessionContext");
     expect(reportRoute).toContain("getLatestProtectedReportForTenant");
   });
 

@@ -20,6 +20,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BrandMark } from "@/components/BrandMark";
 import { useBrand } from "@/components/BrandProvider";
+import { SignOutButton } from "@/components/SignOutButton";
 
 const nav = [
   { href: "/app", label: "Home", helper: "Where to start", icon: Home },
@@ -99,9 +100,12 @@ export function AppShell({ children, title, subtitle }: { children: React.ReactN
               <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em]">{title}</h1>
               <p className="mt-2 text-sm leading-6 text-[var(--brand-muted)]">{subtitle}</p>
             </div>
-            <Link href="/app/pilot" className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--brand-ink)] px-5 text-sm font-semibold text-white">
-              First-run guide
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link href="/app/pilot" className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--brand-ink)] px-5 text-sm font-semibold text-white">
+                First-run guide
+              </Link>
+              <SignOutButton />
+            </div>
           </header>
           <div className="pt-5">{children}</div>
         </section>

@@ -1,13 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { parseEmployeeCsv } from "@/lib/csvEmployees";
-import { adminAccessCookieName } from "@/lib/adminAccessConstants";
+import { getSessionContext } from "@/lib/server/authSession";
 import { getDatabasePool } from "@/lib/server/db/pool";
-import { verifyAdminAccessToken } from "@/lib/server/adminAccess";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
-import { resolveTenantContext } from "@/lib/server/tenant";
 
 export async function POST(request: NextRequest) {
-  if (!verifyAdminAccessToken(request.cookies.get(adminAccessCookieName)?.value)) {
+  const session = await getSessionContext();
+  if (!session) {
     return NextResponse.json({ ok: false, error: "Unauthorized employee import." }, { status: 401 });
   }
 
@@ -22,8 +21,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, errors: preview.errors, preview }, { status: 400 });
   }
 
-  const { tenant } = await resolveTenantContext(request);
-  const imported = await new IdentityRepository(db).importEmployees(tenant.id, preview.employees);
+  const { tenant, userId } = session;
+  const repo = new IdentityRepository(db);
+  const imported = await repo.importEmployees(tenant.id, preview.employees);
+
+  if (imported > 0) {
+    await repo.emitOnboardingEvent(tenant.id, userId, "employees");
+  }
 
   return NextResponse.json({
     ok: true,
