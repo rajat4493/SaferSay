@@ -16,6 +16,180 @@
 
 ---
 
+## 2026 Market Gap Addendum
+
+**Date:** 3 August 2026  
+**Purpose:** Answer five product-strategy questions: what is actually missing, what different companies want, where the pain sits for employers and survey takers, and what could become a best-in-category idea for SaferSay.
+
+### 1. What Is Actually Missing In The Market
+
+The market is crowded, but the missing product is narrow and real:
+
+**A trust-first employee listening product for 10-60 person companies that can be launched in minutes, paid for without an annual suite contract, and closed with visible action.**
+
+Current tools cluster into four groups:
+
+| Category | Examples | What they do well | What is missing |
+|---|---|---|---|
+| Enterprise listening suites | Culture Amp, Peakon, Viva Glint | Benchmarks, people science, enterprise security, mature analytics | Too much procurement, setup, annual commitment, and HR maturity for small companies |
+| People/performance suites | Lattice, 15Five, Workleap | Engagement connected to reviews, manager workflows, goals, action plans | Bundled platform economics; engagement is one module inside a larger people suite |
+| SMB pulse tools | Officevibe / Workleap Officevibe | Simplicity, pulse cadence, manager guidance, integrations | Small-group anonymity tension; weaker proof that identity and answers cannot be joined |
+| Generic forms | Google Forms, Typeform, Tally, SurveyMonkey | Fast form creation, familiar UX, cheap/free starts | No built-in confidentiality architecture, threshold suppression, safe reporting, or action accountability |
+
+The highest-value gap is not another survey builder. It is the **confidentiality-to-action gap**:
+
+1. Employees do not fully trust "anonymous" claims, especially in small teams.
+2. Companies still need enough signal to act.
+3. Managers need safe guidance without seeing raw identity-linked comments.
+4. HR needs proof that follow-up happened, otherwise every later survey gets weaker.
+
+Evidence:
+
+- Gallup states that what matters is not only whether surveys are anonymous, but whether employees believe responses are confidential and used responsibly.
+- A 2025 qualitative pulse-survey study found confidentiality was considered essential for truthful responses, but also found common reporting for groups of only 3-5, creating anonymity and reliability problems.
+- SurveyMonkey's 2025 benchmark data shows employee engagement surveys averaging roughly 21% response rates on its platform, while mature/high-trust internal programs can be far higher.
+- Lattice publishes a $4/user/month Engagement module but also a $4,000 annual minimum, which creates a real purchase barrier for very small teams.
+- Workleap/Officevibe positions around SMB simplicity and starts around $5/user/month, but its help docs show scores can display with a minimum of 3 responses per metric, which is weaker than SaferSay's stricter k>=5 trust posture.
+
+### 2. What Different Companies Want
+
+Different company types are not buying the same thing:
+
+| Company type | What they want | What they fear | SaferSay fit |
+|---|---|---|---|
+| 10-25 person founder-led startup | "Tell me if something is wrong without creating HR admin work." | Employees may not trust the founder-run process; small groups make anonymity fragile | Strong fit if positioned as an external confidential pulse with no setup burden |
+| 25-60 person startup/SME | "Give me enough signal to retain people and stop small problems becoming exits." | Tool cost, lack of HR expertise, low response rates, no action follow-through | Core ICP |
+| 60-250 scaling company | "Segment by team/location/manager safely and track action." | Losing trust, manager misuse, needing more role controls | Fit after role/viewer scopes and manager action loop |
+| 250+ mid-market | Benchmarks, HRIS integration, manager enablement, sophisticated analytics | Security review, works council/privacy concerns, procurement | Later market; do not chase first |
+| Regulated / public / healthcare | Defensible process, audit logs, safe reporting, legal review | Retaliation, compliance breach, discovery/legal exposure | Only after audit logs, legal/privacy maturity, and grievance separation |
+
+Buying triggers by type:
+
+- **Founder/CEO:** retention risk, culture uncertainty, recent resignation, funding/scale stress.
+- **Junior HR / People Ops:** needs a credible survey without becoming a data analyst.
+- **COO/Ops:** wants operational clarity, not HR theatre.
+- **Manager:** wants one practical action, not a 40-page report.
+- **Employee:** wants protection, proof of follow-up, and low effort.
+
+### 3. Company Pain Areas
+
+Company-side pain is practical and economic:
+
+1. **Low trust creates bad data.** If employees think responses can be traced, the result is either low response or "safe" answers.
+2. **Small teams break anonymity.** A company of 20 people may only have 3 engineers, 2 salespeople, or 1 new starter. Segment-level reporting can expose people.
+3. **No HR expertise.** In SMEs, the buyer may be a founder, office manager, COO, or junior HR generalist.
+4. **Enterprise tools are overbuilt.** They assume HR process maturity, procurement, annual contracts, people analytics literacy, and manager training.
+5. **Free tools create liability.** Google Forms can collect sensitive employee data, exact timestamps, free-text identifiers, and raw exports without guardrails.
+6. **Reports do not change behavior.** Many tools collect data but do not force a visible action loop.
+7. **Managers need help, but AI can become unsafe.** Companies want recommendations, but workplace emotion inference and individual risk scoring are legally and ethically dangerous.
+8. **Cost predictability matters.** SMBs dislike annual commitments and per-seat suites when they only want one pulse or quarterly cycle.
+9. **Legal/compliance ambiguity.** "Anonymous feedback" and grievance/harassment reporting are often conflated, but they need separate handling.
+
+For SaferSay, the product should sell:
+
+- "Launch one confidential pulse in 10 minutes."
+- "No annual lock-in."
+- "No raw identity-answer join."
+- "Reports only show groups of 5+."
+- "Every survey ends with one visible action."
+
+### 4. Survey-Taker Pain Areas
+
+Employee/respondent pain is different from company pain:
+
+1. **Fear of being identified.** Small-team demographics, writing style, timing, and unique situations can reveal identity.
+2. **Fear of retaliation.** Speaking-up research repeatedly shows retaliation fear suppresses honest reporting.
+3. **Belief that nothing will change.** If last survey produced no action, the next survey feels performative.
+4. **Survey fatigue.** Long surveys and repeated pulses without visible outcome train people to ignore the next invite.
+5. **Unclear confidentiality copy.** "Anonymous" without explanation can reduce trust rather than increase it.
+6. **Open text risk.** Employees may self-identify accidentally, or avoid writing the useful detail because they are afraid.
+7. **Unhelpful questions.** Generic questions that do not map to action feel like HR box-ticking.
+8. **No feedback loop to respondents.** Employees rarely see "what we heard / what we will do / what we cannot show because it would identify people."
+
+Respondent trust requirements:
+
+- Show the confidentiality screen before Q1.
+- Explain identity store vs answer store in plain language.
+- Say exactly what the employer can and cannot see.
+- Warn against self-identifying details in open text.
+- Show after submission what happens next.
+- Later, show a team-facing action note after the report is reviewed.
+
+### 5. Best Idea In This Field
+
+The strongest product idea is:
+
+## The Confidential Action Loop
+
+Not "AI survey recommendations." Not "anonymous forms." The best wedge is a product that guarantees every survey becomes a safe, visible, tracked action without exposing people.
+
+Core concept:
+
+1. **Run a confidential pulse.**
+2. **Suppress unsafe data automatically.**
+3. **Generate 1-3 safe, manager-facing action options from a curated playbook.**
+4. **Require the manager/founder to choose one action.**
+5. **Share a short "You said / we will" note back to employees.**
+6. **Track whether the action was seen, accepted, rejected, in progress, or done.**
+7. **Ask the next survey whether the action was noticed.**
+
+This is more powerful than a dashboard because it solves the trust flywheel:
+
+- Employees trust the system because identity is protected and follow-up is visible.
+- Companies trust the system because it gives one practical next step, not an overwhelming analytics dump.
+- Future response rates improve because people see the loop close.
+
+### SaferSay's Differentiating Product Principles
+
+1. **Confidentiality is a product feature, not a policy sentence.**
+2. **Small-company defaults must be safer than enterprise defaults.**
+3. **If a report cell is unsafe, the product should explain why and suggest what to do instead.**
+4. **No open-ended AI advice in v1. Use curated playbooks mapped to question constructs.**
+5. **Every survey must end with an action note, even if the note says "we cannot show team-level data yet because fewer than five people responded."**
+6. **Respondents should see the action loop too, not only HR.**
+
+### Recommended Product Bets
+
+| Bet | Why it matters | Build timing |
+|---|---|---|
+| Delivery-safe invite links | Makes live survey cycles real | Now |
+| Verified sending domain/mailbox | Makes employee delivery credible | Now |
+| Google/Microsoft OAuth with tenant allowlist | Makes admin login realistic without open signup risk | Now |
+| Confidential Action Loop | Converts reports into visible trust-building behavior | Now/Next |
+| TAT instrumentation | Measures whether "easy to start" is real | Now/Next |
+| Curated playbook recommendations | Gives useful guidance without risky AI inference | Next |
+| Grievance channel separation | Prevents anonymity/legal-duty contradiction | Later, legal-reviewed |
+| Slack/Teams delivery | Useful reminder/action surface but not first critical path | Later |
+
+### Updated Answer To "What Is Missing?"
+
+The missing product is **not** a cheaper Culture Amp clone.
+
+The missing product is a **small-company confidential listening loop**:
+
+- Fast enough for a founder or junior HR person.
+- Strict enough that employees believe it.
+- Cheap/flexible enough for 10-60 people.
+- Honest enough to say when data cannot be shown.
+- Action-oriented enough that the next survey gets more trust, not less.
+
+### Additional 2026 Sources
+
+- [Gallup: Employee Surveys, anonymity and confidentiality](https://www.gallup.com/workplace/692474/workplace-employee-surveys.aspx)
+- [Frontiers 2025 qualitative study on pulse survey implementation](https://www.frontiersin.org/journals/organizational-psychology/articles/10.3389/forgp.2025.1696769/full)
+- [SurveyMonkey 2025 response-rate benchmarks](https://www.surveymonkey.com/learn/survey-best-practices/survey-response-rate-benchmarks/)
+- [Capterra: 2026 HR challenges for SMBs](https://www.capterra.com/resources/key-hr-challenges-smbs/)
+- [Wiley Workplace Intelligence 2026 HR/L&D leader survey](https://newsroom.wiley.com/press-releases/press-release-details/2026/New-Wiley-Survey-HR-Leaders-Express-Optimism-About-2026-Despite-Expecting-Challenges-Change/default.aspx)
+- [Gartner 2026 CHRO priorities](https://www.gartner.com/en/human-resources/trends/11-trends-that-will-shape-work-in-2022-and-beyond-hbr)
+- [G2 Culture Amp reviews and pros/cons](https://www.g2.com/products/culture-amp/reviews)
+- [Lattice pricing](https://lattice.com/pricing)
+- [Workleap pricing](https://workleap.com/pricing)
+- [Workleap Officevibe surveys](https://workleap.com/officevibe/surveys)
+- [Workleap Officevibe score/report threshold help](https://help.workleap.com/en/articles/10281693-understand-workleap-officevibe-scores-and-survey-reports)
+- [Institute of Business Ethics 2024 Ethics at Work Survey](https://www.ibe.org.uk/knowledge-hub/bullying-and-sexual-harassment-go-unreported-as-employees-fear-retaliation/)
+
+---
+
 ## 1. Onboarding UX Benchmark
 
 ### Patterns To Copy
@@ -287,4 +461,3 @@ Do not copy proprietary question text verbatim. Build original questions around 
 4. **Open text is high re-identification risk.** Keep optional, suppress under threshold, and consider warning respondents not to include identifying details.
 5. **Works council thresholds vary and are more nuanced than a single headcount cutoff.** The product should not make legal claims about not needing consultation.
 6. **Payment model currencies need a product choice.** The brief uses pounds while ICP is EU. Pick GBP for owner preference or EUR for EU market fit before Stripe implementation.
-
