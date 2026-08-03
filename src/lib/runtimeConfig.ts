@@ -37,9 +37,18 @@ export function runtimeChecks(): RuntimeCheck[] {
     {
       key: "SUPABASE_OAUTH_PROVIDERS",
       label: "Google + Microsoft sign-in",
-      configured: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY),
+      // The app has no API to inspect which OAuth providers are enabled in
+      // the Supabase dashboard — that state lives entirely in the Supabase
+      // project's own settings, outside this app's env vars. Checking for
+      // NEXT_PUBLIC_SUPABASE_URL here would only prove Supabase itself is
+      // configured, not that Google/Microsoft sign-in actually works, so
+      // this requires an explicit human confirmation after enabling both
+      // providers in Authentication > Providers and test-signing-in with
+      // each one.
+      configured: process.env.SUPABASE_OAUTH_PROVIDERS_CONFIRMED === "true",
       requiredForProduction: true,
-      purpose: "Google and Microsoft OAuth providers configured in the Supabase dashboard for buyer/admin login.",
+      purpose:
+        "Confirms a human has enabled and test-signed-in with Google and Microsoft OAuth in the Supabase dashboard — this cannot be verified automatically from app config alone.",
     },
     {
       key: "TOKEN_SECRET",
