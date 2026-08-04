@@ -1,9 +1,8 @@
 import { AppShell, Card } from "@/components/AppShell";
 import { InviteOutboxPanel } from "@/components/InviteOutboxPanel";
 import { PageGuide } from "@/components/PageGuide";
-import { ServerOpsPanel } from "@/components/ServerOpsPanel";
 
-const integrations = [
+const connectedServices = [
   {
     name: "Google Workspace",
     type: "SSO + directory",
@@ -26,7 +25,7 @@ const integrations = [
     name: "Stripe",
     type: "Payments",
     status: "Planned",
-    text: "Flat per-cycle checkout and optional floor plan. Cancellation remains visible.",
+    text: "Flat per-survey checkout and optional floor plan. Cancellation remains visible.",
   },
   {
     name: "CSV / PDF Export",
@@ -44,33 +43,33 @@ const integrations = [
 
 export default function IntegrationsPage() {
   return (
-    <AppShell title="Integrations" subtitle="Connect identity, delivery, payments, and exports without making them the confidentiality source of truth.">
+    <AppShell title="Invites" subtitle="Send invite links to your team. Optional logins and payments live here too.">
       <PageGuide
         label="Step 3"
-        title="Prepare invitations without touching survey answers"
-        body="For the first usable version, this page shows the invite queue and can send Resend test-mode emails. The queue lives in the identity side only."
+        title="Send invites without touching survey answers"
+        body="This page shows who's been invited and lets you send test-mode emails. It never has access to survey answers."
         actions={[
           { href: "/app/surveys/new", label: "Back: survey" },
           { href: "/app/reports", label: "Next: reports", primary: true },
         ]}
       />
       <InviteOutboxPanel />
-      <div className="grid gap-4 md:grid-cols-2">
-        {integrations.map((item) => (
-          <Card key={item.name}>
+
+      <h2 className="mt-8 text-sm font-semibold uppercase tracking-[0.14em] text-[var(--brand-muted)]">Connected services</h2>
+      <div className="mt-3 grid gap-4 md:grid-cols-2">
+        {connectedServices.map((item) => (
+          <Card key={item.name} className="opacity-90">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-muted)]">{item.type}</p>
-                <h2 className="mt-2 text-xl font-semibold">{item.name}</h2>
+                <h3 className="mt-2 text-lg font-semibold">{item.name}</h3>
               </div>
-              <span className="rounded-full bg-[var(--brand-accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--brand-accent)]">{item.status}</span>
+              <span className="rounded-[var(--radius-pill)] bg-[var(--brand-accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--brand-accent)]">{item.status}</span>
             </div>
             <p className="mt-3 text-sm leading-6 text-[var(--brand-muted)]">{item.text}</p>
-            <button className="mt-5 rounded-full border border-[var(--brand-border)] bg-white px-4 py-2 text-sm font-semibold">Configure</button>
           </Card>
         ))}
       </div>
-      <ServerOpsPanel />
     </AppShell>
   );
 }

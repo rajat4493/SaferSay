@@ -14,8 +14,8 @@ export default function NewSurveyPage() {
     <AppShell title="New Survey" subtitle="Template first, then light editing, then launch.">
       <PageGuide
         label="Step 2"
-        title="Pick a template and create the survey cycle"
-        body="Choose the closest template. When you click Create, SaferSay creates a draft survey and issues one secure respondent token for each active employee."
+        title="Pick a template and create your survey"
+        body="Choose the closest template. When you click Create, SaferSay creates a draft survey and a secure invite link for each active employee."
         actions={[
           { href: "/app/participants", label: "Back: people" },
           { href: "/app/integrations", label: "Next: invites", primary: true },
@@ -40,7 +40,7 @@ export default function NewSurveyPage() {
         <Card>
           <h2 className="text-xl font-semibold">{template.name}</h2>
           <p className="mt-2 text-sm leading-6 text-[var(--brand-muted)]">{template.description}</p>
-          <p className="mt-4 text-sm text-[var(--brand-muted)]">{template.questions.length} questions — customize them below before creating the cycle.</p>
+          <p className="mt-4 text-sm text-[var(--brand-muted)]">{template.questions.length} questions — customize them below before launching the survey.</p>
         </Card>
       </div>
       <CreateSurveyCycle key={template.slug} templateSlug={template.slug} />
