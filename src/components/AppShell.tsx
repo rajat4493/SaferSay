@@ -23,7 +23,6 @@ import { useBrand } from "@/components/BrandProvider";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import { RoleTag } from "@/components/RoleTag";
 import { SignOutButton } from "@/components/SignOutButton";
-import { SuperAdminTenantSwitcher } from "@/components/SuperAdminTenantSwitcher";
 
 const featuredNavItem = { href: "/app", label: "Get started", helper: "Your next step", icon: Home };
 
@@ -104,8 +103,8 @@ export function AppShell({ children, title, subtitle }: { children: React.ReactN
         </aside>
 
         <section className="rounded-[var(--radius-shell)] border border-white/80 bg-[var(--brand-glass-surface)] p-4 shadow-[var(--shadow-elevated)] backdrop-blur-2xl">
-          <header className="flex flex-col justify-between gap-4 border-b border-[var(--brand-border)] pb-5 sm:flex-row sm:items-center">
-            <div>
+          <header className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--brand-border)] pb-5">
+            <div className="min-w-0">
               <div className="inline-flex items-center gap-2 rounded-[var(--radius-pill)] bg-[var(--brand-accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--brand-accent)]">
                 <ShieldCheck size={14} />
                 Confidential by design
@@ -113,9 +112,8 @@ export function AppShell({ children, title, subtitle }: { children: React.ReactN
               <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em]">{title}</h1>
               <p className="mt-2 text-sm leading-6 text-[var(--brand-muted)]">{subtitle}</p>
             </div>
-            <div className="flex items-center gap-3">
-              <SuperAdminTenantSwitcher />
-              <Link href="/app/pilot" className="inline-flex h-11 items-center justify-center rounded-[var(--radius-pill)] bg-[var(--brand-ink)] px-5 text-sm font-semibold text-white">
+            <div className="flex shrink-0 flex-wrap items-center gap-3">
+              <Link href="/app/pilot" className="inline-flex h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-[var(--radius-pill)] bg-[var(--brand-ink)] px-5 text-sm font-semibold text-white">
                 First-run guide
               </Link>
               <SignOutButton />
