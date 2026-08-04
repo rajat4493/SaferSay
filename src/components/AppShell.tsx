@@ -18,6 +18,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BrandMark } from "@/components/BrandMark";
 import { useBrand } from "@/components/BrandProvider";
+import { ImpersonationBanner } from "@/components/ImpersonationBanner";
+import { RoleTag } from "@/components/RoleTag";
 import { SignOutButton } from "@/components/SignOutButton";
 import { SuperAdminTenantSwitcher } from "@/components/SuperAdminTenantSwitcher";
 
@@ -57,7 +59,10 @@ export function AppShell({ children, title, subtitle }: { children: React.ReactN
           <Link href="/" className="flex items-center gap-3">
             <BrandMark />
             <div>
-              <div className="font-semibold leading-none">{brand.name}</div>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold leading-none">{brand.name}</span>
+                <RoleTag />
+              </div>
               <div className="mt-1 text-xs text-[var(--brand-muted)]">{brand.tagline}</div>
             </div>
           </Link>
@@ -96,7 +101,10 @@ export function AppShell({ children, title, subtitle }: { children: React.ReactN
               <SignOutButton />
             </div>
           </header>
-          <div className="pt-5">{children}</div>
+          <div className="pt-5">
+            <ImpersonationBanner />
+            {children}
+          </div>
         </section>
       </div>
     </main>

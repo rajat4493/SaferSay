@@ -6,5 +6,12 @@ export async function GET() {
   if (!session) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
-  return NextResponse.json({ ok: true, tenant: session.tenant, source: "session" });
+  return NextResponse.json({
+    ok: true,
+    tenant: session.tenant,
+    role: session.role,
+    isSuperAdmin: session.isSuperAdmin,
+    isImpersonating: session.tenant.id !== session.homeTenantId,
+    source: "session",
+  });
 }

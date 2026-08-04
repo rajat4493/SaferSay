@@ -25,8 +25,13 @@ export function ViewerShell({ children, title, subtitle }: { children: React.Rea
           <Link href="/" className="flex items-center gap-3">
             <BrandMark />
             <div>
-              <div className="font-semibold leading-none">{brand.name}</div>
-              <div className="mt-1 text-xs text-[var(--brand-muted)]">Viewer portal</div>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold leading-none">{brand.name}</span>
+                <span className="inline-flex items-center rounded-[var(--radius-pill)] bg-[var(--brand-accent-soft)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--brand-accent)]">
+                  Viewer
+                </span>
+              </div>
+              <div className="mt-1 text-xs text-[var(--brand-muted)]">Manager / HRBP portal</div>
             </div>
           </Link>
           <Link href="/app" className="rounded-full border border-[var(--brand-border)] bg-white px-4 py-2 text-sm font-semibold">Admin</Link>
