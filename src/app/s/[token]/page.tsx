@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Check, EyeOff } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Download, EyeOff } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { BrandMark } from "@/components/BrandMark";
@@ -101,6 +101,22 @@ export default function RespondentTokenPage() {
     setTextValue("");
   }
 
+  function downloadAnswers() {
+    const lines = answers.map((answer, index) => {
+      const q = questions[index];
+      const value = answer.textValue ?? answer.numberValue ?? "(skipped)";
+      return `${index + 1}. ${q?.text ?? answer.questionId}\n   Your answer: ${value}`;
+    });
+    const content = `${brand.name} — your survey answers\n\n${lines.join("\n\n")}\n`;
+    const blob = new Blob([content], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "my-survey-answers.txt";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function recordAnswer(answer: Answer) {
     const next = [...answers, answer];
     if (next.length < questions.length) {
@@ -171,6 +187,13 @@ export default function RespondentTokenPage() {
               </div>
               <h2 className="mt-6 text-4xl font-semibold tracking-[-0.03em]">Thanks. Your answers are in.</h2>
               <p className="mt-3 text-sm leading-6 text-[var(--brand-muted)]">Your participation was marked complete separately from your response content.</p>
+              <button
+                onClick={downloadAnswers}
+                className="mx-auto mt-6 inline-flex items-center justify-center gap-2 rounded-[var(--radius-pill)] border border-[var(--brand-border)] bg-white px-5 py-3 text-sm font-semibold transition hover:border-[var(--brand-accent)] hover:text-[var(--brand-accent)]"
+              >
+                <Download size={15} />
+                Download a copy of your answers
+              </button>
             </div>
           ) : question ? (
             <div className="rounded-[var(--radius-shell)] bg-white p-7 shadow-[var(--shadow-soft)]">
