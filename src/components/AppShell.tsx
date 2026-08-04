@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  ArrowRight,
   BarChart3,
   CreditCard,
   FileText,
@@ -9,7 +8,6 @@ import {
   Plug,
   LockKeyhole,
   Palette,
-  ListChecks,
   Plus,
   Rocket,
   ShieldCheck,
@@ -23,19 +21,29 @@ import { useBrand } from "@/components/BrandProvider";
 import { SignOutButton } from "@/components/SignOutButton";
 import { SuperAdminTenantSwitcher } from "@/components/SuperAdminTenantSwitcher";
 
-const nav = [
-  { href: "/app", label: "Home", helper: "Where to start", icon: Home },
-  { href: "/app/pilot", label: "First run", helper: "Your checklist", icon: ListChecks, featured: true },
-  { href: "/app/participants", label: "People", helper: "Upload employees", icon: Users },
-  { href: "/app/templates", label: "Templates", helper: "Question sets", icon: FileText },
-  { href: "/app/surveys/new", label: "Create survey", helper: "Issue tokens", icon: Plus },
-  { href: "/app/integrations", label: "Invites", helper: "Prepare sending", icon: Plug },
-  { href: "/app/reports", label: "Reports", helper: "Safe insights", icon: BarChart3 },
-  { href: "/app/readiness", label: "Go-live", helper: "Production checks", icon: Rocket },
-  { href: "/app/security", label: "Security", helper: "Confidentiality proof", icon: LockKeyhole },
-  { href: "/app/billing", label: "Billing", helper: "Payment setup", icon: CreditCard },
-  { href: "/app/brand", label: "Brand Studio", helper: "Client styling", icon: Palette },
-  { href: "/viewer", label: "Viewer portal", helper: "Manager view", icon: UserRoundCheck },
+const featuredNavItem = { href: "/app", label: "Get started", helper: "Your next step", icon: Home };
+
+const navGroups = [
+  {
+    label: "Run a survey",
+    items: [
+      { href: "/app/participants", label: "People", helper: "Upload employees", icon: Users },
+      { href: "/app/templates", label: "Templates", helper: "Question sets", icon: FileText },
+      { href: "/app/surveys/new", label: "Create survey", helper: "Send invite links", icon: Plus },
+      { href: "/app/integrations", label: "Invites", helper: "Prepare sending", icon: Plug },
+      { href: "/app/reports", label: "Reports", helper: "Safe insights", icon: BarChart3 },
+    ],
+  },
+  {
+    label: "Manage & settings",
+    items: [
+      { href: "/app/billing", label: "Billing", helper: "Payment setup", icon: CreditCard },
+      { href: "/app/brand", label: "Brand Studio", helper: "Client styling", icon: Palette },
+      { href: "/viewer", label: "Viewer portal", helper: "Manager view", icon: UserRoundCheck },
+      { href: "/app/readiness", label: "Go-live", helper: "Production checks", icon: Rocket, muted: true },
+      { href: "/app/security", label: "Security", helper: "Confidentiality proof", icon: LockKeyhole, muted: true },
+    ],
+  },
 ];
 
 export function AppShell({ children, title, subtitle }: { children: React.ReactNode; title: string; subtitle: string }) {
@@ -45,7 +53,7 @@ export function AppShell({ children, title, subtitle }: { children: React.ReactN
   return (
     <main className="min-h-screen bg-[var(--brand-bg)] text-[var(--brand-ink)]">
       <div className="mx-auto grid min-h-screen max-w-7xl gap-4 px-4 py-4 lg:grid-cols-[260px_1fr]">
-        <aside className="rounded-[2rem] border border-[var(--brand-border)] bg-white/70 p-4 shadow-[0_24px_70px_rgba(22,22,22,0.08)]">
+        <aside className="rounded-[var(--radius-shell)] border border-[var(--brand-glass-border)] bg-[var(--brand-glass-strong)] p-4 shadow-[var(--shadow-soft)] backdrop-blur-xl">
           <Link href="/" className="flex items-center gap-3">
             <BrandMark />
             <div>
@@ -55,46 +63,25 @@ export function AppShell({ children, title, subtitle }: { children: React.ReactN
           </Link>
 
           <nav className="mt-8 space-y-1">
-            {nav.map((item) => {
-              const active = pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold transition ${
-                    active
-                      ? "bg-[var(--brand-accent-soft)] text-[var(--brand-accent)]"
-                      : item.featured
-                        ? "bg-[var(--brand-ink)] text-white hover:opacity-90"
-                        : "text-[var(--brand-muted)] hover:bg-white"
-                  }`}
-                >
-                  <item.icon size={17} />
-                  <span className="min-w-0">
-                    <span className="block">{item.label}</span>
-                    <span className={`block truncate text-xs font-medium ${active || item.featured ? "opacity-75" : "text-[var(--brand-muted)]"}`}>
-                      {item.helper}
-                    </span>
-                  </span>
-                </Link>
-              );
-            })}
+            <NavLink item={featuredNavItem} active={pathname === featuredNavItem.href} featured />
           </nav>
 
-          <div className="mt-6 rounded-[1.5rem] border border-[var(--brand-border)] bg-white p-4">
-            <p className="text-sm font-semibold">Lost?</p>
-            <p className="mt-1 text-xs leading-5 text-[var(--brand-muted)]">Use the first-run guide. It tells you the next click based on what is already done.</p>
-            <Link href="/app/pilot" className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-[var(--brand-accent)]">
-              Open guide
-              <ArrowRight size={14} />
-            </Link>
-          </div>
+          {navGroups.map((group) => (
+            <div key={group.label} className="mt-6">
+              <p className="px-3 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--brand-muted)]">{group.label}</p>
+              <nav className="mt-2 space-y-1">
+                {group.items.map((item) => (
+                  <NavLink key={item.href} item={item} active={pathname === item.href} muted={"muted" in item && item.muted} />
+                ))}
+              </nav>
+            </div>
+          ))}
         </aside>
 
-        <section className="rounded-[2rem] border border-white/80 bg-white/60 p-4 shadow-[0_35px_100px_rgba(22,22,22,0.12)] backdrop-blur-2xl">
+        <section className="rounded-[var(--radius-shell)] border border-white/80 bg-[var(--brand-glass-surface)] p-4 shadow-[var(--shadow-elevated)] backdrop-blur-2xl">
           <header className="flex flex-col justify-between gap-4 border-b border-[var(--brand-border)] pb-5 sm:flex-row sm:items-center">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-[var(--brand-accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--brand-accent)]">
+              <div className="inline-flex items-center gap-2 rounded-[var(--radius-pill)] bg-[var(--brand-accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--brand-accent)]">
                 <ShieldCheck size={14} />
                 Confidential by design
               </div>
@@ -103,7 +90,7 @@ export function AppShell({ children, title, subtitle }: { children: React.ReactN
             </div>
             <div className="flex items-center gap-3">
               <SuperAdminTenantSwitcher />
-              <Link href="/app/pilot" className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--brand-ink)] px-5 text-sm font-semibold text-white">
+              <Link href="/app/pilot" className="inline-flex h-11 items-center justify-center rounded-[var(--radius-pill)] bg-[var(--brand-ink)] px-5 text-sm font-semibold text-white">
                 First-run guide
               </Link>
               <SignOutButton />
@@ -116,6 +103,37 @@ export function AppShell({ children, title, subtitle }: { children: React.ReactN
   );
 }
 
+type NavItem = { href: string; label: string; helper: string; icon: typeof Home };
+
+function NavLink({ item, active, featured, muted }: { item: NavItem; active: boolean; featured?: boolean; muted?: boolean }) {
+  return (
+    <Link
+      href={item.href}
+      className={`flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold transition ${
+        active
+          ? "bg-[var(--brand-accent-soft)] text-[var(--brand-accent)]"
+          : featured
+            ? "bg-[var(--brand-ink)] text-white hover:opacity-90"
+            : muted
+              ? "text-[var(--brand-muted)] opacity-80 hover:opacity-100 hover:bg-white"
+              : "text-[var(--brand-muted)] hover:bg-white"
+      }`}
+    >
+      <item.icon size={muted ? 15 : 17} />
+      <span className="min-w-0">
+        <span className="block">{item.label}</span>
+        <span className={`block truncate text-xs font-medium ${active || featured ? "opacity-75" : "text-[var(--brand-muted)]"}`}>{item.helper}</span>
+      </span>
+    </Link>
+  );
+}
+
 export function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <div className={`rounded-3xl border border-[var(--brand-border)] bg-[var(--brand-surface)] p-5 shadow-sm ${className}`}>{children}</div>;
+  return (
+    <div
+      className={`rounded-[var(--radius-card)] border border-[var(--brand-glass-border)] bg-[var(--brand-glass-strong)] p-5 shadow-[var(--shadow-soft)] backdrop-blur-xl ${className}`}
+    >
+      {children}
+    </div>
+  );
 }

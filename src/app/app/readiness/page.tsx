@@ -1,5 +1,6 @@
 import { AppShell, Card } from "@/components/AppShell";
 import { PageGuide } from "@/components/PageGuide";
+import { ServerOpsPanel } from "@/components/ServerOpsPanel";
 import { getRuntimeMode, runtimeChecks } from "@/lib/runtimeConfig";
 
 export default function ReadinessPage() {
@@ -44,6 +45,10 @@ export default function ReadinessPage() {
           </Card>
         ))}
       </div>
+
+      <h2 className="mt-8 text-sm font-semibold uppercase tracking-[0.14em] text-[var(--brand-muted)]">Developer tools</h2>
+      <p className="mt-1 text-sm text-[var(--brand-muted)]">Raw API testing for engineering use — not part of the normal workflow.</p>
+      <ServerOpsPanel />
     </AppShell>
   );
 }

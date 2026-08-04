@@ -11,6 +11,25 @@
   --brand-accent-soft: #ebe4ff;
   --brand-border: #e4ddd2;
   --brand-font: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+
+  /* Glass/shadow/radius tokens, derived from the brand palette above so any
+     white-label palette (Brand Studio) gets correctly-tinted surfaces for
+     free, without adding new fields to BrandTheme. */
+  --brand-glass-surface: color-mix(in srgb, var(--brand-surface) 72%, transparent);
+  --brand-glass-border: color-mix(in srgb, var(--brand-border) 60%, transparent);
+  --brand-glass-strong: color-mix(in srgb, var(--brand-surface) 88%, transparent);
+  --shadow-soft: 0 20px 60px rgba(22, 22, 22, 0.08);
+  --shadow-elevated: 0 35px 100px rgba(22, 22, 22, 0.14);
+  --radius-card: 1.75rem;
+  --radius-shell: 2rem;
+  --radius-pill: 999px;
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  :root {
+    --brand-glass-surface: var(--brand-surface);
+    --brand-glass-strong: var(--brand-surface);
+  }
 }
 
 @theme inline {
