@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MailCheck, Send } from "lucide-react";
+import { Check, Copy, ExternalLink, MailCheck, Send } from "lucide-react";
 import { Card } from "@/components/AppShell";
 
 type OutboxResult = {
@@ -35,6 +35,13 @@ type OutboxResult = {
 export function InviteOutboxPanel() {
   const [result, setResult] = useState<OutboxResult | null>(null);
   const [loading, setLoading] = useState("");
+  const [copiedId, setCopiedId] = useState("");
+
+  async function copyLink(id: string, path: string) {
+    await navigator.clipboard.writeText(`${window.location.origin}${path}`);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(""), 2000);
+  }
 
   async function call(path: string, body?: object, label = "Working") {
     setLoading(label);
@@ -104,14 +111,34 @@ export function InviteOutboxPanel() {
       ) : null}
 
       {result?.rows && result.rows.length > 0 ? (
-        <div className="mt-5 max-h-72 overflow-auto rounded-2xl border border-[var(--brand-border)] bg-white">
+        <div className="mt-5 max-h-96 overflow-auto rounded-2xl border border-[var(--brand-border)] bg-white">
           {result.rows.slice(0, 12).map((row) => (
             <div key={row.id} className="grid gap-3 border-b border-[var(--brand-border)] p-3 text-sm last:border-b-0 md:grid-cols-[1fr_110px_110px_90px]">
               <div>
                 <div className="font-semibold">{row.name || row.email}</div>
-                <div className="text-[var(--brand-muted)]">
-                  {row.email} {row.respondentPath ? "- link ready" : "- no link"}
-                </div>
+                <div className="text-[var(--brand-muted)]">{row.email}</div>
+                {row.respondentPath ? (
+                  <div className="mt-2 flex items-center gap-2">
+                    <button
+                      onClick={() => copyLink(row.id, row.respondentPath!)}
+                      className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] border border-[var(--brand-border)] bg-white px-3 py-1.5 text-xs font-semibold"
+                    >
+                      {copiedId === row.id ? <Check size={12} /> : <Copy size={12} />}
+                      {copiedId === row.id ? "Copied" : "Copy link"}
+                    </button>
+                    <a
+                      href={row.respondentPath}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] border border-[var(--brand-border)] bg-white px-3 py-1.5 text-xs font-semibold"
+                    >
+                      <ExternalLink size={12} />
+                      Open
+                    </a>
+                  </div>
+                ) : (
+                  <div className="mt-2 text-xs text-[var(--brand-muted)]">No link yet</div>
+                )}
               </div>
               <span className="text-[var(--brand-muted)]">{row.deliveryType}</span>
               <span className="font-semibold">{row.deliveryStatus}</span>
