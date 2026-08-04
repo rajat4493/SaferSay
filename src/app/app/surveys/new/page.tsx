@@ -40,16 +40,10 @@ export default function NewSurveyPage() {
         <Card>
           <h2 className="text-xl font-semibold">{template.name}</h2>
           <p className="mt-2 text-sm leading-6 text-[var(--brand-muted)]">{template.description}</p>
-          <div className="mt-4 max-h-80 space-y-2 overflow-auto">
-            {template.questions.map((question, index) => (
-              <div key={question.id} className="rounded-2xl bg-white p-3 text-sm">
-                <span className="font-semibold">{index + 1}.</span> {question.text}
-              </div>
-            ))}
-          </div>
+          <p className="mt-4 text-sm text-[var(--brand-muted)]">{template.questions.length} questions — customize them below before creating the cycle.</p>
         </Card>
       </div>
-      <CreateSurveyCycle templateSlug={template.slug} />
+      <CreateSurveyCycle key={template.slug} templateSlug={template.slug} />
     </AppShell>
   );
 }

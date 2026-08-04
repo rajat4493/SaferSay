@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getSessionContext } from "@/lib/server/authSession";
 import { getDatabasePool } from "@/lib/server/db/pool";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
-import { createTenantSurveyCycle } from "@/lib/server/surveyCycleService";
+import { createTenantSurveyCycle, type CustomCycleQuestion } from "@/lib/server/surveyCycleService";
 
 export async function POST(request: NextRequest) {
   const session = await getSessionContext();
@@ -15,7 +15,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "DATABASE_URL is required for survey cycle creation." }, { status: 503 });
   }
 
-  const body = (await request.json().catch(() => ({}))) as { templateSlug?: string; cycleName?: string };
+  const body = (await request.json().catch(() => ({}))) as {
+    templateSlug?: string;
+    cycleName?: string;
+    questions?: CustomCycleQuestion[];
+  };
   const { tenant, userId } = session;
 
   try {
@@ -25,6 +29,7 @@ export async function POST(request: NextRequest) {
       tenantName: tenant.name,
       templateSlug: body.templateSlug ?? "engagement-check",
       cycleName: body.cycleName,
+      questions: body.questions,
     });
     const repo = new IdentityRepository(db);
     await repo.emitOnboardingEvent(tenant.id, userId, "cycle");

@@ -556,20 +556,26 @@ Every downstream prioritization call (should we build directory import, should w
 
 See [docs/strategy/roadmap.md](docs/strategy/roadmap.md) for the full roadmap. Re-sequenced 2026-08-03 per founder direction: the grievance channel, while strategically important, was mis-prioritized in the first pass — it adds legal complexity, new roles, and audit trails not needed to prove the core product. The real validation question comes first: can a 10–60 person company run one confidential survey, get enough responses, see useful output, and pay?
 
+**Update, 2026-08-04 — real end-to-end proof + a new gap found by actually using the product:**
+- Ran the full product spine live against production: real Google OAuth login, real CSV employee upload, real survey cycle, 5 real respondent submissions clicked through the actual browser UI, report correctly protected below k=5 and unlocked exactly at n=5 (verified via the app's own DB function). Tenant isolation confirmed (`401` from an unauthenticated session on another tenant's report).
+- Founder asked directly whether they'd buy this as a founder — honest answer was no, chiefly because there was no way to customize a survey (only 3 hardcoded templates, zero editing). Built and shipped a minimal fix same-day: `/app/surveys/new` now supports include/exclude, reorder, and inline wording edits per question before creating a cycle. Customized cycles get their own cycle-scoped template row so edits never mutate the shared base template other tenants use — proven via a real Postgres-backed test against production, not just unit-level.
+- Known bug found during the walkthrough, not yet fixed: TAT `outbox`/`queue` onboarding events aren't firing even though invites were genuinely prepared/queued successfully — needs root-causing.
+
 **P0 — make one real paid confidential survey work:**
-1. Verified Resend sender domain (`survey@safersay.com`) — untrusted sandbox sender hurts response rate and trust directly.
-2. End-to-end live survey test — cycle creation → real invite links → submission → token spend → k≥5 report unlock. The product spine, proven not assumed.
-3. DB migration verification + integration tests, repeatable against Supabase.
-4. Stripe checkout + webhook + persisted billing (per-cycle pricing first).
-5. Security hardening (rate limiting, CSP, secret rotation, fail-closed production mode).
-6. CI/CD (lint/test/build/migration gates).
+1. Verified Resend sender domain (`survey@safersay.com`) — untrusted sandbox sender hurts response rate and trust directly. *Still pending real domain verification; code now fails closed on the sandbox sender in production.*
+2. ~~End-to-end live survey test~~ — **done, 2026-08-04**, proven live against production (see above).
+3. **Minimal survey customization** — **done, 2026-08-04** (see above). Re-prioritized here from P2 after using the live product surfaced it as the top gap.
+4. DB migration verification + integration tests, repeatable against Supabase. *Migrations through `0007` applied and verified against production.*
+5. Stripe checkout + webhook + persisted billing (per-cycle pricing first). *Not yet built.*
+6. Security hardening (rate limiting, CSP, secret rotation, fail-closed production mode).
+7. CI/CD (lint/test/build/migration gates).
 
 **P1 — make the pilot trustworthy and measurable:**
-7. In-product confidentiality explainer — ships before grievance, not after.
-8. TAT instrumentation completion (first-response and report-unlock events still unwired).
-9. Observability (Sentry-class error tracking).
-10. Action loop / recommendations ("You said / we will / done") — likely the biggest real differentiator; build before grievance.
+8. In-product confidentiality explainer — ships before grievance, not after.
+9. TAT instrumentation completion (first-response and report-unlock events still unwired; outbox/queue events have a known firing bug, see above).
+10. Observability (Sentry-class error tracking).
+11. Action loop / recommendations ("You said / we will / done") — likely the biggest real differentiator; build before grievance.
 
 **P2 — after first pilot signal:**
-11. Role/access matrix, data retention/deletion controls, real PDF export, directory connectors.
-12. Grievance/lawful-disclosure channel with legal review — deliberately deferred until core product has proven demand.
+12. Role/access matrix, data retention/deletion controls, real PDF export, directory connectors.
+13. Grievance/lawful-disclosure channel with legal review — deliberately deferred until core product has proven demand.

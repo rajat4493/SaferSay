@@ -3,12 +3,20 @@ import type { Pool } from "pg";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import { surveyTemplates, type SurveyTemplate } from "@/lib/templates";
 
+export type CustomCycleQuestion = {
+  text: string;
+  type: "likert_5" | "enps_0_10" | "open_text";
+  construct: string;
+  optional?: boolean;
+};
+
 export async function createTenantSurveyCycle(params: {
   db: Pool;
   tenantId: string;
   tenantName: string;
   templateSlug: string;
   cycleName?: string;
+  questions?: CustomCycleQuestion[];
 }) {
   const template = surveyTemplates.find((item) => item.slug === params.templateSlug);
   if (!template) throw new Error("Template was not found.");
@@ -17,8 +25,11 @@ export async function createTenantSurveyCycle(params: {
   const employeeCount = await identity.countActiveEmployees(params.tenantId);
   if (employeeCount < 1) throw new Error("Upload employees before creating a survey cycle.");
 
-  const templateId = await upsertTemplate(params.db, template);
   const cycleId = randomUUID();
+  const templateId =
+    params.questions && params.questions.length > 0
+      ? await createCycleScopedTemplate(params.db, template, cycleId, params.questions)
+      : await upsertTemplate(params.db, template);
   await params.db.query(
     `insert into responses.survey_cycles
       (id, tenant_id, template_id, name, status, payment_status)
@@ -70,6 +81,38 @@ async function upsertTemplate(db: Pool, template: SurveyTemplate) {
         question.construct,
         Boolean(question.optional),
       ],
+    );
+  }
+
+  return templateId;
+}
+
+/**
+ * Customized cycles get their own template row instead of the shared
+ * stable-hash one `upsertTemplate` writes — so editing/reordering/removing
+ * questions for one tenant's cycle never mutates the base template other
+ * tenants use unmodified.
+ */
+async function createCycleScopedTemplate(
+  db: Pool,
+  baseTemplate: SurveyTemplate,
+  cycleId: string,
+  questions: CustomCycleQuestion[],
+) {
+  const templateId = randomUUID();
+  const slug = `${baseTemplate.slug}-${cycleId}`;
+  await db.query(
+    `insert into responses.survey_templates (id, slug, name, description, category, estimated_minutes)
+     values ($1, $2, $3, $4, $5, $6)`,
+    [templateId, slug, baseTemplate.name, baseTemplate.description, baseTemplate.category, estimateMinutes(baseTemplate.duration)],
+  );
+
+  for (const [index, question] of questions.entries()) {
+    await db.query(
+      `insert into responses.template_questions
+        (id, template_id, position, question_text, question_type, construct, is_optional)
+       values ($1, $2, $3, $4, $5, $6, $7)`,
+      [randomUUID(), templateId, index + 1, question.text, question.type, question.construct, Boolean(question.optional)],
     );
   }
 
