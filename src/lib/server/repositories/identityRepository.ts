@@ -9,6 +9,7 @@ import {
   OnboardingEventKey,
   PilotIdentitySummary,
   QueuedInviteDelivery,
+  TenantDirectoryEntry,
   TenantRecord,
   UserRecord,
   UserRole,
@@ -76,6 +77,41 @@ export class IdentityRepository {
       "select id, name, slug from identity.tenants order by name asc",
     );
     return result.rows;
+  }
+
+  async listTenantsWithStats(): Promise<TenantDirectoryEntry[]> {
+    const result = await this.db.query<{
+      id: string;
+      name: string;
+      slug: string;
+      employee_count: string;
+      latest_cycle_name: string | null;
+      latest_cycle_status: string | null;
+      last_activity_at: string | null;
+    }>(
+      `select
+         t.id,
+         t.name,
+         t.slug,
+         (select count(*) from identity.employees e where e.tenant_id = t.id and e.employment_status = 'active')::text as employee_count,
+         (select c.name from responses.survey_cycles c where c.tenant_id = t.id order by c.created_at desc limit 1) as latest_cycle_name,
+         (select c.status from responses.survey_cycles c where c.tenant_id = t.id order by c.created_at desc limit 1) as latest_cycle_status,
+         greatest(
+           t.updated_at,
+           coalesce((select max(oe.occurred_at) from identity.onboarding_events oe where oe.tenant_id = t.id), t.updated_at)
+         )::text as last_activity_at
+       from identity.tenants t
+       order by last_activity_at desc nulls last`,
+    );
+    return result.rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      employeeCount: Number(row.employee_count),
+      latestCycleName: row.latest_cycle_name,
+      latestCycleStatus: row.latest_cycle_status,
+      lastActivityAt: row.last_activity_at,
+    }));
   }
 
   async logSuperAdminAccess(superAdminUserId: string, superAdminEmail: string, tenantId: string) {

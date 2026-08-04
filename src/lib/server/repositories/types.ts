@@ -18,6 +18,16 @@ export type UserRecord = {
 
 export type OnboardingEventKey = "signup" | "employees" | "cycle" | "tokens" | "outbox" | "queue" | "responses" | "report";
 
+export type TenantDirectoryEntry = {
+  id: string;
+  name: string;
+  slug: string;
+  employeeCount: number;
+  latestCycleName: string | null;
+  latestCycleStatus: string | null;
+  lastActivityAt: string | null;
+};
+
 export type EmployeeImportRecord = {
   email: string;
   name?: string;

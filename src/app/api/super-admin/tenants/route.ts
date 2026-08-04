@@ -20,7 +20,9 @@ export async function GET() {
   }
 
   const db = getDatabasePool();
-  const tenants = db ? await new IdentityRepository(db).listTenants() : [session.tenant];
+  const tenants = db
+    ? await new IdentityRepository(db).listTenantsWithStats()
+    : [{ ...session.tenant, employeeCount: 0, latestCycleName: null, latestCycleStatus: null, lastActivityAt: null }];
 
   return NextResponse.json({
     ok: true,

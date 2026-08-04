@@ -2,6 +2,7 @@
 
 import {
   BarChart3,
+  ChevronDown,
   CreditCard,
   FileText,
   Home,
@@ -16,6 +17,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { BrandMark } from "@/components/BrandMark";
 import { useBrand } from "@/components/BrandProvider";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
@@ -38,6 +40,7 @@ const navGroups = [
   },
   {
     label: "Manage & settings",
+    collapsible: true,
     items: [
       { href: "/app/billing", label: "Billing", helper: "Payment setup", icon: CreditCard },
       { href: "/app/brand", label: "Brand Studio", helper: "Client styling", icon: Palette },
@@ -51,6 +54,7 @@ const navGroups = [
 export function AppShell({ children, title, subtitle }: { children: React.ReactNode; title: string; subtitle: string }) {
   const pathname = usePathname();
   const { brand } = useBrand();
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
   return (
     <main className="min-h-screen bg-[var(--brand-bg)] text-[var(--brand-ink)]">
@@ -71,16 +75,32 @@ export function AppShell({ children, title, subtitle }: { children: React.ReactN
             <NavLink item={featuredNavItem} active={pathname === featuredNavItem.href} featured />
           </nav>
 
-          {navGroups.map((group) => (
-            <div key={group.label} className="mt-6">
-              <p className="px-3 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--brand-muted)]">{group.label}</p>
-              <nav className="mt-2 space-y-1">
-                {group.items.map((item) => (
-                  <NavLink key={item.href} item={item} active={pathname === item.href} muted={"muted" in item && item.muted} />
-                ))}
-              </nav>
-            </div>
-          ))}
+          {navGroups.map((group) => {
+            const hasActiveItem = group.items.some((item) => pathname === item.href);
+            const isOpen = "collapsible" in group && group.collapsible ? (openGroups[group.label] ?? hasActiveItem) : true;
+            return (
+              <div key={group.label} className="mt-6">
+                {"collapsible" in group && group.collapsible ? (
+                  <button
+                    onClick={() => setOpenGroups((current) => ({ ...current, [group.label]: !isOpen }))}
+                    className="flex w-full items-center justify-between px-3 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--brand-muted)]"
+                  >
+                    {group.label}
+                    <ChevronDown size={14} className={`transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                  </button>
+                ) : (
+                  <p className="px-3 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--brand-muted)]">{group.label}</p>
+                )}
+                {isOpen ? (
+                  <nav className="mt-2 space-y-1">
+                    {group.items.map((item) => (
+                      <NavLink key={item.href} item={item} active={pathname === item.href} muted={"muted" in item && item.muted} />
+                    ))}
+                  </nav>
+                ) : null}
+              </div>
+            );
+          })}
         </aside>
 
         <section className="rounded-[var(--radius-shell)] border border-white/80 bg-[var(--brand-glass-surface)] p-4 shadow-[var(--shadow-elevated)] backdrop-blur-2xl">

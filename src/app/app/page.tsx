@@ -1,13 +1,43 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { OwnerTenantDirectory } from "@/components/OwnerTenantDirectory";
 import { PilotGuide } from "@/components/PilotGuide";
 
+type ViewMode = "loading" | "owner-directory" | "workflow";
+
 export default function Dashboard() {
+  const [mode, setMode] = useState<ViewMode>("loading");
+
+  useEffect(() => {
+    fetch("/api/tenants/current")
+      .then((response) => response.json())
+      .then((data) => {
+        if (!data.ok) return setMode("workflow");
+        setMode(data.isSuperAdmin && !data.isImpersonating ? "owner-directory" : "workflow");
+      })
+      .catch(() => setMode("workflow"));
+  }, []);
+
   const workflow = [
     { step: "1", title: "Load people", text: "Upload a CSV with employee email, name, team, and location.", href: "/app/participants" },
     { step: "2", title: "Create survey", text: "Pick a template and send a secure invite link to each employee.", href: "/app/surveys/new" },
     { step: "3", title: "Prepare invites", text: "Queue invitations from the participation store only.", href: "/app/integrations" },
     { step: "4", title: "Read report", text: "Reports unlock only when the safe response threshold is met.", href: "/app/reports" },
   ];
+
+  if (mode === "loading") {
+    return <AppShell title="Get started" subtitle=" "><div className="h-40" /></AppShell>;
+  }
+
+  if (mode === "owner-directory") {
+    return (
+      <AppShell title="Get started" subtitle="You're signed in as SaferSay's owner — here's every customer workspace.">
+        <OwnerTenantDirectory />
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell title="Get started" subtitle="Here's your next step — this page always shows exactly what to do to run one confidential survey.">
