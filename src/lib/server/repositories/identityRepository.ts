@@ -71,6 +71,21 @@ export class IdentityRepository {
     );
   }
 
+  async listTenants(): Promise<TenantRecord[]> {
+    const result = await this.db.query<{ id: string; name: string; slug: string }>(
+      "select id, name, slug from identity.tenants order by name asc",
+    );
+    return result.rows;
+  }
+
+  async logSuperAdminAccess(superAdminUserId: string, superAdminEmail: string, tenantId: string) {
+    await this.db.query(
+      `insert into identity.super_admin_access_log (id, super_admin_user_id, super_admin_email, tenant_id)
+       values ($1, $2, $3, $4)`,
+      [randomUUID(), superAdminUserId, superAdminEmail, tenantId],
+    );
+  }
+
   async createTenant(name: string, slug = toTenantSlug(name)): Promise<TenantRecord> {
     const id = randomUUID();
     const result = await this.db.query<{ id: string; name: string; slug: string }>(

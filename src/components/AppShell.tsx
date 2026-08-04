@@ -21,6 +21,7 @@ import { usePathname } from "next/navigation";
 import { BrandMark } from "@/components/BrandMark";
 import { useBrand } from "@/components/BrandProvider";
 import { SignOutButton } from "@/components/SignOutButton";
+import { SuperAdminTenantSwitcher } from "@/components/SuperAdminTenantSwitcher";
 
 const nav = [
   { href: "/app", label: "Home", helper: "Where to start", icon: Home },
@@ -101,6 +102,7 @@ export function AppShell({ children, title, subtitle }: { children: React.ReactN
               <p className="mt-2 text-sm leading-6 text-[var(--brand-muted)]">{subtitle}</p>
             </div>
             <div className="flex items-center gap-3">
+              <SuperAdminTenantSwitcher />
               <Link href="/app/pilot" className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--brand-ink)] px-5 text-sm font-semibold text-white">
                 First-run guide
               </Link>

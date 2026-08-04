@@ -1,4 +1,5 @@
 import "server-only";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getRuntimeMode } from "@/lib/runtimeConfig";
 import { getDatabasePool } from "@/lib/server/db/pool";
@@ -13,7 +14,11 @@ export type SessionContext = {
   name: string | null;
   role: UserRole;
   tenant: { id: string; name: string; slug: string };
+  isSuperAdmin: boolean;
+  homeTenantId: string;
 };
+
+export const superAdminTenantCookieName = "safersay_super_admin_tenant";
 
 const localDevContext: SessionContext = {
   userId: "local-dev",
@@ -21,10 +26,27 @@ const localDevContext: SessionContext = {
   name: "Local dev",
   role: "owner",
   tenant: localTenant,
+  isSuperAdmin: false,
+  homeTenantId: localTenant.id,
 };
 
 function hasSupabaseConfig() {
   return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
+}
+
+/**
+ * The Super Admin switch is scoped to tenant/ops management only — it never
+ * exempts anything from the k>=5 protected-report threshold or any other
+ * severance rule. A super admin viewing another tenant sees exactly what
+ * that tenant's own owner/admin would see, nothing more, and every switch
+ * is logged (see IdentityRepository.logSuperAdminAccess).
+ */
+export function isSuperAdminEmail(email: string) {
+  const allowlist = (process.env.SUPER_ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean);
+  return allowlist.includes(email.toLowerCase());
 }
 
 /**
@@ -47,16 +69,28 @@ export async function getSessionContext(): Promise<SessionContext | null> {
   const db = getDatabasePool();
   if (!db) {
     const { tenant } = await resolveTenantContext();
-    return { userId: authUser.id, email: authUser.email, name: null, role: "owner", tenant };
+    return { userId: authUser.id, email: authUser.email, name: null, role: "owner", tenant, isSuperAdmin: false, homeTenantId: tenant.id };
   }
 
   const repo = new IdentityRepository(db);
   const record = await resolveUserRecord(repo, authUser.id, authUser.email, authUser.user_metadata);
 
-  const tenant = await repo.findTenantById(record.tenantId);
-  if (!tenant) return null;
+  const homeTenant = await repo.findTenantById(record.tenantId);
+  if (!homeTenant) return null;
 
-  return { userId: authUser.id, email: record.email, name: record.name, role: record.role, tenant };
+  const isSuperAdmin = isSuperAdminEmail(authUser.email);
+  let tenant = homeTenant;
+
+  if (isSuperAdmin) {
+    const cookieStore = await cookies();
+    const overrideTenantId = cookieStore.get(superAdminTenantCookieName)?.value;
+    if (overrideTenantId && overrideTenantId !== homeTenant.id) {
+      const overrideTenant = await repo.findTenantById(overrideTenantId);
+      if (overrideTenant) tenant = overrideTenant;
+    }
+  }
+
+  return { userId: authUser.id, email: record.email, name: record.name, role: record.role, tenant, isSuperAdmin, homeTenantId: homeTenant.id };
 }
 
 async function resolveUserRecord(
