@@ -1,25 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ShieldAlert } from "lucide-react";
-
-type Info = { isImpersonating: boolean; tenantName: string } | null;
+import { useTenantSession } from "@/lib/useTenantSession";
 
 export function ImpersonationBanner() {
   const router = useRouter();
-  const [info, setInfo] = useState<Info>(null);
+  const { info } = useTenantSession();
   const [returning, setReturning] = useState(false);
-
-  useEffect(() => {
-    fetch("/api/tenants/current")
-      .then((response) => response.json())
-      .then((data) => {
-        if (!data.ok || !data.isImpersonating) return;
-        setInfo({ isImpersonating: true, tenantName: data.tenant?.name ?? "another workspace" });
-      })
-      .catch(() => undefined);
-  }, []);
 
   async function returnToOwnWorkspace() {
     setReturning(true);

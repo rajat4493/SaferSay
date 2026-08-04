@@ -23,12 +23,30 @@ import { useBrand } from "@/components/BrandProvider";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import { RoleTag } from "@/components/RoleTag";
 import { SignOutButton } from "@/components/SignOutButton";
+import { useTenantSession } from "@/lib/useTenantSession";
 
 const featuredNavItem = { href: "/app", label: "Get started", helper: "Your next step", icon: Home };
 
-const navGroups = [
+type NavItemConfig = {
+  href: string;
+  label: string;
+  helper: string;
+  icon: typeof Home;
+  muted?: boolean;
+  hideForPureOwner?: boolean;
+};
+
+type NavGroupConfig = {
+  label: string;
+  collapsible?: boolean;
+  hideForPureOwner?: boolean;
+  items: NavItemConfig[];
+};
+
+const navGroups: NavGroupConfig[] = [
   {
     label: "Run a survey",
+    hideForPureOwner: true,
     items: [
       { href: "/app/participants", label: "People", helper: "Upload employees", icon: Users },
       { href: "/app/templates", label: "Templates", helper: "Question sets", icon: FileText },
@@ -41,9 +59,9 @@ const navGroups = [
     label: "Manage & settings",
     collapsible: true,
     items: [
-      { href: "/app/billing", label: "Billing", helper: "Payment setup", icon: CreditCard },
-      { href: "/app/brand", label: "Brand Studio", helper: "Client styling", icon: Palette },
-      { href: "/viewer", label: "Viewer portal", helper: "Manager view", icon: UserRoundCheck },
+      { href: "/app/billing", label: "Billing", helper: "Payment setup", icon: CreditCard, hideForPureOwner: true },
+      { href: "/app/brand", label: "Brand Studio", helper: "Client styling", icon: Palette, hideForPureOwner: true },
+      { href: "/viewer", label: "Viewer portal", helper: "Manager view", icon: UserRoundCheck, hideForPureOwner: true },
       { href: "/app/readiness", label: "Go-live", helper: "Production checks", icon: Rocket, muted: true },
       { href: "/app/security", label: "Security", helper: "Confidentiality proof", icon: LockKeyhole, muted: true },
     ],
@@ -53,7 +71,21 @@ const navGroups = [
 export function AppShell({ children, title, subtitle }: { children: React.ReactNode; title: string; subtitle: string }) {
   const pathname = usePathname();
   const { brand } = useBrand();
+  const { info } = useTenantSession();
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+
+  // Pure Owner mode: signed in as the platform's super admin, not currently
+  // acting inside any customer's workspace. No survey-running nav belongs
+  // here -- that only appears once the Owner has explicitly entered a tenant.
+  const pureOwnerMode = Boolean(info?.isSuperAdmin && !info.isImpersonating);
+
+  const visibleNavGroups = navGroups
+    .filter((group) => !(pureOwnerMode && group.hideForPureOwner))
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => !(pureOwnerMode && item.hideForPureOwner)),
+    }))
+    .filter((group) => group.items.length > 0);
 
   return (
     <main className="min-h-screen bg-[var(--brand-bg)] text-[var(--brand-ink)]">
@@ -74,12 +106,12 @@ export function AppShell({ children, title, subtitle }: { children: React.ReactN
             <NavLink item={featuredNavItem} active={pathname === featuredNavItem.href} featured />
           </nav>
 
-          {navGroups.map((group) => {
+          {visibleNavGroups.map((group) => {
             const hasActiveItem = group.items.some((item) => pathname === item.href);
-            const isOpen = "collapsible" in group && group.collapsible ? (openGroups[group.label] ?? hasActiveItem) : true;
+            const isOpen = group.collapsible ? (openGroups[group.label] ?? hasActiveItem) : true;
             return (
               <div key={group.label} className="mt-6">
-                {"collapsible" in group && group.collapsible ? (
+                {group.collapsible ? (
                   <button
                     onClick={() => setOpenGroups((current) => ({ ...current, [group.label]: !isOpen }))}
                     className="flex w-full items-center justify-between px-3 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--brand-muted)]"
@@ -93,7 +125,7 @@ export function AppShell({ children, title, subtitle }: { children: React.ReactN
                 {isOpen ? (
                   <nav className="mt-2 space-y-1">
                     {group.items.map((item) => (
-                      <NavLink key={item.href} item={item} active={pathname === item.href} muted={"muted" in item && item.muted} />
+                      <NavLink key={item.href} item={item} active={pathname === item.href} muted={item.muted} />
                     ))}
                   </nav>
                 ) : null}

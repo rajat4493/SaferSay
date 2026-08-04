@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Search } from "lucide-react";
+import { ArrowRight, Search, ShieldAlert, X } from "lucide-react";
 import { Card } from "@/components/AppShell";
 
 type TenantEntry = {
@@ -24,7 +24,8 @@ export function OwnerTenantDirectory() {
   const router = useRouter();
   const [tenants, setTenants] = useState<TenantEntry[] | null>(null);
   const [search, setSearch] = useState("");
-  const [switchingId, setSwitchingId] = useState("");
+  const [pendingTenant, setPendingTenant] = useState<TenantEntry | null>(null);
+  const [entering, setEntering] = useState(false);
 
   useEffect(() => {
     fetch("/api/super-admin/tenants")
@@ -36,12 +37,13 @@ export function OwnerTenantDirectory() {
       .catch(() => undefined);
   }, []);
 
-  async function enter(tenantId: string) {
-    setSwitchingId(tenantId);
+  async function confirmEnter() {
+    if (!pendingTenant) return;
+    setEntering(true);
     await fetch("/api/super-admin/switch", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ tenantId }),
+      body: JSON.stringify({ tenantId: pendingTenant.id }),
     });
     router.push("/app");
     router.refresh();
@@ -130,11 +132,10 @@ export function OwnerTenantDirectory() {
                     <td className="px-4 py-3 text-[var(--brand-muted)]">{formatDate(tenant.lastActivityAt)}</td>
                     <td className="px-4 py-3 text-right">
                       <button
-                        onClick={() => enter(tenant.id)}
-                        disabled={switchingId === tenant.id}
-                        className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[var(--radius-pill)] bg-[var(--brand-ink)] px-4 text-xs font-semibold text-white disabled:opacity-50"
+                        onClick={() => setPendingTenant(tenant)}
+                        className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[var(--radius-pill)] bg-[var(--brand-ink)] px-4 text-xs font-semibold text-white"
                       >
-                        {switchingId === tenant.id ? "Entering..." : "Enter"}
+                        Enter
                         <ArrowRight size={12} />
                       </button>
                     </td>
@@ -145,6 +146,46 @@ export function OwnerTenantDirectory() {
           )}
         </div>
       </Card>
+
+      {pendingTenant ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onClick={() => !entering && setPendingTenant(null)}>
+          <div
+            className="w-full max-w-sm rounded-[var(--radius-shell)] bg-white p-6 shadow-[var(--shadow-elevated)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="inline-flex items-center gap-2 rounded-[var(--radius-pill)] bg-[#f6e2df] px-3 py-1 text-xs font-semibold text-[#9a392d]">
+                <ShieldAlert size={14} />
+                Confirm
+              </div>
+              <button onClick={() => !entering && setPendingTenant(null)} className="text-[var(--brand-muted)]">
+                <X size={18} />
+              </button>
+            </div>
+            <h2 className="mt-4 text-xl font-semibold">Enter {pendingTenant.name}?</h2>
+            <p className="mt-2 text-sm leading-6 text-[var(--brand-muted)]">
+              You&apos;ll see and act on this workspace&apos;s real data as SaferSay Owner. This is logged. Use this only for support or
+              testing, not routine access.
+            </p>
+            <div className="mt-5 flex gap-2">
+              <button
+                onClick={() => setPendingTenant(null)}
+                disabled={entering}
+                className="flex-1 rounded-[var(--radius-pill)] border border-[var(--brand-border)] bg-white px-4 py-3 text-sm font-semibold disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmEnter}
+                disabled={entering}
+                className="flex-1 rounded-[var(--radius-pill)] bg-[var(--brand-ink)] px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {entering ? "Entering..." : "Enter workspace"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
