@@ -129,8 +129,8 @@ export default function RespondentTokenPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#111] p-4 text-[var(--brand-ink)]">
-      <section className="mx-auto grid min-h-[calc(100vh-2rem)] max-w-5xl place-items-center rounded-[2.5rem] bg-[var(--brand-bg)] p-5">
+    <main className="min-h-screen bg-[var(--brand-ink)] p-4 text-[var(--brand-ink)]">
+      <section className="mx-auto grid min-h-[calc(100vh-2rem)] max-w-5xl place-items-center rounded-[var(--radius-shell)] bg-[var(--brand-bg)] p-5">
         <div className="w-full max-w-xl">
           <div className="mb-8 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -140,7 +140,7 @@ export default function RespondentTokenPage() {
                 <p className="text-xs text-[var(--brand-muted)]">Confidential employee survey</p>
               </div>
             </div>
-            <div className="rounded-full bg-white px-3 py-2 text-xs font-semibold text-[var(--brand-muted)]">{progressText}</div>
+            <div className="rounded-[var(--radius-pill)] bg-white px-3 py-2 text-xs font-semibold text-[var(--brand-muted)]">{progressText}</div>
           </div>
 
           {step === "loading" ? (
@@ -148,37 +148,37 @@ export default function RespondentTokenPage() {
           ) : step === "invalid" ? (
             <Panel title="This link is not active" text={error || "The token is missing, already submitted, or no longer valid."} />
           ) : step === "intro" ? (
-            <div className="rounded-[2rem] bg-white p-6 shadow-sm">
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-[var(--brand-accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--brand-accent)]">
+            <div className="rounded-[var(--radius-shell)] bg-white p-7 shadow-[var(--shadow-soft)]">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-[var(--radius-pill)] bg-[var(--brand-accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--brand-accent)]">
                 <EyeOff size={14} />
                 Before question 1
               </div>
-              <h2 className="text-4xl font-semibold leading-tight tracking-[-0.04em]">How your answers stay confidential</h2>
-              <div className="mt-5 space-y-3 text-sm leading-6 text-[var(--brand-muted)]">
+              <h2 className="text-5xl font-semibold leading-[0.98] tracking-[-0.045em]">How your answers stay confidential</h2>
+              <div className="mt-6 space-y-3 text-sm leading-6 text-[var(--brand-muted)]">
                 <p>This link confirms eligibility and prevents duplicate responses.</p>
                 <p>Your answers are stored separately from identity and participation state.</p>
                 <p>Your employer sees grouped results only. Groups under five stay hidden.</p>
               </div>
-              <button onClick={() => setStep("survey")} className="mt-8 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[var(--brand-accent)] text-sm font-semibold text-white">
+              <button onClick={() => setStep("survey")} className="mt-8 flex h-12 w-full items-center justify-center gap-2 rounded-[var(--radius-pill)] bg-[var(--brand-accent)] text-sm font-semibold text-white transition hover:-translate-y-0.5">
                 Start survey
                 <ArrowRight size={16} />
               </button>
             </div>
           ) : step === "done" ? (
-            <div className="rounded-[2rem] bg-white p-6 text-center shadow-sm">
-              <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-[var(--brand-accent-soft)] text-[var(--brand-accent)]">
-                <Check />
+            <div className="rounded-[var(--radius-shell)] bg-white p-8 text-center shadow-[var(--shadow-elevated)]">
+              <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-[var(--brand-accent-soft)] text-[var(--brand-accent)]">
+                <Check size={28} />
               </div>
-              <h2 className="mt-5 text-3xl font-semibold">Thanks. Your answers are in.</h2>
+              <h2 className="mt-6 text-4xl font-semibold tracking-[-0.03em]">Thanks. Your answers are in.</h2>
               <p className="mt-3 text-sm leading-6 text-[var(--brand-muted)]">Your participation was marked complete separately from your response content.</p>
             </div>
           ) : question ? (
-            <div className="rounded-[2rem] bg-white p-6 shadow-sm">
-              <div className="mb-5 h-2 rounded-full bg-[var(--brand-border)]">
-                <div className="h-full rounded-full bg-[var(--brand-accent)]" style={{ width: `${((current + 1) / questions.length) * 100}%` }} />
+            <div className="rounded-[var(--radius-shell)] bg-white p-7 shadow-[var(--shadow-soft)]">
+              <div className="mb-5 h-2 rounded-[var(--radius-pill)] bg-[var(--brand-border)]">
+                <div className="h-full rounded-[var(--radius-pill)] bg-[var(--brand-accent)] transition-all" style={{ width: `${((current + 1) / questions.length) * 100}%` }} />
               </div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--brand-muted)]">{question.construct ?? session?.templateName ?? "Survey"}</p>
-              <h2 className="mt-3 text-3xl font-semibold leading-tight tracking-[-0.03em]">{question.text}</h2>
+              <h2 className="mt-3 text-4xl font-semibold leading-[1.02] tracking-[-0.035em]">{question.text}</h2>
               {question.type === "open_text" ? (
                 <div className="mt-7 grid gap-3">
                   <textarea value={textValue} onChange={(event) => setTextValue(event.target.value)} className="min-h-36 rounded-2xl border border-[var(--brand-border)] bg-[var(--brand-bg)] p-4 text-sm outline-none focus:border-[var(--brand-accent)]" />
@@ -223,8 +223,8 @@ function scaleLabel(type: SurveyQuestion["type"], value: number) {
 
 function Panel({ title, text }: { title: string; text: string }) {
   return (
-    <div className="rounded-[2rem] bg-white p-6 shadow-sm">
-      <h2 className="text-3xl font-semibold">{title}</h2>
+    <div className="rounded-[var(--radius-shell)] bg-white p-7 shadow-[var(--shadow-soft)]">
+      <h2 className="text-4xl font-semibold tracking-[-0.03em]">{title}</h2>
       <p className="mt-3 text-sm leading-6 text-[var(--brand-muted)]">{text}</p>
     </div>
   );

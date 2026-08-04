@@ -41,9 +41,18 @@ export function ProtectedReportPanel({ mode = "admin" }: { mode?: "admin" | "vie
   return (
     <>
       <div className="grid gap-4 lg:grid-cols-3">
-        <ShellCard><h2 className="text-3xl font-semibold">{report?.n ?? 0}</h2><p className="text-sm text-[var(--brand-muted)]">Responses</p></ShellCard>
-        <ShellCard><h2 className="text-3xl font-semibold">{minGroupSize}</h2><p className="text-sm text-[var(--brand-muted)]">Minimum group size</p></ShellCard>
-        <ShellCard><h2 className="text-3xl font-semibold">{report?.protected ? "Protected" : "Visible"}</h2><p className="text-sm text-[var(--brand-muted)]">Report state</p></ShellCard>
+        <ShellCard><h2 className="text-5xl font-semibold tracking-[-0.03em]">{report?.n ?? 0}</h2><p className="mt-1 text-sm text-[var(--brand-muted)]">Responses</p></ShellCard>
+        <ShellCard><h2 className="text-5xl font-semibold tracking-[-0.03em]">{minGroupSize}</h2><p className="mt-1 text-sm text-[var(--brand-muted)]">Minimum group size</p></ShellCard>
+        <div
+          className={`rounded-[var(--radius-card)] p-5 shadow-[var(--shadow-soft)] ${
+            report?.protected
+              ? "border border-[var(--brand-border)] bg-[var(--brand-surface)]"
+              : "bg-[var(--brand-ink)] text-white"
+          }`}
+        >
+          <h2 className="text-5xl font-semibold tracking-[-0.03em]">{report?.protected ? "Protected" : "Unlocked"}</h2>
+          <p className={`mt-1 text-sm ${report?.protected ? "text-[var(--brand-muted)]" : "text-white/60"}`}>Report state</p>
+        </div>
       </div>
 
       <ShellCard>
