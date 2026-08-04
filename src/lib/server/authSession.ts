@@ -127,3 +127,14 @@ export async function requireSessionContext(nextPath: string): Promise<SessionCo
   if (context) return context;
   redirect(`/login?next=${encodeURIComponent(nextPath)}`);
 }
+
+/**
+ * True when the platform owner is currently acting inside a tenant that
+ * isn't their own. Single source of truth for this check -- routes that
+ * must never expose response content to the Company/Owner layer (see
+ * docs/strategy/SAFERSAY_FINAL_ARCHITECTURE.md §2.2) should gate on this,
+ * not re-derive it inline, so the rule can't drift out of sync.
+ */
+export function isPlatformOwnerImpersonating(session: SessionContext): boolean {
+  return session.isSuperAdmin && session.tenant.id !== session.homeTenantId;
+}

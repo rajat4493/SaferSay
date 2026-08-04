@@ -12,7 +12,6 @@ import {
   Plus,
   Rocket,
   ShieldCheck,
-  UserRoundCheck,
   Users,
 } from "lucide-react";
 import Link from "next/link";
@@ -61,7 +60,12 @@ const navGroups: NavGroupConfig[] = [
     items: [
       { href: "/app/billing", label: "Billing", helper: "Payment setup", icon: CreditCard, hideForPureOwner: true },
       { href: "/app/brand", label: "Brand Studio", helper: "Client styling", icon: Palette, hideForPureOwner: true },
-      { href: "/viewer", label: "Viewer portal", helper: "Manager view", icon: UserRoundCheck, hideForPureOwner: true },
+      // "Viewer portal" (manager/team-lead scoped views) is deliberately not
+      // linked from nav yet -- the Manager role and its scope enforcement
+      // aren't real (see docs/strategy/SAFERSAY_FINAL_ARCHITECTURE.md §6),
+      // and shipping the UI ahead of the permission model risks leaking a
+      // sub-k team's data. The /viewer pages/routes still exist but are
+      // unlinked until that role ships for real.
       { href: "/app/readiness", label: "Go-live", helper: "Production checks", icon: Rocket, muted: true },
       { href: "/app/security", label: "Security", helper: "Confidentiality proof", icon: LockKeyhole, muted: true },
     ],

@@ -30,11 +30,12 @@ export async function createTenantSurveyCycle(params: {
     params.questions && params.questions.length > 0
       ? await createCycleScopedTemplate(params.db, template, cycleId, params.questions)
       : await upsertTemplate(params.db, template);
+  const minGroupSize = await identity.getMinGroupSize(params.tenantId);
   await params.db.query(
     `insert into responses.survey_cycles
-      (id, tenant_id, template_id, name, status, payment_status)
-     values ($1, $2, $3, $4, 'draft', 'free_preview')`,
-    [cycleId, params.tenantId, templateId, params.cycleName?.trim() || `${params.tenantName} ${template.name}`],
+      (id, tenant_id, template_id, name, status, payment_status, min_group_size)
+     values ($1, $2, $3, $4, 'draft', 'free_preview', $5)`,
+    [cycleId, params.tenantId, templateId, params.cycleName?.trim() || `${params.tenantName} ${template.name}`, minGroupSize],
   );
 
   const tokens = await identity.issueTokens(params.tenantId, cycleId);

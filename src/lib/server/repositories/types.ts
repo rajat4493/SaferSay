@@ -42,6 +42,10 @@ export type EmployeeImportRecord = {
   name?: string;
   team?: string;
   location?: string;
+  // Captured now, unused until Manager/Team scope ships (v1.1+) -- this is
+  // the org chart, no separate builder needed. See
+  // docs/strategy/SAFERSAY_FINAL_ARCHITECTURE.md §5.
+  managerEmail?: string;
 };
 
 export type IssuedParticipantToken = {
@@ -108,6 +112,18 @@ export type RespondentSurveySession = {
   templateName: string;
   questions: RespondentSurveyQuestion[];
 };
+
+/**
+ * Reporting scope: what slice of the org a report is aggregated over.
+ * v1 only ever passes { type: "org" } -- Department/Team scoping is
+ * deferred to v1.1+ (see docs/strategy/SAFERSAY_FINAL_ARCHITECTURE.md
+ * §4). The parameter exists now so adding those scopes later is a query
+ * change, not a reporting-layer rewrite.
+ */
+export type ReportScope =
+  | { type: "org" }
+  | { type: "department"; department: string }
+  | { type: "team"; managerEmail: string };
 
 export type ProtectedReport =
   | { protected: true; n: number; rows: [] }

@@ -73,6 +73,22 @@ export class IdentityRepository {
     );
   }
 
+  /**
+   * A tenant's configured confidentiality threshold. Guarded by a hard
+   * floor of 3 -- never overridable below that, since that's the point
+   * where "confidential survey" stops meaning anything (see
+   * docs/strategy/SAFERSAY_FINAL_ARCHITECTURE.md §3). Clamped to a safe
+   * band (3-10) even if a bad value somehow got into the settings row.
+   */
+  async getMinGroupSize(tenantId: string): Promise<number> {
+    const result = await this.db.query<{ default_min_group_size: number }>(
+      "select default_min_group_size from identity.tenant_settings where tenant_id = $1",
+      [tenantId],
+    );
+    const configured = result.rows[0]?.default_min_group_size ?? 5;
+    return Math.min(10, Math.max(3, configured));
+  }
+
   async listTenants(): Promise<TenantRecord[]> {
     const result = await this.db.query<{ id: string; name: string; slug: string }>(
       "select id, name, slug from identity.tenants order by name asc",
@@ -169,12 +185,12 @@ export class IdentityRepository {
     for (const employee of employees) {
       const id = randomUUID();
       await this.db.query(
-        `insert into identity.employees (id, tenant_id, email, name, team, location)
-         values ($1, $2, $3, $4, $5, $6)
+        `insert into identity.employees (id, tenant_id, email, name, team, location, manager_email)
+         values ($1, $2, $3, $4, $5, $6, $7)
          on conflict (tenant_id, email)
-         do update set name = excluded.name, team = excluded.team, location = excluded.location
-         returning id, email, name, team, location`,
-        [id, tenantId, employee.email, employee.name ?? null, employee.team ?? null, employee.location ?? null],
+         do update set name = excluded.name, team = excluded.team, location = excluded.location, manager_email = excluded.manager_email
+         returning id, email, name, team, location, manager_email`,
+        [id, tenantId, employee.email, employee.name ?? null, employee.team ?? null, employee.location ?? null, employee.managerEmail ?? null],
       );
       imported.push(employee);
     }

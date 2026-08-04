@@ -8,7 +8,7 @@ export type EmployeeCsvPreview = {
 };
 
 const requiredHeaders = ["email"];
-const optionalHeaders = ["name", "team", "location"];
+const optionalHeaders = ["name", "team", "location", "manager_email"];
 const acceptedHeaders = new Set([...requiredHeaders, ...optionalHeaders]);
 
 export function parseEmployeeCsv(input: string): EmployeeCsvPreview {
@@ -33,6 +33,7 @@ export function parseEmployeeCsv(input: string): EmployeeCsvPreview {
   const nameIndex = headers.indexOf("name");
   const teamIndex = headers.indexOf("team");
   const locationIndex = headers.indexOf("location");
+  const managerEmailIndex = headers.indexOf("manager_email");
   const emails = new Set<string>();
   const employees: EmployeeImportRecord[] = [];
 
@@ -57,6 +58,7 @@ export function parseEmployeeCsv(input: string): EmployeeCsvPreview {
       name: readCell(row, nameIndex) || undefined,
       team: readCell(row, teamIndex) || undefined,
       location: readCell(row, locationIndex) || undefined,
+      managerEmail: readCell(row, managerEmailIndex) || undefined,
     });
   });
 
