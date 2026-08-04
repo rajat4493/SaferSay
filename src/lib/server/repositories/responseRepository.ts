@@ -1,6 +1,8 @@
 import { randomUUID } from "crypto";
 import { Pool } from "pg";
-import { ResponseAnswerInput, ProtectedReport, RespondentSurveySession } from "./types";
+import { ResponseAnswerInput, ProtectedReport, ReportScope, RespondentSurveySession } from "./types";
+
+const orgScope: ReportScope = { type: "org" };
 
 export class ResponseRepository {
   constructor(private readonly db: Pool) {}
@@ -118,7 +120,19 @@ export class ResponseRepository {
     };
   }
 
-  async getProtectedReportForTenant(tenantId: string, cycleId: string, minGroupSize = 5): Promise<ProtectedReport> {
+  async getProtectedReportForTenant(
+    tenantId: string,
+    cycleId: string,
+    minGroupSize = 5,
+    scope: ReportScope = orgScope,
+  ): Promise<ProtectedReport> {
+    if (scope.type !== "org") {
+      // Department/Team scoping isn't implemented yet (v1.1+) -- fail loudly
+      // rather than silently returning org-wide data under a narrower
+      // scope's name, which would be a confidentiality-adjacent bug.
+      throw new Error(`Report scope "${scope.type}" is not implemented yet.`);
+    }
+
     const countResult = await this.db.query<{ n: string }>(
       "select count(*)::text as n from responses.submissions where tenant_id = $1 and cycle_id = $2",
       [tenantId, cycleId],
@@ -159,7 +173,7 @@ export class ResponseRepository {
     return result.rows[0] ?? null;
   }
 
-  async getLatestProtectedReportForTenant(tenantId: string) {
+  async getLatestProtectedReportForTenant(tenantId: string, scope: ReportScope = orgScope) {
     const cycle = await this.getLatestCycleForTenant(tenantId);
     if (!cycle) {
       return {
@@ -169,7 +183,7 @@ export class ResponseRepository {
     }
     return {
       cycle: { id: cycle.id, name: cycle.name, minGroupSize: cycle.min_group_size },
-      report: await this.getProtectedReportForTenant(tenantId, cycle.id, cycle.min_group_size),
+      report: await this.getProtectedReportForTenant(tenantId, cycle.id, cycle.min_group_size, scope),
     };
   }
 }
