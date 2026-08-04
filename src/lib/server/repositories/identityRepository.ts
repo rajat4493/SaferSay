@@ -3,6 +3,7 @@ import { Pool } from "pg";
 import { hashServerToken } from "@/lib/server/tokenHashing";
 import {
   EmployeeImportRecord,
+  EmployeeRecord,
   InviteOutboxRow,
   InviteOutboxSummary,
   IssuedParticipantToken,
@@ -178,6 +179,59 @@ export class IdentityRepository {
       imported.push(employee);
     }
     return imported.length;
+  }
+
+  async listEmployees(
+    tenantId: string,
+    options: { search?: string; limit?: number; offset?: number } = {},
+  ): Promise<{ employees: EmployeeRecord[]; total: number }> {
+    const limit = options.limit ?? 25;
+    const offset = options.offset ?? 0;
+    const search = options.search?.trim();
+
+    const whereSearch = search ? `and (e.email ilike $2 or e.name ilike $2 or e.team ilike $2)` : "";
+    const params: unknown[] = search ? [tenantId, `%${search}%`] : [tenantId];
+
+    const countResult = await this.db.query<{ count: string }>(
+      `select count(*)::text as count from identity.employees e where e.tenant_id = $1 ${whereSearch}`,
+      params,
+    );
+
+    const rowsResult = await this.db.query<{
+      id: string;
+      email: string;
+      name: string | null;
+      team: string | null;
+      location: string | null;
+      employment_status: string;
+    }>(
+      `select e.id, e.email, e.name, e.team, e.location, e.employment_status
+       from identity.employees e
+       where e.tenant_id = $1 ${whereSearch}
+       order by e.name nulls last, e.email
+       limit ${search ? "$3" : "$2"} offset ${search ? "$4" : "$3"}`,
+      [...params, limit, offset],
+    );
+
+    return {
+      employees: rowsResult.rows.map((row) => ({
+        id: row.id,
+        email: row.email,
+        name: row.name,
+        team: row.team,
+        location: row.location,
+        employmentStatus: row.employment_status,
+      })),
+      total: Number(countResult.rows[0]?.count ?? 0),
+    };
+  }
+
+  async setEmployeeStatus(tenantId: string, employeeId: string, status: "active" | "inactive") {
+    const result = await this.db.query(
+      `update identity.employees set employment_status = $3 where tenant_id = $1 and id = $2`,
+      [tenantId, employeeId, status],
+    );
+    if (result.rowCount !== 1) throw new Error("Employee not found.");
   }
 
   async countActiveEmployees(tenantId: string) {

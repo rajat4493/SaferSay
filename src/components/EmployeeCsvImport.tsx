@@ -11,7 +11,7 @@ priya@company.com,Priya Mehta,Sales,Manchester
 sam@company.com,Sam Taylor,Engineering,Bristol
 lee@company.com,Lee Chen,Customer Success,Remote`;
 
-export function EmployeeCsvImport() {
+export function EmployeeCsvImport({ onImported }: { onImported?: () => void } = {}) {
   const [csv, setCsv] = useState("");
   const [fileName, setFileName] = useState("");
   const [status, setStatus] = useState("");
@@ -41,6 +41,7 @@ export function EmployeeCsvImport() {
       return;
     }
     setStatus(`${result.imported ?? 0} employees imported into the secure identity store.`);
+    onImported?.();
   }
 
   function useSampleCsv() {
