@@ -1,13 +1,10 @@
 import { OwnerConsoleShell } from "@/components/OwnerConsoleShell";
-import { ConsoleStubPanel } from "@/components/ConsoleStubPanel";
+import { OverviewDashboard } from "@/components/console/OverviewDashboard";
 
 export default function ConsoleOverviewPage() {
   return (
     <OwnerConsoleShell>
-      <ConsoleStubPanel
-        title="Overview"
-        description="KPI stat-card row (active tenants, live surveys, MRR, employees under management, at-risk tenants), an attention feed, recent activity, and an MRR trend chart land here next."
-      />
+      <OverviewDashboard />
     </OwnerConsoleShell>
   );
 }

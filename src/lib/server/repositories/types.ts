@@ -35,6 +35,78 @@ export type TenantDirectoryEntry = {
   latestCycleName: string | null;
   latestCycleStatus: string | null;
   lastActivityAt: string | null;
+  planTier: TenantPlanTier;
+  createdAt: string;
+};
+
+export type TenantPlanTier = "standard" | "growth" | "enterprise";
+
+export type TenantSupportNote = {
+  id: string;
+  authorEmail: string;
+  note: string;
+  createdAt: string;
+};
+
+/**
+ * Everything the Owner console's tenant-detail view is allowed to show:
+ * operational status, config, and counts. No response content, no
+ * per-employee identity beyond a count (see
+ * docs/strategy/OWNER_CONTROL_ROOM_SPEC.md §3/§9).
+ */
+export type TenantDetail = {
+  id: string;
+  name: string;
+  slug: string;
+  createdAt: string;
+  primaryContactEmail: string | null;
+  dataResidencyRegion: string;
+  planTier: TenantPlanTier;
+  features: Record<string, boolean>;
+  minGroupSize: number;
+  employeeCount: number;
+  latestCycle: {
+    id: string;
+    name: string;
+    status: string;
+    participantCount: number;
+    respondedCount: number;
+    completionRate: number;
+  } | null;
+  supportNotes: TenantSupportNote[];
+};
+
+export type PlatformAttentionItem = {
+  tenantId: string;
+  tenantName: string;
+  kind: "no_employees" | "stalled_draft" | "delivery_failures" | "inactive_30d";
+  detail: string;
+};
+
+export type PlatformActivityItem = {
+  tenantId: string;
+  tenantName: string;
+  eventKey: OnboardingEventKey;
+  occurredAt: string;
+};
+
+export type PlatformOverview = {
+  activeTenantCount: number;
+  liveSurveyCount: number;
+  totalEmployeeCount: number;
+  inactiveTenantCount: number;
+  tenantGrowth: Array<{ weekStart: string; cumulativeTenants: number }>;
+  attention: PlatformAttentionItem[];
+  recentActivity: PlatformActivityItem[];
+};
+
+export type PlatformUsageHealth = {
+  totalSurveysCreated: number;
+  totalResponsesSubmitted: number;
+  invitesSent: number;
+  invitesPending: number;
+  invitesFailed: number;
+  databaseHealthy: boolean;
 };
 
 export type EmployeeImportRecord = {
