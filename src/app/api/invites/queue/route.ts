@@ -34,10 +34,11 @@ export async function POST(request: NextRequest) {
 
     const deliveries = await repo.getQueuedOutboxDeliveries(tenant.id, cycleId, deliveryType);
     const delivery = await sendQueuedInviteDeliveries({ tenant, deliveries });
-    await Promise.all([
-      ...delivery.sentIds.map((id) => repo.markOutboxSent(id)),
-      ...delivery.failedIds.map((id) => repo.markOutboxFailed(id)),
-    ]);
+    // Sequential, not Promise.all: db is a single shared client under
+    // withTenantScopedDb (tenant-scoped connection), and pg clients can't
+    // run concurrent queries on one connection.
+    for (const id of delivery.sentIds) await repo.markOutboxSent(id);
+    for (const id of delivery.failedIds) await repo.markOutboxFailed(id);
 
     return {
       ok: delivery.failed === 0,
