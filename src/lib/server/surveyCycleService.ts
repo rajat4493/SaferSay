@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "crypto";
-import type { Pool } from "pg";
+import type { Queryable } from "@/lib/server/db/tenantPool";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import { surveyTemplates, type SurveyTemplate } from "@/lib/templates";
 
@@ -11,7 +11,7 @@ export type CustomCycleQuestion = {
 };
 
 export async function createTenantSurveyCycle(params: {
-  db: Pool;
+  db: Queryable;
   tenantId: string;
   tenantName: string;
   templateSlug: string;
@@ -50,7 +50,7 @@ export async function createTenantSurveyCycle(params: {
   };
 }
 
-async function upsertTemplate(db: Pool, template: SurveyTemplate) {
+async function upsertTemplate(db: Queryable, template: SurveyTemplate) {
   const templateId = stableUuidFromSlug(`template:${template.slug}`);
   await db.query(
     `insert into responses.survey_templates (id, slug, name, description, category, estimated_minutes)
@@ -95,7 +95,7 @@ async function upsertTemplate(db: Pool, template: SurveyTemplate) {
  * tenants use unmodified.
  */
 async function createCycleScopedTemplate(
-  db: Pool,
+  db: Queryable,
   baseTemplate: SurveyTemplate,
   cycleId: string,
   questions: CustomCycleQuestion[],

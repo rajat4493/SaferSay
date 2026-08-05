@@ -1,11 +1,11 @@
 import { randomUUID } from "crypto";
-import { Pool } from "pg";
+import type { Queryable } from "@/lib/server/db/tenantPool";
 import { ResponseAnswerInput, ProtectedReport, ReportScope, RespondentSurveySession } from "./types";
 
 const orgScope: ReportScope = { type: "org" };
 
 export class ResponseRepository {
-  constructor(private readonly db: Pool) {}
+  constructor(private readonly db: Queryable) {}
 
   async createCycle(params: {
     tenantId: string;

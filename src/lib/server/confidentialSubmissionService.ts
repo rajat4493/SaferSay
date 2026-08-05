@@ -1,11 +1,16 @@
-import { Pool } from "pg";
+import type { Queryable } from "@/lib/server/db/tenantPool";
 import { hashServerToken } from "@/lib/server/tokenHashing";
 import { IdentityRepository } from "./repositories/identityRepository";
 import { ResponseRepository } from "./repositories/responseRepository";
 import { ResponseAnswerInput } from "./repositories/types";
 
+/**
+ * Caller is responsible for wrapping this in a transaction (a single
+ * checked-out client, not a bare Pool -- see withTenantContext) so the
+ * submission insert and token-spend update are atomic together.
+ */
 export async function submitWithSeveredRepositories(params: {
-  db: Pool;
+  db: Queryable;
   rawToken: string;
   answers: ResponseAnswerInput[];
 }) {
@@ -18,20 +23,12 @@ export async function submitWithSeveredRepositories(params: {
     throw new Error("Token is invalid or already spent.");
   }
 
-  return params.db.query("begin").then(async () => {
-    try {
-      const submission = await responseRepository.submitAnswers({
-        tenantId: participant.tenant_id,
-        cycleId: participant.cycle_id,
-        spentTokenHash: tokenHash,
-        answers: params.answers,
-      });
-      await identityRepository.markTokenSpent(tokenHash);
-      await params.db.query("commit");
-      return submission;
-    } catch (error) {
-      await params.db.query("rollback");
-      throw error;
-    }
+  const submission = await responseRepository.submitAnswers({
+    tenantId: participant.tenant_id,
+    cycleId: participant.cycle_id,
+    spentTokenHash: tokenHash,
+    answers: params.answers,
   });
+  await identityRepository.markTokenSpent(tokenHash);
+  return submission;
 }

@@ -1,8 +1,8 @@
-import type { Pool } from "pg";
+import type { Queryable } from "@/lib/server/db/tenantPool";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import { ResponseRepository } from "@/lib/server/repositories/responseRepository";
 
-export async function getPilotState(params: { db: Pool; tenantId: string }) {
+export async function getPilotState(params: { db: Queryable; tenantId: string }) {
   const responseRepository = new ResponseRepository(params.db);
   const identityRepository = new IdentityRepository(params.db);
   const report = await responseRepository.getLatestProtectedReportForTenant(params.tenantId);
