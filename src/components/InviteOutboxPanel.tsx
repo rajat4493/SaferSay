@@ -83,9 +83,17 @@ export function InviteOutboxPanel() {
             <Send size={14} />
             Queue invites
           </button>
-          <button onClick={() => call("/api/invites/queue", { deliveryType: "invite", sendNow: true }, "Sending")} className="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--brand-ink)] px-4 py-2 text-sm font-semibold text-white sm:col-span-2">
+          <button onClick={() => call("/api/invites/queue", { deliveryType: "invite", sendNow: true }, "Sending")} className="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--brand-ink)] px-4 py-2 text-sm font-semibold text-white">
             <Send size={14} />
             Send test invites
+          </button>
+          <button onClick={() => call("/api/invites/queue", { deliveryType: "reminder" }, "Queueing")} className="inline-flex items-center justify-center gap-2 rounded-full border border-[var(--brand-border)] bg-white px-4 py-2 text-sm font-semibold">
+            <Send size={14} />
+            Queue reminders
+          </button>
+          <button onClick={() => call("/api/invites/queue", { deliveryType: "reminder", sendNow: true }, "Sending")} className="inline-flex items-center justify-center gap-2 rounded-full border border-[var(--brand-border)] bg-white px-4 py-2 text-sm font-semibold">
+            <Send size={14} />
+            Send test reminders
           </button>
         </div>
       </div>

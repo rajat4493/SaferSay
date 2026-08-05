@@ -109,7 +109,14 @@ export async function getSessionContext(): Promise<SessionContext | null> {
     }
   }
 
-  return { userId: authId, email: record.email, name: record.name, role: record.role, tenant, isSuperAdmin, homeTenantId: homeTenant.id };
+  // userId must be identity.users.id (a real row in this DB), not the raw
+  // auth-provider subject -- callers insert it into uuid columns
+  // (onboarding_events.user_id, super_admin_access_log.super_admin_user_id).
+  // For real Supabase logins authId happens to already be a valid UUID, but
+  // it doesn't correspond to a users row and the dev-bypass authId is an
+  // email, not a UUID at all -- record.id is the only value that's actually
+  // correct for both.
+  return { userId: record.id, email: record.email, name: record.name, role: record.role, tenant, isSuperAdmin, homeTenantId: homeTenant.id };
 }
 
 async function resolveUserRecord(

@@ -100,6 +100,25 @@ export type PlatformOverview = {
   recentActivity: PlatformActivityItem[];
 };
 
+/**
+ * A tenant's own view of their plan/settings -- read-only for plan/features
+ * (the Owner console controls those), but minGroupSize is tenant-adjustable
+ * within the floor (see docs/strategy/CLIENT_TENANT_ADMIN_SPEC.md §7).
+ */
+export type TenantSelfSettings = {
+  minGroupSize: number;
+  dataResidencyRegion: string;
+  planTier: TenantPlanTier;
+  features: Record<string, boolean>;
+};
+
+export type CycleAction = {
+  id: string;
+  authorEmail: string;
+  actionText: string;
+  createdAt: string;
+};
+
 export type PlatformUsageHealth = {
   totalSurveysCreated: number;
   totalResponsesSubmitted: number;

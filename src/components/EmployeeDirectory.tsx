@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { Card } from "@/components/AppShell";
 
 type Employee = {
@@ -19,6 +19,10 @@ export function EmployeeDirectory({ refreshKey = 0 }: { refreshKey?: number }) {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [newName, setNewName] = useState("");
+  const [addStatus, setAddStatus] = useState("");
 
   const load = useCallback(async (searchValue: string) => {
     setLoading(true);
@@ -52,6 +56,28 @@ export function EmployeeDirectory({ refreshKey = 0 }: { refreshKey?: number }) {
 
   const activeCount = employees.filter((e) => e.employmentStatus === "active").length;
 
+  async function addPerson() {
+    const email = newEmail.trim().toLowerCase();
+    if (!email) return;
+    setAdding(true);
+    setAddStatus("");
+    const response = await fetch("/api/employees", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email, name: newName.trim() || undefined }),
+    });
+    const result = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+    setAdding(false);
+    if (!response.ok || !result.ok) {
+      setAddStatus(result.error ?? "Couldn't add that person.");
+      return;
+    }
+    setNewEmail("");
+    setNewName("");
+    setAddStatus(`${email} added.`);
+    load(search);
+  }
+
   return (
     <Card className="mt-4">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
@@ -70,6 +96,30 @@ export function EmployeeDirectory({ refreshKey = 0 }: { refreshKey?: number }) {
             className="h-10 w-full rounded-[var(--radius-pill)] border border-[var(--brand-border)] bg-white pl-9 pr-4 text-sm outline-none focus:border-[var(--brand-accent)] sm:w-64"
           />
         </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-dashed border-[var(--brand-border)] bg-[var(--brand-bg)] p-3">
+        <input
+          value={newEmail}
+          onChange={(event) => setNewEmail(event.target.value)}
+          placeholder="new.person@company.com"
+          className="h-9 min-w-0 flex-1 rounded-[var(--radius-pill)] border border-[var(--brand-border)] bg-white px-3 text-sm outline-none focus:border-[var(--brand-accent)]"
+        />
+        <input
+          value={newName}
+          onChange={(event) => setNewName(event.target.value)}
+          placeholder="Name (optional)"
+          className="h-9 min-w-0 flex-1 rounded-[var(--radius-pill)] border border-[var(--brand-border)] bg-white px-3 text-sm outline-none focus:border-[var(--brand-accent)]"
+        />
+        <button
+          onClick={addPerson}
+          disabled={adding || !newEmail.trim()}
+          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[var(--radius-pill)] bg-[var(--brand-ink)] px-4 text-xs font-semibold text-white disabled:opacity-50"
+        >
+          <Plus size={13} />
+          {adding ? "Adding..." : "Add person"}
+        </button>
+        {addStatus ? <p className="w-full text-xs font-semibold text-[var(--brand-muted)]">{addStatus}</p> : null}
       </div>
 
       <div className="mt-4 max-h-96 overflow-auto rounded-2xl border border-[var(--brand-border)] bg-white">

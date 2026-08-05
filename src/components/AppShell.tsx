@@ -11,6 +11,7 @@ import {
   Palette,
   Plus,
   Rocket,
+  Settings,
   ShieldCheck,
   Users,
 } from "lucide-react";
@@ -58,6 +59,7 @@ const navGroups: NavGroupConfig[] = [
     label: "Manage & settings",
     collapsible: true,
     items: [
+      { href: "/app/settings", label: "Settings", helper: "Threshold, export, deletion", icon: Settings, hideForPureOwner: true },
       { href: "/app/billing", label: "Billing", helper: "Payment setup", icon: CreditCard, hideForPureOwner: true },
       { href: "/app/brand", label: "Brand Studio", helper: "Client styling", icon: Palette, hideForPureOwner: true },
       // "Viewer portal" (manager/team-lead scoped views) is deliberately not

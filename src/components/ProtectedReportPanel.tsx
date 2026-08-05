@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { EyeOff, RefreshCw } from "lucide-react";
+import { Download, EyeOff, RefreshCw, Share2 } from "lucide-react";
 import { Card } from "@/components/AppShell";
 import { ViewerCard } from "@/components/ViewerShell";
+
+type CycleAction = { id: string; authorEmail: string; actionText: string; createdAt: string };
 
 type ReportResponse = {
   ok?: boolean;
@@ -20,13 +22,23 @@ export function ProtectedReportPanel({ mode = "admin" }: { mode?: "admin" | "vie
   const [result, setResult] = useState<ReportResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [, startTransition] = useTransition();
+  const [actions, setActions] = useState<CycleAction[]>([]);
+  const [actionDraft, setActionDraft] = useState("");
+  const [savingAction, setSavingAction] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
   const ShellCard = mode === "viewer" ? ViewerCard : Card;
 
   async function loadReport() {
     setLoading(true);
     const response = await fetch("/api/report");
-    setResult((await response.json().catch(() => ({ ok: false, error: "Report could not be loaded." }))) as ReportResponse);
+    const data = (await response.json().catch(() => ({ ok: false, error: "Report could not be loaded." }))) as ReportResponse;
+    setResult(data);
     setLoading(false);
+    if (data.cycle?.id) {
+      const actionsResponse = await fetch(`/api/report/action?cycleId=${data.cycle.id}`);
+      const actionsData = (await actionsResponse.json().catch(() => ({}))) as { ok?: boolean; actions?: CycleAction[] };
+      if (actionsData.ok) setActions(actionsData.actions ?? []);
+    }
   }
 
   useEffect(() => {
@@ -37,6 +49,47 @@ export function ProtectedReportPanel({ mode = "admin" }: { mode?: "admin" | "vie
 
   const report = result?.report;
   const minGroupSize = result?.cycle?.minGroupSize ?? 5;
+
+  function exportCsv() {
+    if (!report || report.protected) return;
+    const rows = [["Question", "Responses", "Average"], ...report.rows.map((row) => [row.label ?? row.questionId, String(row.n), row.average?.toFixed(2) ?? ""])];
+    const csv = rows.map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${result?.cycle?.name ?? "safersay-report"}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function submitAction() {
+    if (!actionDraft.trim() || !result?.cycle?.id) return;
+    setSavingAction(true);
+    const response = await fetch("/api/report/action", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ cycleId: result.cycle.id, actionText: actionDraft.trim() }),
+    });
+    const data = (await response.json().catch(() => ({}))) as { ok?: boolean; actions?: CycleAction[] };
+    setSavingAction(false);
+    if (data.ok) {
+      setActions(data.actions ?? []);
+      setActionDraft("");
+    }
+  }
+
+  async function shareScore() {
+    if (!report || report.protected) return;
+    const lines = [
+      `${result?.cycle?.name ?? "Survey"} results (n=${report.n}):`,
+      ...report.rows.map((row) => `- ${row.label ?? row.questionId}: ${(row.average ?? 0).toFixed(2)}`),
+      actions[0] ? `\nOne change we're committing to: ${actions[0].actionText}` : "",
+    ].filter(Boolean);
+    await navigator.clipboard.writeText(lines.join("\n"));
+    setShareCopied(true);
+    setTimeout(() => setShareCopied(false), 2000);
+  }
 
   return (
     <>
@@ -61,10 +114,24 @@ export function ProtectedReportPanel({ mode = "admin" }: { mode?: "admin" | "vie
             <h2 className="text-xl font-semibold">{result?.cycle?.name ?? "Latest survey report"}</h2>
             <p className="mt-1 text-sm text-[var(--brand-muted)]">Supabase-backed aggregate report. No participant list, emails, or token state.</p>
           </div>
-          <button onClick={loadReport} className="inline-flex items-center gap-2 rounded-full border border-[var(--brand-border)] bg-white px-4 py-2 text-sm font-semibold">
-            <RefreshCw size={14} />
-            Refresh
-          </button>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <button onClick={loadReport} className="inline-flex items-center gap-2 rounded-full border border-[var(--brand-border)] bg-white px-4 py-2 text-sm font-semibold">
+              <RefreshCw size={14} />
+              Refresh
+            </button>
+            {report && !report.protected ? (
+              <>
+                <button onClick={exportCsv} className="inline-flex items-center gap-2 rounded-full border border-[var(--brand-border)] bg-white px-4 py-2 text-sm font-semibold">
+                  <Download size={14} />
+                  Export CSV
+                </button>
+                <button onClick={shareScore} className="inline-flex items-center gap-2 rounded-full bg-[var(--brand-ink)] px-4 py-2 text-sm font-semibold text-white">
+                  <Share2 size={14} />
+                  {shareCopied ? "Copied" : "Share score"}
+                </button>
+              </>
+            ) : null}
+          </div>
         </div>
 
         {loading ? (
@@ -94,6 +161,40 @@ export function ProtectedReportPanel({ mode = "admin" }: { mode?: "admin" | "vie
           </div>
         )}
       </ShellCard>
+
+      {report && !report.protected ? (
+        <ShellCard>
+          <h2 className="text-xl font-semibold">Commit to one change</h2>
+          <p className="mt-1 text-sm text-[var(--brand-muted)]">
+            Close the loop with your team: share this score and name one thing you&apos;ll do about it.
+          </p>
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <input
+              value={actionDraft}
+              onChange={(event) => setActionDraft(event.target.value)}
+              placeholder="e.g. Run a 15-min retro on workload next Friday"
+              className="h-11 flex-1 rounded-[var(--radius-pill)] border border-[var(--brand-border)] bg-white px-4 text-sm outline-none focus:border-[var(--brand-accent)]"
+            />
+            <button
+              onClick={submitAction}
+              disabled={savingAction || !actionDraft.trim()}
+              className="h-11 shrink-0 rounded-[var(--radius-pill)] bg-[var(--brand-accent)] px-5 text-sm font-semibold text-white disabled:opacity-50"
+            >
+              {savingAction ? "Saving..." : "Commit"}
+            </button>
+          </div>
+          {actions.length > 0 ? (
+            <div className="mt-4 space-y-2">
+              {actions.map((action) => (
+                <div key={action.id} className="rounded-2xl border border-[var(--brand-border)] bg-white p-3 text-sm">
+                  <p>{action.actionText}</p>
+                  <p className="mt-1 text-xs text-[var(--brand-muted)]">{action.authorEmail}</p>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </ShellCard>
+      ) : null}
     </>
   );
 }

@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from "crypto";
 import { Pool } from "pg";
 import { hashServerToken } from "@/lib/server/tokenHashing";
 import {
+  CycleAction,
   EmployeeImportRecord,
   EmployeeRecord,
   InviteOutboxRow,
@@ -17,6 +18,7 @@ import {
   TenantDirectoryEntry,
   TenantPlanTier,
   TenantRecord,
+  TenantSelfSettings,
   TenantSupportNote,
   UserRecord,
   UserRole,
@@ -387,6 +389,55 @@ export class IdentityRepository {
       invitesFailed: Number(row?.invites_failed ?? 0),
       databaseHealthy: true,
     };
+  }
+
+  async getTenantSelfSettings(tenantId: string): Promise<TenantSelfSettings> {
+    const result = await this.db.query<{
+      default_min_group_size: number;
+      data_residency_region: string;
+      plan_tier: TenantPlanTier;
+      features: Record<string, boolean>;
+    }>(
+      `select
+         coalesce(default_min_group_size, 5) as default_min_group_size,
+         coalesce(data_residency_region, 'EU') as data_residency_region,
+         coalesce(plan_tier, 'standard') as plan_tier,
+         coalesce(features, '{}'::jsonb) as features
+       from identity.tenant_settings where tenant_id = $1`,
+      [tenantId],
+    );
+    const row = result.rows[0];
+    return {
+      minGroupSize: row?.default_min_group_size ?? 5,
+      dataResidencyRegion: row?.data_residency_region ?? "EU",
+      planTier: row?.plan_tier ?? "standard",
+      features: row?.features ?? {},
+    };
+  }
+
+  async addCycleAction(tenantId: string, cycleId: string, authorEmail: string, actionText: string) {
+    await this.db.query(
+      `insert into identity.cycle_actions (id, tenant_id, cycle_id, author_email, action_text)
+       values ($1, $2, $3, $4, $5)`,
+      [randomUUID(), tenantId, cycleId, authorEmail, actionText],
+    );
+  }
+
+  async listCycleActions(tenantId: string, cycleId: string): Promise<CycleAction[]> {
+    const result = await this.db.query<{ id: string; author_email: string; action_text: string; created_at: string }>(
+      `select id, author_email, action_text, created_at::text as created_at
+       from identity.cycle_actions
+       where tenant_id = $1 and cycle_id = $2
+       order by created_at desc
+       limit 10`,
+      [tenantId, cycleId],
+    );
+    return result.rows.map((row) => ({
+      id: row.id,
+      authorEmail: row.author_email,
+      actionText: row.action_text,
+      createdAt: row.created_at,
+    }));
   }
 
   async listAllSupportNotes(limit = 30): Promise<Array<TenantSupportNote & { tenantId: string; tenantName: string }>> {
