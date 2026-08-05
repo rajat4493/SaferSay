@@ -1,18 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { parseEmployeeCsv } from "@/lib/csvEmployees";
 import { getSessionContext } from "@/lib/server/authSession";
-import { getDatabasePool } from "@/lib/server/db/pool";
+import { withTenantScopedDb } from "@/lib/server/db/tenantPool";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 
 export async function POST(request: NextRequest) {
   const session = await getSessionContext();
   if (!session) {
     return NextResponse.json({ ok: false, error: "Unauthorized employee import." }, { status: 401 });
-  }
-
-  const db = getDatabasePool();
-  if (!db) {
-    return NextResponse.json({ ok: false, error: "DATABASE_URL is required for employee import." }, { status: 503 });
   }
 
   const body = (await request.json().catch(() => ({}))) as { csv?: string };
@@ -22,12 +17,12 @@ export async function POST(request: NextRequest) {
   }
 
   const { tenant, userId } = session;
-  const repo = new IdentityRepository(db);
-  const imported = await repo.importEmployees(tenant.id, preview.employees);
-
-  if (imported > 0) {
-    await repo.emitOnboardingEvent(tenant.id, userId, "employees");
-  }
+  const imported = await withTenantScopedDb(tenant.id, async (db) => {
+    const repo = new IdentityRepository(db);
+    const count = await repo.importEmployees(tenant.id, preview.employees);
+    if (count > 0) await repo.emitOnboardingEvent(tenant.id, userId, "employees");
+    return count;
+  });
 
   return NextResponse.json({
     ok: true,

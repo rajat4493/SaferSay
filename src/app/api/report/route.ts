@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionContext, isPlatformOwnerImpersonating } from "@/lib/server/authSession";
 import { getDatabasePool } from "@/lib/server/db/pool";
+import { getTenantPool, withTenantContext } from "@/lib/server/db/tenantPool";
 import { ResponseRepository } from "@/lib/server/repositories/responseRepository";
 import { getProtectedServerReport } from "@/lib/serverStore";
 
@@ -21,10 +22,17 @@ export async function GET() {
     );
   }
 
-  const db = getDatabasePool();
-  if (db) {
-    const { tenant } = session;
-    return NextResponse.json({ ok: true, tenant, ...(await new ResponseRepository(db).getLatestProtectedReportForTenant(tenant.id)) });
+  const tenantPool = getTenantPool();
+  const { tenant } = session;
+  if (tenantPool) {
+    const result = await withTenantContext(tenantPool, tenant.id, (client) =>
+      new ResponseRepository(client).getLatestProtectedReportForTenant(tenant.id),
+    );
+    return NextResponse.json({ ok: true, tenant, ...result });
+  }
+  const adminPool = getDatabasePool();
+  if (adminPool) {
+    return NextResponse.json({ ok: true, tenant, ...(await new ResponseRepository(adminPool).getLatestProtectedReportForTenant(tenant.id)) });
   }
   return NextResponse.json({ ok: true, cycle: null, report: await getProtectedServerReport() });
 }

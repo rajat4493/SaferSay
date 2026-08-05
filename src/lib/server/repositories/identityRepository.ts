@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from "crypto";
-import { Pool } from "pg";
+import type { Queryable } from "@/lib/server/db/tenantPool";
 import { hashServerToken } from "@/lib/server/tokenHashing";
 import {
   CycleAction,
@@ -25,7 +25,7 @@ import {
 } from "./types";
 
 export class IdentityRepository {
-  constructor(private readonly db: Pool) {}
+  constructor(private readonly db: Queryable) {}
 
   async findUserByAuthSubject(authProvider: string, providerSubject: string): Promise<UserRecord | null> {
     const result = await this.db.query<UserRow>(
