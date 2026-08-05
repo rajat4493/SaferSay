@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 import { BrandMark } from "@/components/BrandMark";
 import { useBrand } from "@/components/BrandProvider";
+import { DevLoginPanel } from "@/components/DevLoginPanel";
 import { OAuthLoginButtons } from "@/components/OAuthLoginButtons";
 
 export default function LoginPage() {
@@ -40,6 +41,9 @@ export default function LoginPage() {
           <h2 className="hidden text-xl font-semibold lg:block">Sign in to launch a survey</h2>
           <Suspense fallback={<div className="mt-8 h-28 rounded-3xl bg-[var(--brand-bg)]" />}>
             <OAuthLoginButtons />
+          </Suspense>
+          <Suspense fallback={null}>
+            <DevLoginPanel />
           </Suspense>
           <div className="mt-5 rounded-3xl border border-[var(--brand-border)] bg-[var(--brand-bg)] p-4 text-sm leading-6 text-[var(--brand-muted)] lg:hidden">
             Your first sign-in creates your organisation&apos;s workspace automatically.

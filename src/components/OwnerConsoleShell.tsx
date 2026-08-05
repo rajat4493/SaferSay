@@ -85,7 +85,7 @@ export function OwnerConsoleShell({ children }: { children: React.ReactNode }) {
             <div className="relative flex-1 max-w-md">
               <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--brand-muted)]" />
               <input
-                type="search"
+                type="text"
                 value={searchDraft}
                 onChange={(event) => setSearchDraft(event.target.value)}
                 onKeyDown={(event) => event.key === "Enter" && runSearch()}
