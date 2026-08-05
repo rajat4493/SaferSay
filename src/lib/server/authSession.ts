@@ -2,6 +2,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getRuntimeMode } from "@/lib/runtimeConfig";
+import { devAuthCookieName, isDevAuthAllowed } from "@/lib/server/devAuth";
 import { getDatabasePool } from "@/lib/server/db/pool";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import type { UserRecord, UserRole } from "@/lib/server/repositories/types";
@@ -57,32 +58,50 @@ export function isSuperAdminEmail(email: string) {
  * production mode, so local development stays zero-config.
  */
 export async function getSessionContext(): Promise<SessionContext | null> {
-  if (!hasSupabaseConfig()) {
+  const cookieStore = await cookies();
+  const devEmail = isDevAuthAllowed() ? cookieStore.get(devAuthCookieName)?.value : undefined;
+
+  if (!hasSupabaseConfig() && !devEmail) {
     return getRuntimeMode() === "production" ? null : localDevContext;
   }
 
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
-  const authUser = data.user;
-  if (!authUser?.email) return null;
+  let authId: string;
+  let authEmail: string;
+  let authMetadata: Record<string, unknown> | undefined;
+  let authProvider: "supabase" | "dev-bypass";
+
+  if (devEmail) {
+    authId = devEmail;
+    authEmail = devEmail;
+    authMetadata = undefined;
+    authProvider = "dev-bypass";
+  } else {
+    const supabase = await createClient();
+    const { data } = await supabase.auth.getUser();
+    const authUser = data.user;
+    if (!authUser?.email) return null;
+    authId = authUser.id;
+    authEmail = authUser.email;
+    authMetadata = authUser.user_metadata;
+    authProvider = "supabase";
+  }
 
   const db = getDatabasePool();
   if (!db) {
     const { tenant } = await resolveTenantContext();
-    return { userId: authUser.id, email: authUser.email, name: null, role: "owner", tenant, isSuperAdmin: false, homeTenantId: tenant.id };
+    return { userId: authId, email: authEmail, name: null, role: "owner", tenant, isSuperAdmin: false, homeTenantId: tenant.id };
   }
 
   const repo = new IdentityRepository(db);
-  const record = await resolveUserRecord(repo, authUser.id, authUser.email, authUser.user_metadata);
+  const record = await resolveUserRecord(repo, authId, authEmail, authMetadata, authProvider);
 
   const homeTenant = await repo.findTenantById(record.tenantId);
   if (!homeTenant) return null;
 
-  const isSuperAdmin = isSuperAdminEmail(authUser.email);
+  const isSuperAdmin = isSuperAdminEmail(authEmail);
   let tenant = homeTenant;
 
   if (isSuperAdmin) {
-    const cookieStore = await cookies();
     const overrideTenantId = cookieStore.get(superAdminTenantCookieName)?.value;
     if (overrideTenantId && overrideTenantId !== homeTenant.id) {
       const overrideTenant = await repo.findTenantById(overrideTenantId);
@@ -90,7 +109,7 @@ export async function getSessionContext(): Promise<SessionContext | null> {
     }
   }
 
-  return { userId: authUser.id, email: record.email, name: record.name, role: record.role, tenant, isSuperAdmin, homeTenantId: homeTenant.id };
+  return { userId: authId, email: record.email, name: record.name, role: record.role, tenant, isSuperAdmin, homeTenantId: homeTenant.id };
 }
 
 async function resolveUserRecord(
@@ -98,21 +117,29 @@ async function resolveUserRecord(
   providerSubject: string,
   email: string,
   metadata: Record<string, unknown> | undefined,
+  authProvider: "supabase" | "dev-bypass" = "supabase",
 ): Promise<UserRecord> {
-  const existing = await repo.findUserByAuthSubject("supabase", providerSubject);
+  const existing = await repo.findUserByAuthSubject(authProvider, providerSubject);
   if (existing) return existing;
 
   const invited = await repo.findUserByEmail(email);
   if (invited) {
-    await repo.linkAuthSubject(invited.id, "supabase", providerSubject);
-    return { ...invited, authProvider: "supabase", providerSubject };
+    // Only the real Supabase flow is allowed to claim/relink an identity
+    // row -- a dev-bypass login must never overwrite a real user's linked
+    // Google/Microsoft auth_provider/provider_subject, or their real OAuth
+    // sign-in would stop resolving to this account afterward.
+    if (authProvider === "supabase") {
+      await repo.linkAuthSubject(invited.id, authProvider, providerSubject);
+      return { ...invited, authProvider, providerSubject };
+    }
+    return invited;
   }
 
   const displayName = typeof metadata?.full_name === "string" ? (metadata.full_name as string) : null;
   const tenant = await repo.createTenant(`${displayName ?? email}'s workspace`);
   const user = await repo.createUser({
     tenantId: tenant.id,
-    authProvider: "supabase",
+    authProvider,
     providerSubject,
     email,
     name: displayName,

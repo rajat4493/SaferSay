@@ -7,7 +7,7 @@ export function SignOutButton() {
   const router = useRouter();
 
   async function signOut() {
-    await createClient().auth.signOut();
+    await Promise.all([createClient().auth.signOut(), fetch("/api/dev/login", { method: "DELETE" }).catch(() => undefined)]);
     router.replace("/login");
     router.refresh();
   }
