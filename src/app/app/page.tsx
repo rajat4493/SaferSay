@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
-import { OwnerTenantDirectory } from "@/components/OwnerTenantDirectory";
 import { PilotGuide } from "@/components/PilotGuide";
 
-type ViewMode = "loading" | "owner-directory" | "workflow";
+type ViewMode = "loading" | "workflow";
 
 export default function Dashboard() {
+  const router = useRouter();
   const [mode, setMode] = useState<ViewMode>("loading");
 
   useEffect(() => {
@@ -15,10 +16,20 @@ export default function Dashboard() {
       .then((response) => response.json())
       .then((data) => {
         if (!data.ok) return setMode("workflow");
-        setMode(data.isSuperAdmin && !data.isImpersonating ? "owner-directory" : "workflow");
+        // Pure Owner mode (not currently impersonating a tenant) has no
+        // business inside /app at all -- the Owner Control Room at /console
+        // is the real home, and it never offers a full-access "enter this
+        // tenant's workspace" path (see docs/strategy/OWNER_CONTROL_ROOM_SPEC.md
+        // §3/§9: the old ability to see/act inside a tenant is support-only
+        // now, not a silent full login-as).
+        if (data.isSuperAdmin && !data.isImpersonating) {
+          router.replace("/console");
+          return;
+        }
+        setMode("workflow");
       })
       .catch(() => setMode("workflow"));
-  }, []);
+  }, [router]);
 
   const workflow = [
     { step: "1", title: "Load people", text: "Upload a CSV with employee email, name, team, and location.", href: "/app/participants" },
@@ -29,14 +40,6 @@ export default function Dashboard() {
 
   if (mode === "loading") {
     return <AppShell title="Get started" subtitle=" "><div className="h-40" /></AppShell>;
-  }
-
-  if (mode === "owner-directory") {
-    return (
-      <AppShell title="Get started" subtitle="You're signed in as SaferSay's owner — here's every customer workspace.">
-        <OwnerTenantDirectory />
-      </AppShell>
-    );
   }
 
   return (

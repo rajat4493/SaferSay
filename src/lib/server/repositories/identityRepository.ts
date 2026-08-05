@@ -9,9 +9,15 @@ import {
   IssuedParticipantToken,
   OnboardingEventKey,
   PilotIdentitySummary,
+  PlatformAttentionItem,
+  PlatformOverview,
+  PlatformUsageHealth,
   QueuedInviteDelivery,
+  TenantDetail,
   TenantDirectoryEntry,
+  TenantPlanTier,
   TenantRecord,
+  TenantSupportNote,
   UserRecord,
   UserRole,
 } from "./types";
@@ -101,6 +107,8 @@ export class IdentityRepository {
       id: string;
       name: string;
       slug: string;
+      created_at: string;
+      plan_tier: TenantPlanTier;
       employee_count: string;
       latest_cycle_name: string | null;
       latest_cycle_status: string | null;
@@ -110,6 +118,8 @@ export class IdentityRepository {
          t.id,
          t.name,
          t.slug,
+         t.created_at::text as created_at,
+         coalesce(ts.plan_tier, 'standard') as plan_tier,
          (select count(*) from identity.employees e where e.tenant_id = t.id and e.employment_status = 'active')::text as employee_count,
          (select c.name from responses.survey_cycles c where c.tenant_id = t.id order by c.created_at desc limit 1) as latest_cycle_name,
          (select c.status from responses.survey_cycles c where c.tenant_id = t.id order by c.created_at desc limit 1) as latest_cycle_status,
@@ -118,16 +128,290 @@ export class IdentityRepository {
            coalesce((select max(oe.occurred_at) from identity.onboarding_events oe where oe.tenant_id = t.id), t.updated_at)
          )::text as last_activity_at
        from identity.tenants t
+       left join identity.tenant_settings ts on ts.tenant_id = t.id
        order by last_activity_at desc nulls last`,
     );
     return result.rows.map((row) => ({
       id: row.id,
       name: row.name,
       slug: row.slug,
+      createdAt: row.created_at,
+      planTier: row.plan_tier,
       employeeCount: Number(row.employee_count),
       latestCycleName: row.latest_cycle_name,
       latestCycleStatus: row.latest_cycle_status,
       lastActivityAt: row.last_activity_at,
+    }));
+  }
+
+  async getTenantDetail(tenantId: string): Promise<TenantDetail | null> {
+    const tenantResult = await this.db.query<{
+      id: string;
+      name: string;
+      slug: string;
+      created_at: string;
+      data_residency_region: string;
+      plan_tier: TenantPlanTier;
+      features: Record<string, boolean>;
+      min_group_size: number;
+    }>(
+      `select
+         t.id, t.name, t.slug, t.created_at::text as created_at,
+         coalesce(ts.data_residency_region, 'EU') as data_residency_region,
+         coalesce(ts.plan_tier, 'standard') as plan_tier,
+         coalesce(ts.features, '{}'::jsonb) as features,
+         coalesce(ts.default_min_group_size, 5) as min_group_size
+       from identity.tenants t
+       left join identity.tenant_settings ts on ts.tenant_id = t.id
+       where t.id = $1`,
+      [tenantId],
+    );
+    const tenant = tenantResult.rows[0];
+    if (!tenant) return null;
+
+    const contactResult = await this.db.query<{ email: string }>(
+      `select email from identity.users where tenant_id = $1 and role = 'owner' order by created_at asc limit 1`,
+      [tenantId],
+    );
+
+    const employeeCount = await this.countActiveEmployees(tenantId);
+
+    const cycleResult = await this.db.query<{
+      id: string;
+      name: string;
+      status: string;
+    }>(
+      `select id, name, status from responses.survey_cycles where tenant_id = $1 order by created_at desc limit 1`,
+      [tenantId],
+    );
+    const cycle = cycleResult.rows[0];
+
+    let latestCycle: TenantDetail["latestCycle"] = null;
+    if (cycle) {
+      const countsResult = await this.db.query<{ participants: string; responded: string }>(
+        `select
+           count(*)::text as participants,
+           count(*) filter (where token_status = 'spent')::text as responded
+         from identity.survey_participants
+         where tenant_id = $1 and cycle_id = $2`,
+        [tenantId, cycle.id],
+      );
+      const counts = countsResult.rows[0];
+      const participantCount = Number(counts?.participants ?? 0);
+      const respondedCount = Number(counts?.responded ?? 0);
+      latestCycle = {
+        id: cycle.id,
+        name: cycle.name,
+        status: cycle.status,
+        participantCount,
+        respondedCount,
+        completionRate: participantCount > 0 ? respondedCount / participantCount : 0,
+      };
+    }
+
+    const notesResult = await this.db.query<{ id: string; author_email: string; note: string; created_at: string }>(
+      `select id, author_email, note, created_at::text as created_at
+       from identity.tenant_support_notes
+       where tenant_id = $1
+       order by created_at desc
+       limit 25`,
+      [tenantId],
+    );
+
+    return {
+      id: tenant.id,
+      name: tenant.name,
+      slug: tenant.slug,
+      createdAt: tenant.created_at,
+      primaryContactEmail: contactResult.rows[0]?.email ?? null,
+      dataResidencyRegion: tenant.data_residency_region,
+      planTier: tenant.plan_tier,
+      features: tenant.features ?? {},
+      minGroupSize: tenant.min_group_size,
+      employeeCount,
+      latestCycle,
+      supportNotes: notesResult.rows.map((row) => ({
+        id: row.id,
+        authorEmail: row.author_email,
+        note: row.note,
+        createdAt: row.created_at,
+      })),
+    };
+  }
+
+  async updateTenantPlan(tenantId: string, planTier: TenantPlanTier, features: Record<string, boolean>) {
+    await this.db.query(
+      `insert into identity.tenant_settings (tenant_id, plan_tier, features)
+       values ($1, $2, $3::jsonb)
+       on conflict (tenant_id) do update set plan_tier = excluded.plan_tier, features = excluded.features, updated_at = now()`,
+      [tenantId, planTier, JSON.stringify(features)],
+    );
+  }
+
+  async setMinGroupSize(tenantId: string, value: number) {
+    const clamped = Math.min(10, Math.max(3, Math.round(value)));
+    await this.db.query(
+      `insert into identity.tenant_settings (tenant_id, default_min_group_size)
+       values ($1, $2)
+       on conflict (tenant_id) do update set default_min_group_size = excluded.default_min_group_size, updated_at = now()`,
+      [tenantId, clamped],
+    );
+    return clamped;
+  }
+
+  async addSupportNote(tenantId: string, authorEmail: string, note: string) {
+    await this.db.query(
+      `insert into identity.tenant_support_notes (id, tenant_id, author_email, note)
+       values ($1, $2, $3, $4)`,
+      [randomUUID(), tenantId, authorEmail, note],
+    );
+  }
+
+  async getPlatformOverview(): Promise<PlatformOverview> {
+    const summaryResult = await this.db.query<{
+      active_tenants: string;
+      live_surveys: string;
+      total_employees: string;
+      inactive_tenants: string;
+    }>(
+      `select
+         (select count(*) from identity.tenants)::text as active_tenants,
+         (select count(*) from responses.survey_cycles where status = 'open')::text as live_surveys,
+         (select count(*) from identity.employees where employment_status = 'active')::text as total_employees,
+         (select count(*) from identity.tenants t
+            where greatest(t.updated_at, coalesce((select max(oe.occurred_at) from identity.onboarding_events oe where oe.tenant_id = t.id), t.updated_at))
+              < now() - interval '30 days')::text as inactive_tenants`,
+    );
+    const summary = summaryResult.rows[0];
+
+    const growthResult = await this.db.query<{ week_start: string; cumulative_tenants: string }>(
+      `with weeks as (
+         select date_trunc('week', gs)::date as week_start
+         from generate_series(now() - interval '7 weeks', now(), interval '1 week') gs
+       )
+       select
+         w.week_start::text as week_start,
+         (select count(*) from identity.tenants t where t.created_at < w.week_start + interval '1 week')::text as cumulative_tenants
+       from weeks w
+       order by w.week_start asc`,
+    );
+
+    const attention: PlatformAttentionItem[] = [];
+    const noEmployees = await this.db.query<{ id: string; name: string }>(
+      `select t.id, t.name from identity.tenants t
+       where not exists (select 1 from identity.employees e where e.tenant_id = t.id and e.employment_status = 'active')`,
+    );
+    for (const row of noEmployees.rows) {
+      attention.push({ tenantId: row.id, tenantName: row.name, kind: "no_employees", detail: "No employees uploaded yet." });
+    }
+
+    const stalledDrafts = await this.db.query<{ id: string; name: string; cycle_name: string }>(
+      `select t.id, t.name, c.name as cycle_name
+       from responses.survey_cycles c
+       join identity.tenants t on t.id = c.tenant_id
+       where c.status = 'draft' and c.created_at < now() - interval '7 days'`,
+    );
+    for (const row of stalledDrafts.rows) {
+      attention.push({ tenantId: row.id, tenantName: row.name, kind: "stalled_draft", detail: `"${row.cycle_name}" has been a draft for over a week.` });
+    }
+
+    const deliveryFailures = await this.db.query<{ id: string; name: string; failed_count: string }>(
+      `select t.id, t.name, count(*)::text as failed_count
+       from identity.invite_outbox o
+       join identity.tenants t on t.id = o.tenant_id
+       where o.delivery_status = 'failed'
+       group by t.id, t.name`,
+    );
+    for (const row of deliveryFailures.rows) {
+      attention.push({
+        tenantId: row.id,
+        tenantName: row.name,
+        kind: "delivery_failures",
+        detail: `${row.failed_count} invite${row.failed_count === "1" ? "" : "s"} failed to deliver.`,
+      });
+    }
+
+    const activityResult = await this.db.query<{
+      tenant_id: string;
+      tenant_name: string;
+      event_key: OnboardingEventKey;
+      occurred_at: string;
+    }>(
+      `select oe.tenant_id, t.name as tenant_name, oe.event_key, oe.occurred_at::text as occurred_at
+       from identity.onboarding_events oe
+       join identity.tenants t on t.id = oe.tenant_id
+       order by oe.occurred_at desc
+       limit 20`,
+    );
+
+    return {
+      activeTenantCount: Number(summary?.active_tenants ?? 0),
+      liveSurveyCount: Number(summary?.live_surveys ?? 0),
+      totalEmployeeCount: Number(summary?.total_employees ?? 0),
+      inactiveTenantCount: Number(summary?.inactive_tenants ?? 0),
+      tenantGrowth: growthResult.rows.map((row) => ({
+        weekStart: row.week_start,
+        cumulativeTenants: Number(row.cumulative_tenants),
+      })),
+      attention,
+      recentActivity: activityResult.rows.map((row) => ({
+        tenantId: row.tenant_id,
+        tenantName: row.tenant_name,
+        eventKey: row.event_key,
+        occurredAt: row.occurred_at,
+      })),
+    };
+  }
+
+  async getPlatformUsageHealth(): Promise<PlatformUsageHealth> {
+    const result = await this.db.query<{
+      total_surveys: string;
+      total_responses: string;
+      invites_sent: string;
+      invites_pending: string;
+      invites_failed: string;
+    }>(
+      `select
+         (select count(*) from responses.survey_cycles)::text as total_surveys,
+         (select count(*) from identity.survey_participants where token_status = 'spent')::text as total_responses,
+         (select count(*) from identity.invite_outbox where delivery_status = 'sent')::text as invites_sent,
+         (select count(*) from identity.invite_outbox where delivery_status in ('pending', 'queued'))::text as invites_pending,
+         (select count(*) from identity.invite_outbox where delivery_status = 'failed')::text as invites_failed`,
+    );
+    const row = result.rows[0];
+    return {
+      totalSurveysCreated: Number(row?.total_surveys ?? 0),
+      totalResponsesSubmitted: Number(row?.total_responses ?? 0),
+      invitesSent: Number(row?.invites_sent ?? 0),
+      invitesPending: Number(row?.invites_pending ?? 0),
+      invitesFailed: Number(row?.invites_failed ?? 0),
+      databaseHealthy: true,
+    };
+  }
+
+  async listAllSupportNotes(limit = 30): Promise<Array<TenantSupportNote & { tenantId: string; tenantName: string }>> {
+    const result = await this.db.query<{
+      id: string;
+      tenant_id: string;
+      tenant_name: string;
+      author_email: string;
+      note: string;
+      created_at: string;
+    }>(
+      `select n.id, n.tenant_id, t.name as tenant_name, n.author_email, n.note, n.created_at::text as created_at
+       from identity.tenant_support_notes n
+       join identity.tenants t on t.id = n.tenant_id
+       order by n.created_at desc
+       limit $1`,
+      [limit],
+    );
+    return result.rows.map((row) => ({
+      id: row.id,
+      tenantId: row.tenant_id,
+      tenantName: row.tenant_name,
+      authorEmail: row.author_email,
+      note: row.note,
+      createdAt: row.created_at,
     }));
   }
 

@@ -12,7 +12,8 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
 import { SignOutButton } from "@/components/SignOutButton";
 
 const navItems = [
@@ -29,6 +30,13 @@ const environment = process.env.NODE_ENV === "production" ? "Production" : "Deve
 
 export function OwnerConsoleShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [searchDraft, setSearchDraft] = useState("");
+
+  function runSearch() {
+    const query = searchDraft.trim();
+    router.push(query ? `/console/tenants?q=${encodeURIComponent(query)}` : "/console/tenants");
+  }
 
   return (
     <div className="min-h-screen bg-[var(--brand-bg)] text-[var(--brand-ink)]">
@@ -78,9 +86,11 @@ export function OwnerConsoleShell({ children }: { children: React.ReactNode }) {
               <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--brand-muted)]" />
               <input
                 type="search"
+                value={searchDraft}
+                onChange={(event) => setSearchDraft(event.target.value)}
+                onKeyDown={(event) => event.key === "Enter" && runSearch()}
                 placeholder="Search tenants..."
-                disabled
-                className="h-9 w-full rounded-full border border-[var(--brand-border)] bg-white/80 pl-9 pr-3 text-sm text-[var(--brand-ink)] placeholder:text-[var(--brand-muted)] disabled:cursor-not-allowed disabled:opacity-60"
+                className="h-9 w-full rounded-full border border-[var(--brand-border)] bg-white/80 pl-9 pr-3 text-sm text-[var(--brand-ink)] placeholder:text-[var(--brand-muted)]"
               />
             </div>
             <div className="flex shrink-0 items-center gap-3">
