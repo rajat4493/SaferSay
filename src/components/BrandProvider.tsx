@@ -31,7 +31,7 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
       "--brand-font",
       brand.font === "System"
         ? "ui-sans-serif, system-ui, sans-serif"
-        : "var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif",
+        : "var(--font-inter), ui-sans-serif, system-ui, sans-serif",
     );
   }, [brand]);
 

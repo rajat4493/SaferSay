@@ -1,42 +1,55 @@
 @import "tailwindcss";
 
+/* Design tokens -- docs/strategy/SAFERSAY_DESIGN_SYSTEM.md §1.
+   Single source of truth for look & feel. Brand Studio overrides
+   --brand-bg/surface/ink/muted/accent/accent-soft/border/font per tenant
+   at runtime (see BrandProvider.tsx); everything else here (radius,
+   shadow, the amber attention color, typography scale) is platform-wide
+   and not tenant-customizable. */
 :root {
-  --background: #f4f1ea;
-  --foreground: #161616;
-  --brand-bg: #f4f1ea;
-  --brand-surface: #fbfaf7;
-  --brand-ink: #161616;
-  --brand-muted: #625d56;
-  --brand-accent: #5543b7;
-  --brand-accent-soft: #ebe4ff;
-  --brand-border: #e4ddd2;
-  --brand-font: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  --background: #fbfaf7;
+  --foreground: #16241f;
 
-  /* Glass/shadow/radius tokens, derived from the brand palette above so any
-     white-label palette (Brand Studio) gets correctly-tinted surfaces for
-     free, without adding new fields to BrandTheme. */
-  --brand-glass-surface: color-mix(in srgb, var(--brand-surface) 72%, transparent);
-  --brand-glass-border: color-mix(in srgb, var(--brand-border) 60%, transparent);
-  --brand-glass-strong: color-mix(in srgb, var(--brand-surface) 88%, transparent);
-  --shadow-soft: 0 20px 60px rgba(22, 22, 22, 0.08);
-  --shadow-elevated: 0 35px 100px rgba(22, 22, 22, 0.14);
-  --radius-card: 1.75rem;
-  --radius-shell: 2rem;
+  /* Brand-overridable (defaults = SaferSay's own identity, src/lib/brand.ts) */
+  --brand-bg: #fbfaf7;
+  --brand-surface: #ffffff;
+  --brand-ink: #16241f;
+  --brand-muted: #5f6e68;
+  --brand-accent: #0e6e59;
+  --brand-accent-soft: #e7f1ed;
+  --brand-border: #eae6dd;
+  --brand-font: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  /* Platform-wide, not brand-customizable */
+  --brand-accent-deep: #0a5344;
+  --brand-ink-faint: #8a968f;
+  --brand-line-soft: #f1eee7;
+  --brand-amber: #b4701f;
+  --brand-amber-soft: #f8eedd;
+  --font-display: var(--font-bricolage), var(--font-inter), ui-sans-serif, sans-serif;
+
+  /* Flat white cards with a hairline border, per the design system's
+     "Tally-clean restraint" -- not glassmorphism. Kept as CSS vars (rather
+     than rewriting every consuming className) so existing backdrop-blur
+     classes become inert on an opaque surface instead of needing removal. */
+  --brand-glass-surface: var(--brand-surface);
+  --brand-glass-border: var(--brand-border);
+  --brand-glass-strong: var(--brand-surface);
+
+  --shadow-soft: 0 1px 2px rgba(22, 36, 31, 0.04);
+  --shadow-elevated: 0 12px 30px -18px rgba(22, 36, 31, 0.28);
+  --radius-card: 1rem;
+  --radius-input: 0.6875rem;
+  --radius-button: 0.625rem;
+  --radius-shell: 1.25rem;
   --radius-pill: 999px;
-}
-
-@supports not (backdrop-filter: blur(1px)) {
-  :root {
-    --brand-glass-surface: var(--brand-surface);
-    --brand-glass-strong: var(--brand-surface);
-  }
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-display);
 }
 
 body {
@@ -50,8 +63,13 @@ button {
 }
 
 ::selection {
-  background: #c8b6ff;
-  color: #161616;
+  background: var(--brand-accent-soft);
+  color: var(--brand-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand-accent);
+  outline-offset: 2px;
 }
 
 @keyframes marquee {
@@ -70,5 +88,10 @@ button {
 @media (prefers-reduced-motion: reduce) {
   .animate-marquee {
     animation: none;
+  }
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
