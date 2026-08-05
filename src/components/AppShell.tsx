@@ -147,7 +147,7 @@ export function AppShell({ children, title, subtitle }: { children: React.ReactN
                 <ShieldCheck size={14} />
                 Confidential by design
               </div>
-              <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em]">{title}</h1>
+              <h1 className="mt-3 font-[family-name:var(--font-display)] text-3xl font-semibold tracking-[-0.025em]">{title}</h1>
               <p className="mt-2 text-sm leading-6 text-[var(--brand-muted)]">{subtitle}</p>
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-3">

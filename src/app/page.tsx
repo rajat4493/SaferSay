@@ -31,7 +31,7 @@ export default function Home() {
             <ShieldCheck size={15} />
             Confidential employee surveys for SMEs
           </div>
-          <h1 className="max-w-5xl text-6xl font-semibold leading-[0.9] tracking-[-0.05em] sm:text-8xl lg:text-[8.5rem]">
+          <h1 className="max-w-5xl font-[family-name:var(--font-display)] text-6xl font-semibold leading-[0.9] tracking-[-0.03em] sm:text-8xl lg:text-[8.5rem]">
             Say the
             <br />
             <span className="text-[var(--brand-accent-soft)]">unsayable.</span>

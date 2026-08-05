@@ -20,13 +20,13 @@ export const defaultBrand: BrandTheme = {
   logoDataUrl: null,
   font: "Geist",
   colors: {
-    background: "#f4f1ea",
-    surface: "#fbfaf7",
-    ink: "#161616",
-    muted: "#625d56",
-    accent: "#5543b7",
-    accentSoft: "#ebe4ff",
-    border: "#e4ddd2",
+    background: "#fbfaf7",
+    surface: "#ffffff",
+    ink: "#16241f",
+    muted: "#5f6e68",
+    accent: "#0e6e59",
+    accentSoft: "#e7f1ed",
+    border: "#eae6dd",
   },
 };
 

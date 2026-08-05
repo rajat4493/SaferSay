@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
+import { ConfidentialitySeal } from "@/components/ConfidentialitySeal";
 import { PilotGuide } from "@/components/PilotGuide";
 
 type ViewMode = "loading" | "workflow";
@@ -44,6 +45,7 @@ export default function Dashboard() {
 
   return (
     <AppShell title="Get started" subtitle="Here's your next step — this page always shows exactly what to do to run one confidential survey.">
+      <ConfidentialitySeal />
       <div className="mb-5">
         <PilotGuide />
       </div>

@@ -10,7 +10,7 @@ export function StatTile({ label, value, hint }: { label: string; value: React.R
   return (
     <ConsoleCard>
       <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--brand-muted)]">{label}</p>
-      <p className="mt-2 text-3xl font-semibold tracking-tight">{value}</p>
+      <p className="mt-2 font-[family-name:var(--font-display)] text-3xl font-semibold tracking-tight">{value}</p>
       {hint ? <p className="mt-1 text-xs text-[var(--brand-muted)]">{hint}</p> : null}
     </ConsoleCard>
   );

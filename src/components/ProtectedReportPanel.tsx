@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { Download, EyeOff, RefreshCw, Share2 } from "lucide-react";
 import { Card } from "@/components/AppShell";
+import { ConfidentialitySeal } from "@/components/ConfidentialitySeal";
 import { ViewerCard } from "@/components/ViewerShell";
 
 type CycleAction = { id: string; authorEmail: string; actionText: string; createdAt: string };
@@ -93,9 +94,10 @@ export function ProtectedReportPanel({ mode = "admin" }: { mode?: "admin" | "vie
 
   return (
     <>
+      <ConfidentialitySeal />
       <div className="grid gap-4 lg:grid-cols-3">
-        <ShellCard><h2 className="text-5xl font-semibold tracking-[-0.03em]">{report?.n ?? 0}</h2><p className="mt-1 text-sm text-[var(--brand-muted)]">Responses</p></ShellCard>
-        <ShellCard><h2 className="text-5xl font-semibold tracking-[-0.03em]">{minGroupSize}</h2><p className="mt-1 text-sm text-[var(--brand-muted)]">Minimum group size</p></ShellCard>
+        <ShellCard><h2 className="font-[family-name:var(--font-display)] text-5xl font-semibold tracking-[-0.03em]">{report?.n ?? 0}</h2><p className="mt-1 text-sm text-[var(--brand-muted)]">Responses</p></ShellCard>
+        <ShellCard><h2 className="font-[family-name:var(--font-display)] text-5xl font-semibold tracking-[-0.03em]">{minGroupSize}</h2><p className="mt-1 text-sm text-[var(--brand-muted)]">Minimum group size</p></ShellCard>
         <div
           className={`rounded-[var(--radius-card)] p-5 shadow-[var(--shadow-soft)] ${
             report?.protected
@@ -103,7 +105,7 @@ export function ProtectedReportPanel({ mode = "admin" }: { mode?: "admin" | "vie
               : "bg-[var(--brand-ink)] text-white"
           }`}
         >
-          <h2 className="text-5xl font-semibold tracking-[-0.03em]">{report?.protected ? "Protected" : "Unlocked"}</h2>
+          <h2 className="font-[family-name:var(--font-display)] text-5xl font-semibold tracking-[-0.03em]">{report?.protected ? "Protected" : "Unlocked"}</h2>
           <p className={`mt-1 text-sm ${report?.protected ? "text-[var(--brand-muted)]" : "text-white/60"}`}>Report state</p>
         </div>
       </div>
