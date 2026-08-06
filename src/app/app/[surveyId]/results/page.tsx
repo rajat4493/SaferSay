@@ -1,16 +1,16 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, ChevronRight, Download } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { ConfidentialitySeal } from "@/components/ConfidentialitySeal";
 
 export default function SurveyResultsPage() {
-  const params = useParams();
   const router = useRouter();
-  const surveyId = params.surveyId as string;
 
-  // TODO: Fetch survey data and results
+  // TODO: Fetch survey data and results using the surveyId route param
+  // const params = useParams();
+  // const surveyId = params.surveyId as string;
   // const [survey, setSurvey] = useState<SurveyDetail | null>(null);
   // const [report, setReport] = useState<ProtectedReport | null>(null);
   // useEffect(() => {

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Plus } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { ConfidentialitySeal } from "@/components/ConfidentialitySeal";
@@ -51,13 +52,13 @@ export default function SurveysHome() {
               Pick a template, customize questions, and send confidential invite links.
             </p>
           </div>
-          <a
+          <Link
             href="/app/surveys/new"
             className="inline-flex items-center gap-2 rounded-[var(--radius-button)] bg-[var(--brand-accent)] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[var(--brand-accent-deep)]"
           >
             <Plus size={16} />
             New survey
-          </a>
+          </Link>
         </div>
       </div>
 
