@@ -1,0 +1,237 @@
+import type { UserRole } from "@/lib/server/repositories/types";
+
+/**
+ * Audit logging service for operator actions.
+ *
+ * CRITICAL: THE HARD RULE (from CLAUDE_CODE_ADMIN_REFACTOR.md §3)
+ * Audit logs must NEVER become a de-anonymisation tool.
+ * - Log OPERATOR ACTIONS ONLY (what admins do to the system)
+ * - NEVER log respondent participation, submission status tied to identity, or response content
+ * - If an audit entry would let someone infer that a specific person responded (or what they said),
+ *   it must NOT be recorded
+ * - Participation state stays in the operational participation store (for reminders only)
+ *   and is NEVER surfaced to the Auditor role
+ *
+ * Examples of SAFE entries:
+ * - "threshold changed to 5"
+ * - "invites sent to 30 people" (aggregate count only)
+ * - "survey created from Engagement template"
+ * - "survey closed"
+ * - "employee list imported (30 rows)"
+ * - "report exported"
+ *
+ * Examples of UNSAFE entries (NEVER log these):
+ * - "john@company.com submitted response"
+ * - "bob@company.com has not submitted"
+ * - "alice@company.com response: [answer data]"
+ * - Any per-person submission tracking tied to email/identity
+ */
+
+export type AuditLogAction =
+  | "survey_created"
+  | "survey_closed"
+  | "survey_deleted"
+  | "invites_sent"
+  | "reminders_sent"
+  | "employee_list_imported"
+  | "employee_added"
+  | "employee_removed"
+  | "report_exported"
+  | "threshold_changed"
+  | "settings_updated";
+
+export type AuditLogTargetType = "survey" | "workspace" | "people_list" | null;
+
+export interface AuditLogEntry {
+  tenantId: string;
+  actorRole: UserRole;
+  actorId: string;
+  action: AuditLogAction;
+  targetType?: AuditLogTargetType;
+  targetId?: string;
+  safeCounts?: Record<string, number>;
+  details?: string;
+}
+
+/**
+ * Validate that safe_counts contains only aggregate data, no PII or identity info.
+ * This guard ensures we never accidentally log respondent-identifying information.
+ */
+function validateSafeCounts(counts: Record<string, number> | undefined): void {
+  if (!counts) return;
+
+  const unsafePrefixes = [
+    "email",
+    "respondent",
+    "participant",
+    "person",
+    "employee_",
+    "user_",
+    "identity",
+    "submission_per_",
+  ];
+
+  for (const key of Object.keys(counts)) {
+    for (const unsafe of unsafePrefixes) {
+      if (key.toLowerCase().includes(unsafe)) {
+        throw new Error(
+          `AUDIT GUARD VIOLATION: count key "${key}" looks like PII or respondent-specific data. ` +
+            `Audit logs must never track individual responses or submission status.`
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Validate that details string contains no respondent email addresses or PII.
+ */
+function validateDetailsNoPII(details: string | undefined): void {
+  if (!details) return;
+
+  // Basic check: if details look like they contain an email that's not the actor,
+  // that's a red flag for logging respondent email
+  const emailPattern = /[\w.-]+@[\w.-]+\.\w+/g;
+  const emails = details.match(emailPattern) || [];
+
+  if (emails.length > 0) {
+    throw new Error(
+      `AUDIT GUARD VIOLATION: details contain email addresses. ` +
+        `Audit logs must not contain respondent email addresses or PII. ` +
+        `Use aggregate counts instead (e.g., "invites_sent: 30" not "invites_sent_to: [emails]").`
+    );
+  }
+}
+
+/**
+ * Log an audit event. Enforces the hard rule: operator actions only, never respondent data.
+ *
+ * This function validates its inputs to catch PII violations at insert time.
+ * The database layer also enforces RLS to prevent unauthorized reads.
+ */
+export async function logAuditEvent(entry: AuditLogEntry): Promise<void> {
+  // Guard: validate no PII in safe_counts or details
+  validateSafeCounts(entry.safeCounts);
+  validateDetailsNoPII(entry.details);
+
+  // Guard: action must be an operator action, not respondent-tracking
+  const respondentActionPatterns = [
+    "responded",
+    "submission",
+    "participant_",
+    "respondent_",
+    "who_answered",
+  ];
+
+  for (const pattern of respondentActionPatterns) {
+    if (entry.action.toLowerCase().includes(pattern)) {
+      throw new Error(
+        `AUDIT GUARD VIOLATION: action "${entry.action}" looks like respondent tracking. ` +
+          `Audit logs must track operator actions only (survey creation, invites sent, settings changed), ` +
+          `not who responded or what they said.`
+      );
+    }
+  }
+
+  try {
+    // TODO: Insert into identity.audit_logs table via Supabase client
+    // const { error } = await supabase.from("audit_logs").insert({
+    //   tenant_id: entry.tenantId,
+    //   actor_role: entry.actorRole,
+    //   actor_id: entry.actorId,
+    //   action: entry.action,
+    //   target_type: entry.targetType || null,
+    //   target_id: entry.targetId || null,
+    //   safe_counts: entry.safeCounts || null,
+    // });
+    // if (error) throw error;
+
+    console.log(`[AUDIT] ${entry.actorRole} (${entry.actorId}): ${entry.action}`, {
+      target: entry.targetId ? `${entry.targetType}:${entry.targetId}` : "workspace",
+      counts: entry.safeCounts,
+    });
+  } catch (error) {
+    console.error(`Audit log insertion failed: ${error}`);
+    throw error;
+  }
+}
+
+/**
+ * Helper: Log survey creation
+ */
+export async function logSurveyCreated(
+  tenantId: string,
+  actorRole: UserRole,
+  actorId: string,
+  surveyId: string,
+  templateName?: string
+): Promise<void> {
+  await logAuditEvent({
+    tenantId,
+    actorRole,
+    actorId,
+    action: "survey_created",
+    targetType: "survey",
+    targetId: surveyId,
+    details: templateName ? `from ${templateName} template` : undefined,
+  });
+}
+
+/**
+ * Helper: Log invites sent (aggregate count only, never individual emails)
+ */
+export async function logInvitesSent(
+  tenantId: string,
+  actorRole: UserRole,
+  actorId: string,
+  surveyId: string,
+  inviteCount: number
+): Promise<void> {
+  await logAuditEvent({
+    tenantId,
+    actorRole,
+    actorId,
+    action: "invites_sent",
+    targetType: "survey",
+    targetId: surveyId,
+    safeCounts: { invites_sent: inviteCount },
+  });
+}
+
+/**
+ * Helper: Log employee list import (aggregate count only, never individual emails)
+ */
+export async function logEmployeeImport(
+  tenantId: string,
+  actorRole: UserRole,
+  actorId: string,
+  rowCount: number
+): Promise<void> {
+  await logAuditEvent({
+    tenantId,
+    actorRole,
+    actorId,
+    action: "employee_list_imported",
+    targetType: "people_list",
+    safeCounts: { rows_imported: rowCount },
+  });
+}
+
+/**
+ * Helper: Log threshold change
+ */
+export async function logThresholdChanged(
+  tenantId: string,
+  actorRole: UserRole,
+  actorId: string,
+  newThreshold: number
+): Promise<void> {
+  await logAuditEvent({
+    tenantId,
+    actorRole,
+    actorId,
+    action: "threshold_changed",
+    targetType: "workspace",
+    safeCounts: { new_threshold: newThreshold },
+  });
+}

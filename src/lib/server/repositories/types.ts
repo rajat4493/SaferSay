@@ -4,7 +4,12 @@ export type TenantRecord = {
   slug: string;
 };
 
-export type UserRole = "owner" | "admin" | "employee";
+export type UserRole = "customer_admin" | "survey_creator" | "auditor" | "employee";
+
+// For backward compatibility with existing code that uses "owner" or "admin"
+// TODO: migrate all code to use the new four-role model
+export const LEGACY_OWNER_ROLES: UserRole[] = ["customer_admin"];
+export const LEGACY_ADMIN_ROLES: UserRole[] = ["customer_admin", "survey_creator"];
 
 export type UserRecord = {
   id: string;

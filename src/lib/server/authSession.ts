@@ -25,7 +25,7 @@ const localDevContext: SessionContext = {
   userId: "local-dev",
   email: "dev@localhost",
   name: "Local dev",
-  role: "owner",
+  role: "customer_admin",
   tenant: localTenant,
   isSuperAdmin: false,
   homeTenantId: localTenant.id,
@@ -89,7 +89,7 @@ export async function getSessionContext(): Promise<SessionContext | null> {
   const db = getDatabasePool();
   if (!db) {
     const { tenant } = await resolveTenantContext();
-    return { userId: authId, email: authEmail, name: null, role: "owner", tenant, isSuperAdmin: false, homeTenantId: tenant.id };
+    return { userId: authId, email: authEmail, name: null, role: "customer_admin", tenant, isSuperAdmin: false, homeTenantId: tenant.id };
   }
 
   const repo = new IdentityRepository(db);
@@ -150,7 +150,7 @@ async function resolveUserRecord(
     providerSubject,
     email,
     name: displayName,
-    role: "owner",
+    role: "customer_admin",
   });
   await repo.emitOnboardingEvent(tenant.id, user.id, "signup");
   return user;

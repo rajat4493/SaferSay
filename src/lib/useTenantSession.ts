@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 
+import type { UserRole } from "@/lib/server/repositories/types";
+
 export type TenantSessionInfo = {
-  role: "owner" | "admin" | "employee";
+  role: UserRole;
   isSuperAdmin: boolean;
   isImpersonating: boolean;
   tenantName: string;

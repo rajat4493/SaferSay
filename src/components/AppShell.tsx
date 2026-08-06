@@ -14,6 +14,7 @@ import {
   Settings,
   ShieldCheck,
   Users,
+  AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -24,6 +25,7 @@ import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import { RoleTag } from "@/components/RoleTag";
 import { SignOutButton } from "@/components/SignOutButton";
 import { useTenantSession } from "@/lib/useTenantSession";
+import { canAccessPeople, canAccessWorkspace } from "@/lib/permissions";
 
 const featuredNavItem = { href: "/app", label: "Get started", helper: "Your next step", icon: Home };
 
@@ -43,33 +45,33 @@ type NavGroupConfig = {
   items: NavItemConfig[];
 };
 
+// Three-zone navigation per CLAUDE_CODE_ADMIN_REFACTOR.md §1
+// All roles use the SAME app -- differences only in what's visible
 const navGroups: NavGroupConfig[] = [
   {
-    label: "Run a survey",
+    label: "Surveys",
     hideForPureOwner: true,
     items: [
-      { href: "/app/participants", label: "People", helper: "Upload employees", icon: Users },
-      { href: "/app/templates", label: "Templates", helper: "Question sets", icon: FileText },
-      { href: "/app/surveys/new", label: "Create survey", helper: "Send invite links", icon: Plus },
-      { href: "/app/integrations", label: "Invites", helper: "Prepare sending", icon: Plug },
-      { href: "/app/reports", label: "Reports", helper: "Safe insights", icon: BarChart3 },
+      { href: "/app", label: "Browse surveys", helper: "Your active and past surveys", icon: Home },
+      { href: "/app/surveys/new", label: "Create survey", helper: "Pick template, send invites", icon: Plus },
     ],
   },
   {
-    label: "Manage & settings",
-    collapsible: true,
+    label: "People",
+    hideForPureOwner: true,
     items: [
-      { href: "/app/settings", label: "Settings", helper: "Threshold, export, deletion", icon: Settings, hideForPureOwner: true },
-      { href: "/app/billing", label: "Billing", helper: "Payment setup", icon: CreditCard, hideForPureOwner: true },
-      { href: "/app/brand", label: "Brand Studio", helper: "Client styling", icon: Palette, hideForPureOwner: true },
-      // "Viewer portal" (manager/team-lead scoped views) is deliberately not
-      // linked from nav yet -- the Manager role and its scope enforcement
-      // aren't real (see docs/strategy/SAFERSAY_FINAL_ARCHITECTURE.md §6),
-      // and shipping the UI ahead of the permission model risks leaking a
-      // sub-k team's data. The /viewer pages/routes still exist but are
-      // unlinked until that role ships for real.
-      { href: "/app/readiness", label: "Go-live", helper: "Production checks", icon: Rocket, muted: true },
-      { href: "/app/security", label: "Security", helper: "Confidentiality proof", icon: LockKeyhole, muted: true },
+      { href: "/app/people", label: "Employee list", helper: "Import CSV, add or deactivate", icon: Users },
+    ],
+  },
+  {
+    label: "Workspace",
+    collapsible: true,
+    hideForPureOwner: true,
+    items: [
+      { href: "/app/workspace/settings", label: "Settings", helper: "Confidentiality threshold", icon: Settings, hideForPureOwner: true },
+      { href: "/app/workspace/go-live", label: "Go-live", helper: "Production readiness checks", icon: Rocket, hideForPureOwner: true },
+      { href: "/app/workspace/security", label: "Security", helper: "Confidentiality proof", icon: LockKeyhole, hideForPureOwner: true },
+      { href: "/app/workspace/billing", label: "Billing", helper: "Plan & payment", icon: CreditCard, hideForPureOwner: true },
     ],
   },
 ];
@@ -77,7 +79,7 @@ const navGroups: NavGroupConfig[] = [
 export function AppShell({ children, title, subtitle }: { children: React.ReactNode; title: string; subtitle: string }) {
   const pathname = usePathname();
   const { brand } = useBrand();
-  const { info } = useTenantSession();
+  const { info, loaded } = useTenantSession();
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
   // Pure Owner mode: signed in as the platform's super admin, not currently
@@ -85,8 +87,16 @@ export function AppShell({ children, title, subtitle }: { children: React.ReactN
   // here -- that only appears once the Owner has explicitly entered a tenant.
   const pureOwnerMode = Boolean(info?.isSuperAdmin && !info.isImpersonating);
 
+  // Apply role-based permission filters (four-role model per CLAUDE_CODE_ADMIN_REFACTOR.md §2)
   const visibleNavGroups = navGroups
-    .filter((group) => !(pureOwnerMode && group.hideForPureOwner))
+    .filter((group) => {
+      if (pureOwnerMode && group.hideForPureOwner) return false;
+      // Filter "People" zone for roles without access
+      if (group.label === "People" && info && !canAccessPeople(info.role)) return false;
+      // Filter "Workspace" zone for non-admin roles
+      if (group.label === "Workspace" && info && !canAccessWorkspace(info.role)) return false;
+      return true;
+    })
     .map((group) => ({
       ...group,
       items: group.items.filter((item) => !(pureOwnerMode && item.hideForPureOwner)),
