@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Plus } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { ConfidentialitySeal } from "@/components/ConfidentialitySeal";
-import { PilotGuide } from "@/components/PilotGuide";
 
-type ViewMode = "loading" | "workflow";
+type ViewMode = "loading" | "surveys";
 
-export default function Dashboard() {
+export default function SurveysHome() {
   const router = useRouter();
   const [mode, setMode] = useState<ViewMode>("loading");
 
@@ -16,7 +16,7 @@ export default function Dashboard() {
     fetch("/api/tenants/current")
       .then((response) => response.json())
       .then((data) => {
-        if (!data.ok) return setMode("workflow");
+        if (!data.ok) return setMode("surveys");
         // Pure Owner mode (not currently impersonating a tenant) has no
         // business inside /app at all -- the Owner Control Room at /console
         // is the real home, and it never offers a full-access "enter this
@@ -27,36 +27,51 @@ export default function Dashboard() {
           router.replace("/console");
           return;
         }
-        setMode("workflow");
+        setMode("surveys");
       })
-      .catch(() => setMode("workflow"));
+      .catch(() => setMode("surveys"));
   }, [router]);
 
-  const workflow = [
-    { step: "1", title: "Load people", text: "Upload a CSV with employee email, name, team, and location.", href: "/app/participants" },
-    { step: "2", title: "Create survey", text: "Pick a template and send a secure invite link to each employee.", href: "/app/surveys/new" },
-    { step: "3", title: "Prepare invites", text: "Queue invitations from the participation store only.", href: "/app/integrations" },
-    { step: "4", title: "Read report", text: "Reports unlock only when the safe response threshold is met.", href: "/app/reports" },
-  ];
-
   if (mode === "loading") {
-    return <AppShell title="Get started" subtitle=" "><div className="h-40" /></AppShell>;
+    return <AppShell title="Surveys" subtitle=" "><div className="h-40" /></AppShell>;
   }
 
   return (
-    <AppShell title="Get started" subtitle="Here's your next step — this page always shows exactly what to do to run one confidential survey.">
+    <AppShell
+      title="Surveys"
+      subtitle="Your active and past surveys. Open one to manage invites, responses, and results."
+    >
       <ConfidentialitySeal />
-      <div className="mb-5">
-        <PilotGuide />
-      </div>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {workflow.map((item) => (
-          <a key={item.title} href={item.href} className="rounded-[var(--radius-card)] border border-[var(--brand-glass-border)] bg-[var(--brand-glass-strong)] p-5 shadow-[var(--shadow-soft)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-elevated)]">
-            <div className="grid h-9 w-9 place-items-center rounded-[var(--radius-pill)] bg-[var(--brand-accent-soft)] text-sm font-semibold text-[var(--brand-accent)]">{item.step}</div>
-            <h2 className="mt-4 text-lg font-semibold">{item.title}</h2>
-            <p className="mt-2 text-sm leading-6 text-[var(--brand-muted)]">{item.text}</p>
+
+      <div className="mt-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Create a new survey</h2>
+            <p className="mt-1 text-sm text-[var(--brand-muted)]">
+              Pick a template, customize questions, and send confidential invite links.
+            </p>
+          </div>
+          <a
+            href="/app/surveys/new"
+            className="inline-flex items-center gap-2 rounded-[var(--radius-button)] bg-[var(--brand-accent)] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[var(--brand-accent-deep)]"
+          >
+            <Plus size={16} />
+            New survey
           </a>
-        ))}
+        </div>
+      </div>
+
+      <div className="mt-8">
+        <h2 className="text-lg font-semibold">Your surveys</h2>
+        <p className="mt-2 text-sm text-[var(--brand-muted)]">
+          No surveys yet. Create your first survey to get started.
+        </p>
+        {/* TODO: Populate with actual surveys from /api/cycles
+            - Fetch active/recent cycles
+            - Display live survey prominently at top
+            - Show past surveys in quiet list below
+            - Link each to /app/[surveyId] for detail view with Build/Send/Results stages
+        */}
       </div>
     </AppShell>
   );
