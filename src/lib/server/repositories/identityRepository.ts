@@ -172,7 +172,7 @@ export class IdentityRepository {
     if (!tenant) return null;
 
     const contactResult = await this.db.query<{ email: string }>(
-      `select email from identity.users where tenant_id = $1 and role = 'owner' order by created_at asc limit 1`,
+      `select email from identity.users where tenant_id = $1 and role = 'customer_admin' order by created_at asc limit 1`,
       [tenantId],
     );
 

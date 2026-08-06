@@ -235,3 +235,43 @@ export async function logThresholdChanged(
     safeCounts: { new_threshold: newThreshold },
   });
 }
+
+/**
+ * Helper: Log reminders sent (aggregate count only, never individual emails)
+ */
+export async function logRemindersSent(
+  tenantId: string,
+  actorRole: UserRole,
+  actorId: string,
+  surveyId: string,
+  reminderCount: number
+): Promise<void> {
+  await logAuditEvent({
+    tenantId,
+    actorRole,
+    actorId,
+    action: "reminders_sent",
+    targetType: "survey",
+    targetId: surveyId,
+    safeCounts: { reminders_sent: reminderCount },
+  });
+}
+
+/**
+ * Helper: Log survey closure
+ */
+export async function logSurveyClosed(
+  tenantId: string,
+  actorRole: UserRole,
+  actorId: string,
+  surveyId: string
+): Promise<void> {
+  await logAuditEvent({
+    tenantId,
+    actorRole,
+    actorId,
+    action: "survey_closed",
+    targetType: "survey",
+    targetId: surveyId,
+  });
+}

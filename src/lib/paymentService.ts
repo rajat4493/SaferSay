@@ -4,7 +4,7 @@ export async function createCycleCheckout(origin: string, cycleId: string) {
   if (!process.env.STRIPE_SECRET_KEY) {
     return {
       mode: "mock" as const,
-      checkoutUrl: `${origin}/app/billing?mock_paid_cycle=${cycleId}`,
+      checkoutUrl: `${origin}/app/workspace/billing?mock_paid_cycle=${cycleId}`,
     };
   }
 
@@ -21,8 +21,8 @@ export async function createCycleCheckout(origin: string, cycleId: string) {
         quantity: 1,
       },
     ],
-    success_url: `${origin}/app/billing?paid_cycle=${cycleId}`,
-    cancel_url: `${origin}/app/billing`,
+    success_url: `${origin}/app/workspace/billing?paid_cycle=${cycleId}`,
+    cancel_url: `${origin}/app/workspace/billing`,
     metadata: { cycleId },
   });
 

@@ -13,13 +13,10 @@ export default function NewSurveyPage() {
   return (
     <AppShell title="New Survey" subtitle="Template first, then light editing, then launch.">
       <PageGuide
-        label="Step 2"
+        label="Build"
         title="Pick a template and create your survey"
-        body="Choose the closest template. When you click Create, SaferSay creates a draft survey and a secure invite link for each active employee."
-        actions={[
-          { href: "/app/participants", label: "Back: people" },
-          { href: "/app/integrations", label: "Next: invites", primary: true },
-        ]}
+        body="Choose the closest template. When you click Create, SaferSay creates a draft survey and a secure invite link for each active employee, then takes you straight to Send."
+        actions={[{ href: "/app/people", label: "Back: people" }]}
       />
       <div className="grid gap-5 xl:grid-cols-[0.85fr_1.15fr]">
         <Card>

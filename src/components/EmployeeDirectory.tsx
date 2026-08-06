@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Plus, Search } from "lucide-react";
 import { Card } from "@/components/AppShell";
+import { SkeletonRow } from "@/components/Skeleton";
 
 type Employee = {
   id: string;
@@ -124,7 +125,11 @@ export function EmployeeDirectory({ refreshKey = 0 }: { refreshKey?: number }) {
 
       <div className="mt-4 max-h-96 overflow-auto rounded-2xl border border-[var(--brand-border)] bg-white">
         {loading ? (
-          <p className="p-4 text-sm font-semibold text-[var(--brand-muted)]">Loading...</p>
+          <>
+            <SkeletonRow />
+            <SkeletonRow />
+            <SkeletonRow />
+          </>
         ) : employees.length === 0 ? (
           <p className="p-4 text-sm text-[var(--brand-muted)]">No employees match this search.</p>
         ) : (

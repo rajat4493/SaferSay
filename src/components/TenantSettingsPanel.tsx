@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Card } from "@/components/AppShell";
+import { SkeletonCard } from "@/components/Skeleton";
+import { useToast } from "@/components/ToastProvider";
 
 type Settings = {
   minGroupSize: number;
@@ -20,6 +22,7 @@ const featureLabels: Record<string, string> = {
 export function TenantSettingsPanel() {
   const [settings, setSettings] = useState<Settings | null | undefined>(undefined);
   const [saving, setSaving] = useState(false);
+  const toast = useToast();
 
   function load() {
     fetch("/api/tenants/settings")
@@ -37,9 +40,14 @@ export function TenantSettingsPanel() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ minGroupSize: value }),
     });
-    const data = await response.json();
-    if (data.ok) setSettings(data.settings);
+    const data = await response.json().catch(() => ({ ok: false }));
     setSaving(false);
+    if (data.ok) {
+      setSettings(data.settings);
+      toast.show({ variant: "success", message: `Minimum group size set to ${data.settings.minGroupSize}.` });
+    } else {
+      toast.show({ variant: "error", message: "Couldn't save that setting. Try again." });
+    }
   }
 
   function exportEmployeesCsv() {
@@ -68,7 +76,14 @@ export function TenantSettingsPanel() {
       });
   }
 
-  if (settings === undefined) return <p className="text-sm text-[var(--brand-muted)]">Loading settings...</p>;
+  if (settings === undefined) {
+    return (
+      <div className="space-y-4">
+        <SkeletonCard />
+        <SkeletonCard />
+      </div>
+    );
+  }
   if (settings === null) return <p className="text-sm text-[var(--brand-muted)]">Couldn&apos;t load settings.</p>;
 
   return (

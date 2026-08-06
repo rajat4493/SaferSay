@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Bricolage_Grotesque, Inter } from "next/font/google";
 import { BrandProvider } from "@/components/BrandProvider";
 import { DataProvider } from "@/components/DataProvider";
+import { ToastProvider } from "@/components/ToastProvider";
 import "./globals.css";
 
 // Design system (docs/strategy/SAFERSAY_DESIGN_SYSTEM.md §1): Inter for
@@ -37,7 +38,9 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <BrandProvider>
-          <DataProvider>{children}</DataProvider>
+          <DataProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </DataProvider>
         </BrandProvider>
       </body>
     </html>

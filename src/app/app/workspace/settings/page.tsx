@@ -1,30 +1,18 @@
-"use client";
-
 import { AppShell } from "@/components/AppShell";
+import { PageGuide } from "@/components/PageGuide";
+import { TenantSettingsPanel } from "@/components/TenantSettingsPanel";
 
 export default function WorkspaceSettingsPage() {
   return (
-    <AppShell
-      title="Settings"
-      subtitle="Configure your workspace confidentiality settings."
-    >
-      <div className="space-y-6">
-        <div className="rounded-[var(--radius-card)] border border-[var(--brand-glass-border)] bg-[var(--brand-glass-strong)] p-6 shadow-[var(--shadow-soft)] backdrop-blur-xl">
-          <h2 className="font-semibold">Confidentiality Threshold</h2>
-          <p className="mt-2 text-sm text-[var(--brand-muted)]">
-            Reports only show when this many people have responded.
-          </p>
-          <div className="mt-4">
-            <label className="block text-sm font-medium">Minimum group size (k-value)</label>
-            <input
-              type="number"
-              min="2"
-              max="50"
-              defaultValue="5"
-              className="mt-2 w-32 rounded-[var(--radius-button)] border border-[var(--brand-line)] px-3 py-2 text-sm"
-            />
-          </div>
-        </div>
+    <AppShell title="Settings" subtitle="Confidentiality threshold, branding, plan, and data controls for your workspace.">
+      <PageGuide
+        label="Workspace"
+        title="Tune your confidentiality threshold and manage your data"
+        body="This page never shows survey answers -- it configures the wall that protects them."
+        actions={[{ href: "/app/workspace/security", label: "How confidentiality works" }]}
+      />
+      <div className="mt-5">
+        <TenantSettingsPanel />
       </div>
     </AppShell>
   );

@@ -18,7 +18,10 @@ describe("real protected report flow", () => {
   });
 
   it("uses the shared real report panel in admin and viewer pages", () => {
-    const adminPage = readFileSync("src/app/app/reports/page.tsx", "utf8");
+    // Reports moved from the standalone /app/reports route into the
+    // per-survey Results stage (docs/strategy/CLAUDE_CODE_ADMIN_REFACTOR.md
+    // §1) -- same shared panel, now cycle-scoped via a cycleId prop.
+    const adminPage = readFileSync("src/app/app/[surveyId]/results/page.tsx", "utf8");
     const viewerPage = readFileSync("src/app/viewer/page.tsx", "utf8");
     expect(adminPage).toContain("ProtectedReportPanel");
     expect(viewerPage).toContain("ProtectedReportPanel");

@@ -1,35 +1,47 @@
-"use client";
-
-import { AppShell } from "@/components/AppShell";
+import { AppShell, Card } from "@/components/AppShell";
+import { PageGuide } from "@/components/PageGuide";
+import { getRuntimeMode, runtimeChecks } from "@/lib/runtimeConfig";
 
 export default function WorkspaceGoLivePage() {
+  const checks = runtimeChecks();
+  const missing = checks.filter((check) => check.requiredForProduction && !check.configured);
+
   return (
-    <AppShell
-      title="Go-live Checklist"
-      subtitle="Production readiness checks before running your first survey."
-    >
-      <div className="space-y-6">
-        <div className="rounded-[var(--radius-card)] border border-[var(--brand-glass-border)] bg-[var(--brand-glass-strong)] p-6 shadow-[var(--shadow-soft)] backdrop-blur-xl">
-          <h2 className="font-semibold">Pre-production Checklist</h2>
-          <div className="mt-4 space-y-3">
-            <label className="flex items-center gap-3">
-              <input type="checkbox" className="h-4 w-4 rounded" />
-              <span className="text-sm">Employee directory loaded (at least 5 people)</span>
-            </label>
-            <label className="flex items-center gap-3">
-              <input type="checkbox" className="h-4 w-4 rounded" />
-              <span className="text-sm">Confidentiality threshold reviewed and confirmed</span>
-            </label>
-            <label className="flex items-center gap-3">
-              <input type="checkbox" className="h-4 w-4 rounded" />
-              <span className="text-sm">Test survey created and reviewed</span>
-            </label>
-            <label className="flex items-center gap-3">
-              <input type="checkbox" className="h-4 w-4 rounded" />
-              <span className="text-sm">Team briefed on confidentiality model</span>
-            </label>
-          </div>
-        </div>
+    <AppShell title="Go-live Readiness" subtitle="Security first: production mode should fail closed until required integrations are configured.">
+      <PageGuide
+        label="Technical setup"
+        title="Use this page before a real customer pilot"
+        body="This is the production checklist. It tells you which secrets, services, and safety checks are configured before SaferSay is used with a real company."
+      />
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card>
+          <h2 className="text-3xl font-semibold">{getRuntimeMode()}</h2>
+          <p className="text-sm text-[var(--brand-muted)]">Current runtime mode</p>
+        </Card>
+        <Card>
+          <h2 className="text-3xl font-semibold">{checks.length - missing.length}/{checks.length}</h2>
+          <p className="text-sm text-[var(--brand-muted)]">Required checks configured</p>
+        </Card>
+        <Card>
+          <h2 className="text-3xl font-semibold">{missing.length === 0 ? "Ready" : "Blocked"}</h2>
+          <p className="text-sm text-[var(--brand-muted)]">Production launch status</p>
+        </Card>
+      </div>
+
+      <div className="mt-5 grid gap-3">
+        {checks.map((check) => (
+          <Card key={check.key}>
+            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+              <div>
+                <h2 className="text-lg font-semibold">{check.label}</h2>
+                <p className="mt-1 text-sm text-[var(--brand-muted)]">{check.purpose}</p>
+              </div>
+              <span className={`rounded-full px-3 py-1 text-sm font-semibold ${check.configured ? "bg-[var(--brand-accent-soft)] text-[var(--brand-accent)]" : "bg-[var(--brand-amber-soft)] text-[var(--brand-amber)]"}`}>
+                {check.configured ? "Configured" : "Placeholder"}
+              </span>
+            </div>
+          </Card>
+        ))}
       </div>
     </AppShell>
   );

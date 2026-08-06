@@ -3,8 +3,9 @@
 import { useTenantSession } from "@/lib/useTenantSession";
 
 const roleLabels: Record<string, string> = {
-  owner: "HR Admin",
-  admin: "HR Admin",
+  customer_admin: "HR Admin",
+  survey_creator: "Survey Creator",
+  auditor: "Auditor",
   employee: "Employee",
 };
 

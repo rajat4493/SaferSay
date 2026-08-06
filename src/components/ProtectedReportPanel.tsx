@@ -4,6 +4,8 @@ import { useEffect, useState, useTransition } from "react";
 import { Download, EyeOff, RefreshCw, Share2 } from "lucide-react";
 import { Card } from "@/components/AppShell";
 import { ConfidentialitySeal } from "@/components/ConfidentialitySeal";
+import { SkeletonCard, SkeletonText } from "@/components/Skeleton";
+import { useToast } from "@/components/ToastProvider";
 import { ViewerCard } from "@/components/ViewerShell";
 
 type CycleAction = { id: string; authorEmail: string; actionText: string; createdAt: string };
@@ -19,7 +21,7 @@ type ReportResponse = {
   };
 };
 
-export function ProtectedReportPanel({ mode = "admin" }: { mode?: "admin" | "viewer" }) {
+export function ProtectedReportPanel({ mode = "admin", cycleId }: { mode?: "admin" | "viewer"; cycleId?: string }) {
   const [result, setResult] = useState<ReportResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [, startTransition] = useTransition();
@@ -27,14 +29,17 @@ export function ProtectedReportPanel({ mode = "admin" }: { mode?: "admin" | "vie
   const [actionDraft, setActionDraft] = useState("");
   const [savingAction, setSavingAction] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+  const toast = useToast();
   const ShellCard = mode === "viewer" ? ViewerCard : Card;
 
   async function loadReport() {
     setLoading(true);
-    const response = await fetch("/api/report");
+    const reportUrl = cycleId ? `/api/report?cycleId=${encodeURIComponent(cycleId)}` : "/api/report";
+    const response = await fetch(reportUrl);
     const data = (await response.json().catch(() => ({ ok: false, error: "Report could not be loaded." }))) as ReportResponse;
     setResult(data);
     setLoading(false);
+    if (data.error) toast.show({ variant: "error", message: data.error });
     if (data.cycle?.id) {
       const actionsResponse = await fetch(`/api/report/action?cycleId=${data.cycle.id}`);
       const actionsData = (await actionsResponse.json().catch(() => ({}))) as { ok?: boolean; actions?: CycleAction[] };
@@ -46,7 +51,8 @@ export function ProtectedReportPanel({ mode = "admin" }: { mode?: "admin" | "vie
     startTransition(() => {
       loadReport();
     });
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cycleId]);
 
   const report = result?.report;
   const minGroupSize = result?.cycle?.minGroupSize ?? 5;
@@ -72,11 +78,14 @@ export function ProtectedReportPanel({ mode = "admin" }: { mode?: "admin" | "vie
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ cycleId: result.cycle.id, actionText: actionDraft.trim() }),
     });
-    const data = (await response.json().catch(() => ({}))) as { ok?: boolean; actions?: CycleAction[] };
+    const data = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string; actions?: CycleAction[] };
     setSavingAction(false);
     if (data.ok) {
       setActions(data.actions ?? []);
       setActionDraft("");
+      toast.show({ variant: "success", message: "Committed. Shared with the team next time you export or share the score." });
+    } else {
+      toast.show({ variant: "error", message: data.error ?? "Couldn't save that commitment." });
     }
   }
 
@@ -90,6 +99,22 @@ export function ProtectedReportPanel({ mode = "admin" }: { mode?: "admin" | "vie
     await navigator.clipboard.writeText(lines.join("\n"));
     setShareCopied(true);
     setTimeout(() => setShareCopied(false), 2000);
+  }
+
+  if (loading && !result) {
+    return (
+      <>
+        <ConfidentialitySeal />
+        <div className="grid gap-4 lg:grid-cols-3">
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
+        <div className="mt-4 rounded-[var(--radius-card)] border border-[var(--brand-glass-border)] bg-[var(--brand-glass-strong)] p-6 shadow-[var(--shadow-soft)]">
+          <SkeletonText lines={4} />
+        </div>
+      </>
+    );
   }
 
   return (
@@ -137,7 +162,7 @@ export function ProtectedReportPanel({ mode = "admin" }: { mode?: "admin" | "vie
         </div>
 
         {loading ? (
-          <p className="text-sm font-semibold text-[var(--brand-muted)]">Loading protected report...</p>
+          <SkeletonText lines={3} />
         ) : result?.error ? (
           <p className="text-sm font-semibold text-[#9a392d]">{result.error}</p>
         ) : !report || report.protected ? (

@@ -161,6 +161,80 @@ export class ResponseRepository {
     };
   }
 
+  /**
+   * All cycles for the tenant, newest first, with a response count per
+   * cycle. Response *count* (n) is aggregate-only and already shown
+   * unprotected elsewhere (see getProtectedReport) -- only the per-question
+   * breakdown is gated by min_group_size, so surfacing n here on a list of
+   * a tenant's own surveys doesn't cross the confidentiality line.
+   */
+  async listCyclesForTenant(tenantId: string) {
+    const result = await this.db.query<{
+      id: string;
+      name: string;
+      status: string;
+      min_group_size: number;
+      created_at: string;
+      response_count: number;
+    }>(
+      `select c.id, c.name, c.status, c.min_group_size, c.created_at,
+              coalesce(s.n, 0)::int as response_count
+       from responses.survey_cycles c
+       left join (
+         select cycle_id, count(*)::int as n
+         from responses.submissions
+         where tenant_id = $1
+         group by cycle_id
+       ) s on s.cycle_id = c.id
+       where c.tenant_id = $1
+       order by c.created_at desc`,
+      [tenantId],
+    );
+    return result.rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      status: row.status,
+      minGroupSize: row.min_group_size,
+      createdAt: row.created_at,
+      responseCount: row.response_count,
+    }));
+  }
+
+  async getCycleForTenant(tenantId: string, cycleId: string) {
+    const result = await this.db.query<{
+      id: string;
+      name: string;
+      status: string;
+      min_group_size: number;
+      created_at: string;
+    }>(
+      `select id, name, status, min_group_size, created_at
+       from responses.survey_cycles
+       where tenant_id = $1 and id = $2
+       limit 1`,
+      [tenantId, cycleId],
+    );
+    const row = result.rows[0];
+    if (!row) return null;
+    return {
+      id: row.id,
+      name: row.name,
+      status: row.status,
+      minGroupSize: row.min_group_size,
+      createdAt: row.created_at,
+    };
+  }
+
+  async closeCycle(tenantId: string, cycleId: string) {
+    const result = await this.db.query(
+      `update responses.survey_cycles
+       set status = 'closed'
+       where tenant_id = $1 and id = $2 and status <> 'closed'`,
+      [tenantId, cycleId],
+    );
+    return (result.rowCount ?? 0) > 0;
+  }
+
   async getLatestCycleForTenant(tenantId: string) {
     const result = await this.db.query<{ id: string; name: string; min_group_size: number }>(
       `select id, name, min_group_size

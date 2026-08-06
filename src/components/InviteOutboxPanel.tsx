@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Check, Copy, ExternalLink, MailCheck, Send } from "lucide-react";
 import { Card } from "@/components/AppShell";
+import { InlineSpinnerRow } from "@/components/Skeleton";
+import { useToast } from "@/components/ToastProvider";
 
 type OutboxResult = {
   ok?: boolean;
@@ -32,10 +34,11 @@ type OutboxResult = {
   }>;
 };
 
-export function InviteOutboxPanel() {
+export function InviteOutboxPanel({ cycleId }: { cycleId?: string } = {}) {
   const [result, setResult] = useState<OutboxResult | null>(null);
   const [loading, setLoading] = useState("");
   const [copiedId, setCopiedId] = useState("");
+  const toast = useToast();
 
   async function copyLink(id: string, path: string) {
     await navigator.clipboard.writeText(`${window.location.origin}${path}`);
@@ -43,15 +46,21 @@ export function InviteOutboxPanel() {
     setTimeout(() => setCopiedId(""), 2000);
   }
 
-  async function call(path: string, body?: object, label = "Working") {
+  async function call(path: string, body?: Record<string, unknown>, label = "Working") {
     setLoading(label);
-    const response = await fetch(path, {
+    const scopedBody = body ? { ...body, cycleId: body.cycleId ?? cycleId } : undefined;
+    const scopedPath = !body && cycleId ? `${path}?cycleId=${encodeURIComponent(cycleId)}` : path;
+    const response = await fetch(scopedPath, {
       method: body ? "POST" : "GET",
       headers: { "content-type": "application/json" },
-      body: body ? JSON.stringify(body) : undefined,
+      body: scopedBody ? JSON.stringify(scopedBody) : undefined,
     });
-    setResult((await response.json().catch(() => ({ ok: false, error: "Request failed." }))) as OutboxResult);
+    const data = (await response.json().catch(() => ({ ok: false, error: "Request failed." }))) as OutboxResult;
+    setResult(data);
     setLoading("");
+    if (data.error) toast.show({ variant: "error", message: data.error });
+    else if (data.delivery) toast.show({ variant: data.delivery.failed === 0 ? "success" : "error", message: `${data.delivery.sent} sent, ${data.delivery.failed} failed.` });
+    else if (label === "Preparing" || label === "Queueing") toast.show({ variant: "success", message: `${label === "Preparing" ? "Prepared" : "Queued"}.` });
   }
 
   const summary = result?.summary;
@@ -98,7 +107,7 @@ export function InviteOutboxPanel() {
         </div>
       </div>
 
-      {loading ? <p className="mt-4 text-sm font-semibold text-[var(--brand-muted)]">{loading}...</p> : null}
+      {loading ? <InlineSpinnerRow label={loading} /> : null}
       {result?.error ? <p className="mt-4 text-sm font-semibold text-[#9a392d]">{result.error}</p> : null}
       {result?.delivery ? (
         <p className="mt-4 rounded-2xl bg-[var(--brand-bg)] p-3 text-sm font-semibold text-[var(--brand-muted)]">

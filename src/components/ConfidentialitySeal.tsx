@@ -6,7 +6,7 @@ import { ShieldCheck } from "lucide-react";
  * §2). Appears on Home and above every report. The specific "neither can
  * we" phrasing is the differentiator -- do not generalize it away.
  */
-export function ConfidentialitySeal({ verifyHref = "/app/security" }: { verifyHref?: string }) {
+export function ConfidentialitySeal({ verifyHref = "/app/workspace/security" }: { verifyHref?: string }) {
   return (
     <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-[var(--brand-accent-soft)] bg-[var(--brand-accent-soft)] px-5 py-4">
       <div className="flex items-center gap-3">

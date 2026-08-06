@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, Rocket, ShieldCheck } from "lucide-react";
 import { surveyTemplates, type SurveyTemplate } from "@/lib/templates";
+import { useToast } from "@/components/ToastProvider";
 
 type EditableQuestion = SurveyTemplate["questions"][number] & { included: boolean };
 
@@ -25,6 +27,8 @@ export function CreateSurveyCycle({ templateSlug }: { templateSlug: string }) {
   const [cycleName, setCycleName] = useState("");
   const [status, setStatus] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const router = useRouter();
+  const toast = useToast();
 
   function toggleIncluded(index: number) {
     setQuestions((current) => current.map((question, i) => (i === index ? { ...question, included: !question.included } : question)));
@@ -80,13 +84,17 @@ export function CreateSurveyCycle({ templateSlug }: { templateSlug: string }) {
     setSubmitting(false);
 
     if (!response.ok || !result.cycle) {
-      setStatus(result.error ?? "Survey cycle could not be created.");
+      const message = result.error ?? "Survey cycle could not be created.";
+      setStatus(message);
+      toast.show({ variant: "error", message });
       return;
     }
 
-    setStatus(
-      `Draft cycle created. ${result.cycle.tokensIssued} secure respondent tokens issued and ${result.cycle.invitesPrepared ?? 0} delivery-safe invite links prepared.`,
-    );
+    toast.show({
+      variant: "success",
+      message: `Survey created. ${result.cycle.tokensIssued} secure invite links prepared.`,
+    });
+    router.push(`/app/${result.cycle.cycleId}/send`);
   }
 
   return (

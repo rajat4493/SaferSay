@@ -3,6 +3,7 @@ import { getSessionContext } from "@/lib/server/authSession";
 import { withTenantScopedDb } from "@/lib/server/db/tenantPool";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import { sendQueuedInviteDeliveries } from "@/lib/server/resendDelivery";
+import { logInvitesSent, logRemindersSent } from "@/lib/server/auditLog";
 
 export async function POST(request: NextRequest) {
   const session = await getSessionContext();
@@ -51,5 +52,14 @@ export async function POST(request: NextRequest) {
   });
 
   if (!result) return NextResponse.json({ ok: false, error: "No survey cycle was found." }, { status: 400 });
+
+  if ("delivery" in result && result.delivery.sent > 0) {
+    if (deliveryType === "invite") {
+      await logInvitesSent(tenant.id, session.role, session.email, result.cycleId, result.delivery.sent);
+    } else {
+      await logRemindersSent(tenant.id, session.role, session.email, result.cycleId, result.delivery.sent);
+    }
+  }
+
   return NextResponse.json({ tenant, ...result });
 }

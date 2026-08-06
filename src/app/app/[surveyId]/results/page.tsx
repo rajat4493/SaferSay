@@ -1,119 +1,129 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { ArrowLeft, ChevronRight, Download } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { ArrowLeft, ChevronRight, Lock, Send } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import { ConfidentialitySeal } from "@/components/ConfidentialitySeal";
+import { ProtectedReportPanel } from "@/components/ProtectedReportPanel";
+import { SurveyStatusBadge } from "@/components/SurveyStatusBadge";
+import { useToast } from "@/components/ToastProvider";
 
 export default function SurveyResultsPage() {
+  const params = useParams();
   const router = useRouter();
+  const toast = useToast();
+  const surveyId = params.surveyId as string;
+  const [status, setStatus] = useState<string | null>(null);
+  const [closing, setClosing] = useState(false);
+  const [sendingReminders, setSendingReminders] = useState(false);
 
-  // TODO: Fetch survey data and results using the surveyId route param
-  // const params = useParams();
-  // const surveyId = params.surveyId as string;
-  // const [survey, setSurvey] = useState<SurveyDetail | null>(null);
-  // const [report, setReport] = useState<ProtectedReport | null>(null);
-  // useEffect(() => {
-  //   Promise.all([
-  //     fetch(`/api/cycles/${surveyId}`).then(r => r.json()),
-  //     fetch(`/api/cycles/${surveyId}/report`).then(r => r.json())
-  //   ]).then(([cycleData, reportData]) => {
-  //     setSurvey(cycleData.cycle);
-  //     setReport(reportData.report);
-  //   });
-  // }, [surveyId]);
+  useEffect(() => {
+    fetch(`/api/cycles/${surveyId}`)
+      .then((response) => response.json())
+      .then((data: { ok?: boolean; cycle?: { status: string } }) => {
+        if (data.ok && data.cycle) setStatus(data.cycle.status);
+      })
+      .catch(() => undefined);
+  }, [surveyId]);
+
+  async function sendReminders() {
+    setSendingReminders(true);
+    try {
+      await fetch("/api/invites/outbox", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ cycleId: surveyId, includeReminders: true }),
+      });
+      const response = await fetch("/api/invites/queue", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ cycleId: surveyId, deliveryType: "reminder", sendNow: true }),
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        delivery?: { sent: number; failed: number };
+        error?: string;
+      };
+      if (data.error) {
+        toast.show({ variant: "error", message: data.error });
+      } else if (data.delivery) {
+        toast.show({
+          variant: data.delivery.failed === 0 ? "success" : "error",
+          message: `${data.delivery.sent} reminder${data.delivery.sent === 1 ? "" : "s"} sent, ${data.delivery.failed} failed.`,
+        });
+      } else {
+        toast.show({ variant: "info", message: "No pending reminders to send -- everyone has either responded or already been reminded." });
+      }
+    } catch {
+      toast.show({ variant: "error", message: "Couldn't send reminders. Try again." });
+    } finally {
+      setSendingReminders(false);
+    }
+  }
+
+  async function closeSurvey() {
+    if (status === "closed") return;
+    if (!window.confirm("Close this survey and lock responses? No one will be able to submit after this.")) return;
+
+    setClosing(true);
+    try {
+      const response = await fetch(`/api/cycles/${surveyId}/close`, { method: "POST" });
+      const data = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (data.ok) {
+        setStatus("closed");
+        toast.show({ variant: "success", message: "Survey closed. Responses are locked." });
+      } else {
+        toast.show({ variant: "error", message: data.error ?? "Couldn't close the survey." });
+      }
+    } catch {
+      toast.show({ variant: "error", message: "Couldn't close the survey. Try again." });
+    } finally {
+      setClosing(false);
+    }
+  }
 
   return (
     <AppShell
-      title="Results: Safe Report"
+      title="Results"
       subtitle="Aggregate, k-anonymity-protected insights from your survey responses."
     >
       <div className="space-y-6">
-        {/* Stage indicator */}
-        <div className="flex items-center gap-2 text-sm">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
           <div className="flex items-center gap-2 rounded-[var(--radius-pill)] bg-[var(--brand-accent-soft)] px-3 py-1 font-semibold text-[var(--brand-accent)]">
             Stage 3 of 3
           </div>
+          {status ? <SurveyStatusBadge status={status} /> : null}
           <ChevronRight size={16} className="text-[var(--brand-muted)]" />
           <span className="text-[var(--brand-muted)]">Build</span>
           <ChevronRight size={16} className="text-[var(--brand-muted)]" />
           <span className="text-[var(--brand-muted)]">Send</span>
           <ChevronRight size={16} className="text-[var(--brand-muted)]" />
-          <span className="text-[var(--brand-accent)] font-semibold">Results</span>
+          <span className="font-semibold text-[var(--brand-accent)]">Results</span>
         </div>
 
-        {/* Confidentiality seal */}
-        <ConfidentialitySeal />
+        <ProtectedReportPanel cycleId={surveyId} />
 
-        {/* Response status */}
-        <div className="rounded-[var(--radius-card)] border border-[var(--brand-glass-border)] bg-[var(--brand-glass-strong)] p-6 shadow-[var(--shadow-soft)] backdrop-blur-xl">
-          <h2 className="text-lg font-semibold">Response status</h2>
-          <div className="mt-4 grid gap-4 sm:grid-cols-3">
-            <div>
-              <div className="text-3xl font-semibold">0</div>
-              <div className="mt-1 text-sm text-[var(--brand-muted)]">Sent</div>
-            </div>
-            <div>
-              <div className="text-3xl font-semibold">0</div>
-              <div className="mt-1 text-sm text-[var(--brand-muted)]">Responded</div>
-            </div>
-            <div>
-              <div className="text-3xl font-semibold">—</div>
-              <div className="mt-1 text-sm text-[var(--brand-muted)]">Completion rate</div>
-            </div>
-          </div>
-          {/* TODO: Load from /api/cycles/[surveyId] (participation summary) */}
-        </div>
-
-        {/* Report (protected) */}
-        <div className="rounded-[var(--radius-card)] border border-[var(--brand-glass-border)] bg-[var(--brand-glass-strong)] p-6 shadow-[var(--shadow-soft)] backdrop-blur-xl">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold">Results breakdown</h2>
-              <p className="mt-2 text-sm text-[var(--brand-muted)]">
-                Only k-safe aggregate data is shown — no individual responses.
-              </p>
-            </div>
-            <button className="inline-flex items-center gap-2 rounded-[var(--radius-button)] border border-[var(--brand-line)] px-4 py-2 text-sm font-semibold transition hover:bg-[var(--brand-line-soft)]">
-              <Download size={16} />
-              Export PDF
-            </button>
-          </div>
-
-          {/* TODO: Load report from /api/cycles/[surveyId]/report
-              If report.protected === true:
-              - Show: "Results not yet available (need N more responses to reach k-threshold)"
-              If report.protected === false:
-              - Show question breakdown with n, average, response distribution
-              - Never show individual responses
-          */}
-          <div className="mt-6 text-sm text-[var(--brand-muted)]">
-            Waiting for responses... Report will appear once the k-anonymity threshold is met.
-          </div>
-        </div>
-
-        {/* Manage survey */}
         <div className="rounded-[var(--radius-card)] border border-[var(--brand-glass-border)] bg-[var(--brand-glass-strong)] p-6 shadow-[var(--shadow-soft)] backdrop-blur-xl">
           <h2 className="text-lg font-semibold">Manage survey</h2>
           <div className="mt-4 space-y-3">
-            <button className="w-full rounded-[var(--radius-button)] border border-[var(--brand-line)] px-4 py-2 text-left text-sm font-medium transition hover:bg-[var(--brand-line-soft)]">
-              Send reminders to non-respondents
+            <button
+              onClick={sendReminders}
+              disabled={sendingReminders || status === "closed"}
+              className="flex w-full items-center gap-2 rounded-[var(--radius-button)] border border-[var(--brand-line)] px-4 py-2 text-left text-sm font-medium transition hover:bg-[var(--brand-line-soft)] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Send size={15} />
+              {sendingReminders ? "Sending..." : "Send reminders to non-respondents"}
             </button>
-            <button className="w-full rounded-[var(--radius-button)] border border-[var(--brand-line)] px-4 py-2 text-left text-sm font-medium transition hover:bg-[var(--brand-line-soft)]">
-              Close survey & lock responses
-            </button>
-            <button className="w-full rounded-[var(--radius-button)] border border-[var(--brand-line)] px-4 py-2 text-left text-sm font-medium transition hover:bg-[var(--brand-line-soft)]">
-              Archive survey
+            <button
+              onClick={closeSurvey}
+              disabled={closing || status === "closed"}
+              className="flex w-full items-center gap-2 rounded-[var(--radius-button)] border border-[var(--brand-line)] px-4 py-2 text-left text-sm font-medium transition hover:bg-[var(--brand-amber-soft)] hover:text-[var(--brand-amber)] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Lock size={15} />
+              {status === "closed" ? "Survey closed" : closing ? "Closing..." : "Close survey & lock responses"}
             </button>
           </div>
-          {/* TODO: Wire up close/archive actions
-              - POST /api/cycles/[surveyId]/close
-              - POST /api/cycles/[surveyId]/archive
-              - Emit audit logs for each action
-          */}
         </div>
 
-        {/* Back button */}
         <div className="flex justify-start">
           <button
             onClick={() => router.push("/app")}
