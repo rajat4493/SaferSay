@@ -71,7 +71,9 @@ export function getVisibleNavZones(role: UserRole): ("surveys" | "people" | "wor
     case "survey_creator":
       return ["surveys", "people"];
     case "auditor":
-      return ["audit"];
+      // Auditor role is v1.1+, behind a flag -- not surfaced in nav until customer needs it
+      // TODO: Add "audit" zone once auditor is exposed
+      return [];
     case "employee":
       return [];
     default:

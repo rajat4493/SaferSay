@@ -5,7 +5,6 @@ import { AppShell } from "@/components/AppShell";
 import { EmployeeCsvImport } from "@/components/EmployeeCsvImport";
 import { EmployeeDirectory } from "@/components/EmployeeDirectory";
 import { PageGuide } from "@/components/PageGuide";
-import { requireRole } from "@/lib/permissions";
 
 export default function PeoplePage() {
   const [refreshKey, setRefreshKey] = useState(0);

@@ -1,20 +1,15 @@
 "use client";
 
 import {
-  BarChart3,
   ChevronDown,
   CreditCard,
-  FileText,
   Home,
-  Plug,
   LockKeyhole,
-  Palette,
   Plus,
   Rocket,
   Settings,
   ShieldCheck,
   Users,
-  AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -79,7 +74,7 @@ const navGroups: NavGroupConfig[] = [
 export function AppShell({ children, title, subtitle }: { children: React.ReactNode; title: string; subtitle: string }) {
   const pathname = usePathname();
   const { brand } = useBrand();
-  const { info, loaded } = useTenantSession();
+  const { info } = useTenantSession();
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
   // Pure Owner mode: signed in as the platform's super admin, not currently
