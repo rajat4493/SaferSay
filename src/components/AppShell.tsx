@@ -5,7 +5,6 @@ import {
   CreditCard,
   Home,
   LockKeyhole,
-  Plus,
   Rocket,
   Settings,
   ShieldCheck,
@@ -21,8 +20,6 @@ import { RoleTag } from "@/components/RoleTag";
 import { SignOutButton } from "@/components/SignOutButton";
 import { useTenantSession } from "@/lib/useTenantSession";
 import { canAccessPeople, canAccessWorkspace } from "@/lib/permissions";
-
-const featuredNavItem = { href: "/app", label: "Get started", helper: "Your next step", icon: Home };
 
 type NavItemConfig = {
   href: string;
@@ -46,10 +43,7 @@ const navGroups: NavGroupConfig[] = [
   {
     label: "Surveys",
     hideForPureOwner: true,
-    items: [
-      { href: "/app", label: "Browse surveys", helper: "Your active and past surveys", icon: Home },
-      { href: "/app/surveys/new", label: "Create survey", helper: "Pick template, send invites", icon: Plus },
-    ],
+    items: [{ href: "/app", label: "All surveys", helper: "Your active and past surveys", icon: Home }],
   },
   {
     label: "People",
@@ -113,15 +107,11 @@ export function AppShell({ children, title, subtitle }: { children: React.ReactN
             </div>
           </Link>
 
-          <nav className="mt-8 space-y-1">
-            <NavLink item={featuredNavItem} active={pathname === featuredNavItem.href} featured />
-          </nav>
-
-          {visibleNavGroups.map((group) => {
+          {visibleNavGroups.map((group, index) => {
             const hasActiveItem = group.items.some((item) => pathname === item.href);
             const isOpen = group.collapsible ? (openGroups[group.label] ?? hasActiveItem) : true;
             return (
-              <div key={group.label} className="mt-6">
+              <div key={group.label} className={index === 0 ? "mt-8" : "mt-6"}>
                 {group.collapsible ? (
                   <button
                     onClick={() => setOpenGroups((current) => ({ ...current, [group.label]: !isOpen }))}
@@ -174,24 +164,22 @@ export function AppShell({ children, title, subtitle }: { children: React.ReactN
 
 type NavItem = { href: string; label: string; helper: string; icon: typeof Home };
 
-function NavLink({ item, active, featured, muted }: { item: NavItem; active: boolean; featured?: boolean; muted?: boolean }) {
+function NavLink({ item, active, muted }: { item: NavItem; active: boolean; muted?: boolean }) {
   return (
     <Link
       href={item.href}
       className={`flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold transition ${
         active
           ? "bg-[var(--brand-accent-soft)] text-[var(--brand-accent)]"
-          : featured
-            ? "bg-[var(--brand-ink)] text-white hover:opacity-90"
-            : muted
-              ? "text-[var(--brand-muted)] opacity-80 hover:opacity-100 hover:bg-white"
-              : "text-[var(--brand-muted)] hover:bg-white"
+          : muted
+            ? "text-[var(--brand-muted)] opacity-80 hover:opacity-100 hover:bg-white"
+            : "text-[var(--brand-muted)] hover:bg-white"
       }`}
     >
       <item.icon size={muted ? 15 : 17} />
       <span className="min-w-0">
         <span className="block">{item.label}</span>
-        <span className={`block truncate text-xs font-medium ${active || featured ? "opacity-75" : "text-[var(--brand-muted)]"}`}>{item.helper}</span>
+        <span className={`block truncate text-xs font-medium ${active ? "opacity-75" : "text-[var(--brand-muted)]"}`}>{item.helper}</span>
       </span>
     </Link>
   );
