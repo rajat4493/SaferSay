@@ -3,6 +3,7 @@ import { parseEmployeeCsv } from "@/lib/csvEmployees";
 import { getSessionContext } from "@/lib/server/authSession";
 import { withTenantScopedDb } from "@/lib/server/db/tenantPool";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
+import { logEmployeeImport } from "@/lib/server/auditLog";
 
 export async function POST(request: NextRequest) {
   const session = await getSessionContext();
@@ -23,6 +24,11 @@ export async function POST(request: NextRequest) {
     if (count > 0) await repo.emitOnboardingEvent(tenant.id, userId, "employees");
     return count;
   });
+
+  // Log audit event: employee list imported
+  if (imported > 0) {
+    await logEmployeeImport(tenant.id, session.role, session.email, imported);
+  }
 
   return NextResponse.json({
     ok: true,
