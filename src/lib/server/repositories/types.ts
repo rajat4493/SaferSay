@@ -18,6 +18,28 @@ export type UserRecord = {
 
 export type OnboardingEventKey = "signup" | "employees" | "cycle" | "tokens" | "outbox" | "queue" | "responses" | "report";
 
+/** A teammate's role is limited to the three staff roles -- "employee" is
+ * the respondent role, never assignable through team invites. */
+export type TeamRole = Exclude<UserRole, "employee">;
+
+export type PendingInviteRecord = {
+  id: string;
+  tenantId: string;
+  email: string;
+  role: TeamRole;
+  invitedByEmail: string;
+  createdAt: string;
+};
+
+export type TeamMember = {
+  id: string;
+  email: string;
+  name: string | null;
+  role: UserRole;
+  status: "active" | "pending";
+  createdAt: string;
+};
+
 export type EmployeeRecord = {
   id: string;
   email: string;

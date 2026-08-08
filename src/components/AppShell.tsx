@@ -8,6 +8,7 @@ import {
   LockKeyhole,
   Menu,
   Settings,
+  UserPlus,
   Users,
   X,
 } from "lucide-react";
@@ -57,6 +58,7 @@ const navGroups: NavGroupConfig[] = [
       { href: "/app/workspace/settings", label: "Settings", icon: Settings, hideForPureOwner: true },
       { href: "/app/workspace/security", label: "Security", icon: LockKeyhole, hideForPureOwner: true },
       { href: "/app/workspace/billing", label: "Billing", icon: CreditCard, hideForPureOwner: true },
+      { href: "/app/workspace/team", label: "Team", icon: UserPlus, hideForPureOwner: true },
     ],
   },
 ];

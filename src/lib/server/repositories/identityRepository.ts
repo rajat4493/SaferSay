@@ -9,11 +9,14 @@ import {
   InviteOutboxSummary,
   IssuedParticipantToken,
   OnboardingEventKey,
+  PendingInviteRecord,
   PilotIdentitySummary,
   PlatformAttentionItem,
   PlatformOverview,
   PlatformUsageHealth,
   QueuedInviteDelivery,
+  TeamMember,
+  TeamRole,
   TenantDetail,
   TenantDirectoryEntry,
   TenantPlanTier,
@@ -119,6 +122,96 @@ export class IdentityRepository {
        set first_run_completed_at = coalesce(identity.tenant_settings.first_run_completed_at, excluded.first_run_completed_at)`,
       [tenantId],
     );
+  }
+
+  async findPendingInviteByEmail(email: string): Promise<PendingInviteRecord | null> {
+    const result = await this.db.query<{
+      id: string;
+      tenant_id: string;
+      email: string;
+      role: TeamRole;
+      invited_by_email: string;
+      created_at: string;
+    }>(
+      `select id, tenant_id, email, role, invited_by_email, created_at
+       from identity.pending_invites
+       where email = $1 and accepted_at is null
+       limit 1`,
+      [email],
+    );
+    const row = result.rows[0];
+    if (!row) return null;
+    return { id: row.id, tenantId: row.tenant_id, email: row.email, role: row.role, invitedByEmail: row.invited_by_email, createdAt: row.created_at };
+  }
+
+  async markPendingInviteAccepted(id: string) {
+    await this.db.query(`update identity.pending_invites set accepted_at = now() where id = $1`, [id]);
+  }
+
+  async createPendingInvite(tenantId: string, email: string, role: TeamRole, invitedByEmail: string): Promise<PendingInviteRecord> {
+    const id = randomUUID();
+    const result = await this.db.query<{
+      id: string;
+      tenant_id: string;
+      email: string;
+      role: TeamRole;
+      invited_by_email: string;
+      created_at: string;
+    }>(
+      `insert into identity.pending_invites (id, tenant_id, email, role, invited_by_email)
+       values ($1, $2, $3, $4, $5)
+       on conflict (tenant_id, email) do update
+       set role = excluded.role, invited_by_email = excluded.invited_by_email, created_at = now()
+       returning id, tenant_id, email, role, invited_by_email, created_at`,
+      [id, tenantId, email, role, invitedByEmail],
+    );
+    const row = result.rows[0];
+    return { id: row.id, tenantId: row.tenant_id, email: row.email, role: row.role, invitedByEmail: row.invited_by_email, createdAt: row.created_at };
+  }
+
+  /** Active teammates (real identity.users rows) plus anyone invited but not yet signed in. */
+  async listTeam(tenantId: string): Promise<TeamMember[]> {
+    const usersResult = await this.db.query<{ id: string; email: string; name: string | null; role: UserRole; created_at: string }>(
+      `select id, email, name, role, created_at from identity.users where tenant_id = $1 order by created_at asc`,
+      [tenantId],
+    );
+    const invitesResult = await this.db.query<{ id: string; email: string; role: TeamRole; created_at: string }>(
+      `select id, email, role, created_at from identity.pending_invites where tenant_id = $1 and accepted_at is null order by created_at asc`,
+      [tenantId],
+    );
+    const active: TeamMember[] = usersResult.rows.map((row) => ({
+      id: row.id,
+      email: row.email,
+      name: row.name,
+      role: row.role,
+      status: "active",
+      createdAt: row.created_at,
+    }));
+    const pending: TeamMember[] = invitesResult.rows.map((row) => ({
+      id: row.id,
+      email: row.email,
+      name: null,
+      role: row.role,
+      status: "pending",
+      createdAt: row.created_at,
+    }));
+    return [...active, ...pending];
+  }
+
+  /**
+   * Removing a teammate means either canceling a not-yet-accepted invite
+   * or revoking a real account -- `id` could be either, so try the invite
+   * first (cheap, and pending invites vastly outnumber the alternative in
+   * the common "invited the wrong email" case) and fall back to the user
+   * row. Nothing else in the schema has a foreign key to identity.users,
+   * so a hard delete here is safe.
+   */
+  async removeTeamMember(tenantId: string, id: string): Promise<boolean> {
+    const inviteResult = await this.db.query(`delete from identity.pending_invites where id = $1 and tenant_id = $2`, [id, tenantId]);
+    if ((inviteResult.rowCount ?? 0) > 0) return true;
+
+    const userResult = await this.db.query(`delete from identity.users where id = $1 and tenant_id = $2`, [id, tenantId]);
+    return (userResult.rowCount ?? 0) > 0;
   }
 
   async listTenants(): Promise<TenantRecord[]> {

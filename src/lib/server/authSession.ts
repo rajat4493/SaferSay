@@ -142,6 +142,22 @@ async function resolveUserRecord(
     return invited;
   }
 
+  const pendingTeamInvite = await repo.findPendingInviteByEmail(email);
+  if (pendingTeamInvite) {
+    const displayName = typeof metadata?.full_name === "string" ? (metadata.full_name as string) : null;
+    const user = await repo.createUser({
+      tenantId: pendingTeamInvite.tenantId,
+      authProvider,
+      providerSubject,
+      email,
+      name: displayName,
+      role: pendingTeamInvite.role,
+    });
+    await repo.markPendingInviteAccepted(pendingTeamInvite.id);
+    await repo.emitOnboardingEvent(pendingTeamInvite.tenantId, user.id, "signup");
+    return user;
+  }
+
   const displayName = typeof metadata?.full_name === "string" ? (metadata.full_name as string) : null;
   const tenant = await repo.createTenant(`${displayName ?? email}'s workspace`);
   const user = await repo.createUser({

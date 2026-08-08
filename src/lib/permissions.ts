@@ -56,6 +56,10 @@ export function canAccessGoLive(role: UserRole): boolean {
   return role === "customer_admin";
 }
 
+export function canManageTeam(role: UserRole): boolean {
+  return role === "customer_admin";
+}
+
 export function canImportEmployees(role: UserRole): boolean {
   return role === "customer_admin" || role === "survey_creator";
 }

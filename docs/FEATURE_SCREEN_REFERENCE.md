@@ -331,7 +331,7 @@ Gated by `canAccessPeople` at the layout level (§0.2). Two stacked components:
 
 ### 2.4 Zone: Workspace — `/app/workspace/*` (owner-gated, `canAccessWorkspace`)
 
-Three screens, all sharing the same `AppShell` chrome, collapsible under "WORKSPACE" in the sidebar. (A fourth, Go-live Readiness, used to live here — see the note in §2.4.2 for why it moved to the Owner Console.)
+Four screens, all sharing the same `AppShell` chrome, collapsible under "WORKSPACE" in the sidebar. (A fifth, Go-live Readiness, used to live here — see the note in §2.4.2 for why it moved to the Owner Console.) Every route under `/app/workspace/*` is also guarded server-side by `src/app/app/workspace/layout.tsx` (redirects to `/app` if `!canAccessWorkspace(session.role)`) — not just hidden from nav, actually unreachable by URL for `survey_creator`/`auditor`.
 
 #### 2.4.1 Settings — `/app/workspace/settings` (`src/app/app/workspace/settings/page.tsx`)
 
@@ -350,7 +350,23 @@ Static content page (no API calls beyond what `AppShell`/`ConfidentialitySeal` a
 
 **Coherence-directive change:** this card used to also link to a "Check go-live readiness" screen at `/app/workspace/go-live`. That screen is a technical/operator checklist (Supabase config, token secrets, Stripe/Resend readiness) — the wrong audience for an HR admin, so it was removed from here and the whole screen relocated to the Owner Console (see §3.9). The old URL now redirects to `/console/readiness` (owner-gated; a tenant admin hitting it by stale bookmark bounces to `/app`).
 
-#### 2.4.3 Billing — `/app/workspace/billing` (`src/app/app/workspace/billing/page.tsx`)
+#### 2.4.3 Team — `/app/workspace/team` (`src/app/app/workspace/team/page.tsx`, coherence-directive Gap 4)
+
+Body is `TeamPanel` (`src/components/TeamPanel.tsx`): an invite row (email + role `<select>` + "Invite" button) above a list of everyone on the team, active and pending mixed together, newest-invited last.
+
+**Role picker labels** (deliberately different from the `identity.users.role` DB values): "HR Admin" (`customer_admin`), "Survey Creator" (`survey_creator`), "Viewer" (`auditor`) — **confirmed decision: "Viewer" is a UI label for the existing `auditor` role, not a new role.** `RoleTag.tsx` (§2.1) was updated to match — it used to say "Auditor," now says "Viewer" everywhere, so a person invited as "Viewer" sees their own role tag say the same word back to them.
+
+**List rows:** name/email, an "Invited" (gray) or "Active" (green) pill, the role label, and a "Remove" button — hidden on the signed-in user's own row (`member.id === selfId`, from `GET /api/tenants/team`'s response) so nobody can remove themselves and lock themselves out. Removing asks `window.confirm()` first, phrased differently for a pending invite ("Remove the invite for X?") vs. an active member ("Remove X?").
+
+**Backend — the actual invite mechanism:** a new `identity.pending_invites` table (migration `0017_team_invites.sql`, tenant-isolated, `unique(tenant_id, email)`) rather than touching `identity.users` directly, because the invited person has no auth identity yet. `resolveUserRecord()` (`src/lib/server/authSession.ts`) gained a new branch, checked between "existing user by email" and "brand-new tenant, sign up as customer_admin": if a not-yet-accepted `pending_invites` row matches the signing-in email, a real `identity.users` row is created with **that invite's tenant and role** (not a new tenant), `accepted_at` is stamped, and the person lands directly in their inviter's workspace on first login — no separate "accept invite" screen or token link needed, since the invite email itself *is* the credential (matches whatever auth the person signs in with).
+
+- `POST /api/tenants/team/invite {email, role}` (`src/app/api/tenants/team/invite/route.ts`) — `canManageTeam(role)` (`src/lib/permissions.ts`, `customer_admin`-only) gated, 403 otherwise. Rejects if `findUserByEmail(email)` already resolves to a real account (any tenant) — "That email already belongs to a SaferSay account." Upserts on `(tenant_id, email)` conflict (re-inviting the same email just updates the pending role), returns the refreshed team list.
+- `GET /api/tenants/team` — `IdentityRepository.listTeam()`, `customer_admin`-only, returns active `identity.users` rows and not-yet-accepted `pending_invites` rows as one merged list, plus `selfId` for the "hide my own Remove button" check.
+- `POST /api/tenants/team/[id]/remove` — `id` may be either a pending invite id or a real user id; tries the invite delete first (cheap, no destructive side effect), falls back to deleting the user row (nothing else in the schema has a foreign key to `identity.users`, so this is a safe hard delete). Blocks self-removal and blocks removing the tenant's last active `customer_admin` ("A workspace needs at least one HR Admin...").
+
+**Verified end-to-end in the browser this build:** invited a second account as Viewer, signed in as that email, confirmed it landed in the *same* tenant (not a new one) with `auditor`'s nav restrictions already in effect (no People or Workspace zones visible) — all pre-existing role-gating, now reachable through a real invite for the first time.
+
+#### 2.4.4 Billing — `/app/workspace/billing` (`src/app/app/workspace/billing/page.tsx`)
 
 Two static pricing cards (£200/survey flat, £15/month optional history floor) + a **"Cancel plan"** button styled `.btn-destructive` (red) — guarded by `window.confirm()`, then shows an info toast pointing to `support@safersay.com`, since there's no actual cancellation backend wired up yet (honest placeholder, not a fake success state).
 
@@ -490,7 +506,8 @@ Every route under `src/app/api/`, grouped by what calls it. "Auth" column: **Non
 | `/api/invites/send` | POST | Session | Send tab (Tier 1 smart button), Results tab (reminders) |
 | `/api/invites/outbox`, `/api/invites/queue` | GET/POST | Session | Send tab (Tier 2 "Developer / test mode") |
 | `/api/report`, `/api/report/action` | GET/POST | Session (report also blocks impersonating Owners explicitly, 403) | Results tab, `/viewer` |
-| `/api/pilot/state` | GET | Session | `/app/pilot` |
+| `/api/pilot/state` | GET | Session | `/app/pilot`, `FirstRunGuide` (§2.7) |
+| `/api/tenants/team`, `/api/tenants/team/invite`, `/api/tenants/team/[id]/remove` | GET/POST | Session, `customer_admin`-only | Team screen (§2.4.3) |
 | `/api/readiness` | GET | **None** | Go-live page's underlying data source (fetched server-side, not via this API, but the API itself is also publicly reachable) |
 | `/api/respondent/session`, `/api/respondent/submit` | GET/POST | **None** (token is the credential) | Survey Taker |
 | `/api/super-admin/*` (overview, settings, support-notes, tenants, tenants/[id], usage, switch) | GET/POST/PATCH | **Owner** | `/console/*` |
@@ -504,7 +521,7 @@ Every route under `src/app/api/`, grouped by what calls it. "Auth" column: **Non
 Flagging these explicitly rather than letting the doc imply full coverage where it isn't:
 
 1. ~~Owner "enter this tenant" flow.~~ **Resolved** — Tenant Detail's "Enter workspace →" button (§3.4) now calls `POST /api/super-admin/switch` with the real `tenantId`.
-2. **`survey_creator` and `auditor` roles.** Fully modeled in `permissions.ts` and the `identity.users.role` constraint, but there's no invite-a-teammate-with-a-role UI anywhere — every real signup becomes `customer_admin`. `getVisibleNavZones("auditor")` returns an empty array; no audit-log viewer screen has been built yet.
+2. ~~`survey_creator` and `auditor` roles unreachable.~~ **Partially resolved** — the Team screen (§2.4.3) now invites teammates with a role, so both roles are reachable through real UI, not just `permissions.ts`. Still true: `getVisibleNavZones("auditor")` returns an empty array, and no audit-log viewer screen exists yet for the "Viewer" role to actually view anything beyond k-safe survey results.
 3. **`ServerOpsPanel`** (raw API test buttons for seed/pay/launch/prepare/queue/read-report) is orphaned — the component file exists, nothing imports it.
 4. **Brand Studio color/font customization** was removed during the design-directive build (conflicted with the locked palette); only name/tagline/logo remain, and that data is `localStorage`-only, never synced server-side.
 5. **Billing** (both `/app/workspace/billing` and `/console/billing`) are placeholder screens — no Stripe integration wired up; `/api/cycles/pay` exists but nothing currently calls it from a reachable UI path.
