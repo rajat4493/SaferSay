@@ -30,9 +30,6 @@ export default function WorkspaceSecurityPage() {
           privacy contact configured.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
-          <Link href="/app/workspace/go-live" className="btn-primary">
-            Check go-live readiness
-          </Link>
           <Link href="/privacy" className="btn-secondary">
             Privacy notice
           </Link>

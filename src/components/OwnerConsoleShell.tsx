@@ -6,6 +6,7 @@ import {
   CreditCard,
   LayoutGrid,
   Menu,
+  Rocket,
   Search,
   Settings,
   Sliders,
@@ -25,6 +26,7 @@ const navItems = [
   { href: "/console/usage", label: "Usage & Health", icon: Activity },
   { href: "/console/plans", label: "Plans & Features", icon: Sliders },
   { href: "/console/support", label: "Support & Alerts", icon: Bell },
+  { href: "/console/readiness", label: "Readiness", icon: Rocket },
   { href: "/console/settings", label: "Settings", icon: Settings },
 ];
 

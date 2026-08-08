@@ -7,7 +7,6 @@ import {
   Lock,
   LockKeyhole,
   Menu,
-  Rocket,
   Settings,
   Users,
   X,
@@ -56,7 +55,6 @@ const navGroups: NavGroupConfig[] = [
     hideForPureOwner: true,
     items: [
       { href: "/app/workspace/settings", label: "Settings", icon: Settings, hideForPureOwner: true },
-      { href: "/app/workspace/go-live", label: "Go-live", icon: Rocket, hideForPureOwner: true },
       { href: "/app/workspace/security", label: "Security", icon: LockKeyhole, hideForPureOwner: true },
       { href: "/app/workspace/billing", label: "Billing", icon: CreditCard, hideForPureOwner: true },
     ],

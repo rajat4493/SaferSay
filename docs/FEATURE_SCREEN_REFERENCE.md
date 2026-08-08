@@ -205,6 +205,8 @@ The landing screen for every non-Owner login. Two-stage client-side load:
 
 **Backend:** `GET /api/cycles` (`src/app/api/cycles/route.ts`) → `ResponseRepository.listCyclesForTenant()` — one query joining `responses.survey_cycles` to a `LEFT JOIN` aggregate on `responses.submissions` grouped by `cycle_id`, so each row carries `id/name/status/minGroupSize/createdAt/responseCount` in a single round trip. No pagination — returns every cycle for the tenant.
 
+**Coherence-directive change:** cycles created without an explicit name are stored as `"{tenantName} {templateName}"` (e.g. "Rajat Pandey's workspace Engagement Check") — the sidebar footer already shows workspace context, so that prefix was redundant noise on every card. `listCyclesForTenant()` (and `getCycleForTenant()` / `getLatestCycleForTenant()` / `getLatestProtectedReportForTenant()`) now take an optional `tenantName` and strip it as a display-only transform (`stripTenantPrefix()` in `responseRepository.ts`) — the stored name is untouched, and every caller (Surveys home, survey detail, Send, Results, the pilot guide) passes `session.tenant.name` through so the stripped name shows consistently everywhere, not just here.
+
 #### 2.2.2 New survey (Build) — `/app/surveys/new` (`src/app/app/surveys/new/page.tsx`)
 
 The **only** place template selection happens — there's no separate `/app/templates` route (the old standalone destination was retired; a `next.config.ts` redirect sends `/app/templates` here).
@@ -314,7 +316,7 @@ Gated by `canAccessPeople` at the layout level (§0.2). Two stacked components:
 
 ### 2.4 Zone: Workspace — `/app/workspace/*` (owner-gated, `canAccessWorkspace`)
 
-Four screens, all sharing the same `AppShell` chrome, collapsible under "WORKSPACE" in the sidebar.
+Three screens, all sharing the same `AppShell` chrome, collapsible under "WORKSPACE" in the sidebar. (A fourth, Go-live Readiness, used to live here — see the note in §2.4.2 for why it moved to the Owner Console.)
 
 #### 2.4.1 Settings — `/app/workspace/settings` (`src/app/app/workspace/settings/page.tsx`)
 
@@ -329,25 +331,11 @@ Subtitle exact copy: **"Settings configure the wall, never breach it"**. Body is
 
 #### 2.4.2 Security — `/app/workspace/security` (`src/app/app/workspace/security/page.tsx`)
 
-Static content page (no API calls beyond what `AppShell`/`ConfidentialitySeal` already need). `ConfidentialitySeal` at top, then a 2-column grid of six plain-English control cards (Identity store / Response store / Minimum group size / Reminder isolation / Payment isolation / No emotion inference — each a one-line plain-English claim about the architecture), then a "Production safety status" card linking to Go-live, `/privacy`, and `/dpa`.
+Static content page (no API calls beyond what `AppShell`/`ConfidentialitySeal` already need). `ConfidentialitySeal` at top, then a 2-column grid of six plain-English control cards (Identity store / Response store / Minimum group size / Reminder isolation / Payment isolation / No emotion inference — each a one-line plain-English claim about the architecture), then a "Production safety status" card linking to `/privacy` and `/dpa`.
 
-#### 2.4.3 Go-live — `/app/workspace/go-live` (`src/app/app/workspace/go-live/page.tsx`)
+**Coherence-directive change:** this card used to also link to a "Check go-live readiness" screen at `/app/workspace/go-live`. That screen is a technical/operator checklist (Supabase config, token secrets, Stripe/Resend readiness) — the wrong audience for an HR admin, so it was removed from here and the whole screen relocated to the Owner Console (see §3.9). The old URL now redirects to `/console/readiness` (owner-gated; a tenant admin hitting it by stale bookmark bounces to `/app`).
 
-Server component (not `"use client"` — reads env vars directly at render time via `runtimeChecks()`, `src/lib/runtimeConfig.ts`). Three stat cards (current runtime mode / "N of 7 required checks configured" / "Ready" or "Blocked" — green text if ready, red if blocked), then a card per check:
-
-| Check | What it verifies |
-|---|---|
-| Supabase Postgres | `DATABASE_URL` set |
-| Supabase app client | `NEXT_PUBLIC_SUPABASE_URL` + publishable key set |
-| Google + Microsoft sign-in | A **manual** env flag (`SUPABASE_OAUTH_PROVIDERS_CONFIRMED=true`) — cannot be auto-detected, since provider enablement lives entirely in the Supabase dashboard, outside this app's config |
-| Token signing secret | `TOKEN_SECRET` set, not a placeholder value, ≥32 chars |
-| Stripe | secret key + webhook secret both set |
-| Resend | API key + a `FROM` address that is **not** the shared `resend.dev` sandbox sender |
-| Privacy contact | `PRIVACY_CONTACT_EMAIL` set |
-
-Each renders a **green** "Configured" or **red** "Placeholder" pill. This is the same underlying `runtimeChecks()` function `GET /api/readiness` exposes publicly (that endpoint has no auth check — worth knowing it's technically fetchable by anyone, though it only reveals boolean configured/not-configured state, no secret values). Note: the old `/app/readiness` route also used to render a `ServerOpsPanel` dev-tools widget (raw API test buttons); that panel is now **orphaned** — still exists as a component but nothing renders it anymore, deliberately excluded from the customer-facing version of this page (see §5).
-
-#### 2.4.4 Billing — `/app/workspace/billing` (`src/app/app/workspace/billing/page.tsx`)
+#### 2.4.3 Billing — `/app/workspace/billing` (`src/app/app/workspace/billing/page.tsx`)
 
 Two static pricing cards (£200/survey flat, £15/month optional history floor) + a **"Cancel plan"** button styled `.btn-destructive` (red) — guarded by `window.confirm()`, then shows an info toast pointing to `support@safersay.com`, since there's no actual cancellation backend wired up yet (honest placeholder, not a fake success state).
 
@@ -371,7 +359,7 @@ Gated entirely by `session.isSuperAdmin` (`src/app/console/layout.tsx`) — a te
 
 Structurally identical pattern to the Client Admin shell (200px sidebar / slim topbar / mobile drawer), separate implementation, same design tokens.
 
-**Sidebar:** SaferSay's own logo (never a tenant's Brand-Studio logo — "this console is not white-labeled," per an explicit code comment) + "Console" label. Seven nav items: Overview, Tenants, Billing, Usage & Health, Plans & Features, Support & Alerts, Settings. Footer: plain "Owner" text.
+**Sidebar:** SaferSay's own logo (never a tenant's Brand-Studio logo — "this console is not white-labeled," per an explicit code comment) + "Console" label. Eight nav items: Overview, Tenants, Billing, Usage & Health, Plans & Features, Support & Alerts, Readiness, Settings. Footer: plain "Owner" text.
 
 **Topbar:** an environment pill (**green** "Production" or neutral-gray "Development", derived from `process.env.NODE_ENV`) + a tenant search box (`Enter` submits, routes to `/console/tenants?q=<query>`) + Sign Out. No confidentiality badge here — that's an admin-surface concept specific to a tenant's own data, not meaningful at the platform level.
 
@@ -430,7 +418,23 @@ Two cards: "System alerts" (same `attention` list as the Overview dashboard, fet
 
 **Backend:** `GET /api/super-admin/overview` (reused for the alerts half) + `GET /api/super-admin/support-notes` → `IdentityRepository.listAllSupportNotes()`.
 
-### 3.9 Settings — `/console/settings` (`SettingsPanel.tsx`)
+### 3.9 Readiness — `/console/readiness` (`ReadinessPanel.tsx`, `src/components/console/ReadinessPanel.tsx`)
+
+The platform-wide go-live checklist — relocated here from the tenant-facing `/app/workspace/go-live` per the coherence directive (a technical/operator screen a real HR admin has no reason to see). Three stat tiles (current runtime mode / "N of 7 required checks configured" / "Ready" or "Blocked" — green text if ready, red if blocked), then a card per check:
+
+| Check | What it verifies |
+|---|---|
+| Supabase Postgres | `DATABASE_URL` set |
+| Supabase app client | `NEXT_PUBLIC_SUPABASE_URL` + publishable key set |
+| Google + Microsoft sign-in | A **manual** env flag (`SUPABASE_OAUTH_PROVIDERS_CONFIRMED=true`) — cannot be auto-detected, since provider enablement lives entirely in the Supabase dashboard, outside this app's config |
+| Token signing secret | `TOKEN_SECRET` set, not a placeholder value, ≥32 chars |
+| Stripe | secret key + webhook secret both set |
+| Resend | API key + a `FROM` address that is **not** the shared `resend.dev` sandbox sender |
+| Privacy contact | `PRIVACY_CONTACT_EMAIL` set |
+
+Each renders a **green** "Configured" or **red** "Placeholder" pill, using the Owner Console's own `ConsoleCard`/`StatTile` primitives rather than the tenant-side `Card`/`AppShell`. Same underlying `runtimeChecks()` function (`src/lib/runtimeConfig.ts`) that `GET /api/readiness` exposes publicly (that endpoint has no auth check — worth knowing it's technically fetchable by anyone, though it only reveals boolean configured/not-configured state, no secret values). Owner-gated like the rest of `/console/*`; both old URLs (`/app/workspace/go-live`, `/app/readiness`) redirect here.
+
+### 3.10 Settings — `/console/settings` (`SettingsPanel.tsx`)
 
 Two read-only cards: "Platform admins" (lists every email in the `SUPER_ADMIN_EMAILS` env var — explicit note that this isn't editable from the UI, only via the env var) and "Global config" (runtime mode, default data residency, legal entity name — all read from env vars server-side).
 

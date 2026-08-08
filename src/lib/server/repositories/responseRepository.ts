@@ -4,6 +4,18 @@ import { ResponseAnswerInput, ProtectedReport, ReportScope, RespondentSurveySess
 
 const orgScope: ReportScope = { type: "org" };
 
+/**
+ * Cycles created without an explicit name are stored as `"{tenantName}
+ * {templateName}"` (see createTenantSurveyCycle) -- the sidebar already
+ * shows workspace context, so that prefix is redundant noise on every
+ * survey list. Strip it for display only; the stored name is untouched.
+ */
+function stripTenantPrefix(name: string, tenantName?: string): string {
+  if (!tenantName) return name;
+  const prefix = `${tenantName} `;
+  return name.startsWith(prefix) ? name.slice(prefix.length) : name;
+}
+
 export class ResponseRepository {
   constructor(private readonly db: Queryable) {}
 
@@ -168,7 +180,7 @@ export class ResponseRepository {
    * breakdown is gated by min_group_size, so surfacing n here on a list of
    * a tenant's own surveys doesn't cross the confidentiality line.
    */
-  async listCyclesForTenant(tenantId: string) {
+  async listCyclesForTenant(tenantId: string, tenantName?: string) {
     const result = await this.db.query<{
       id: string;
       name: string;
@@ -192,7 +204,7 @@ export class ResponseRepository {
     );
     return result.rows.map((row) => ({
       id: row.id,
-      name: row.name,
+      name: stripTenantPrefix(row.name, tenantName),
       status: row.status,
       minGroupSize: row.min_group_size,
       createdAt: row.created_at,
@@ -200,7 +212,7 @@ export class ResponseRepository {
     }));
   }
 
-  async getCycleForTenant(tenantId: string, cycleId: string) {
+  async getCycleForTenant(tenantId: string, cycleId: string, tenantName?: string) {
     const result = await this.db.query<{
       id: string;
       name: string;
@@ -218,7 +230,7 @@ export class ResponseRepository {
     if (!row) return null;
     return {
       id: row.id,
-      name: row.name,
+      name: stripTenantPrefix(row.name, tenantName),
       status: row.status,
       minGroupSize: row.min_group_size,
       createdAt: row.created_at,
@@ -235,7 +247,7 @@ export class ResponseRepository {
     return (result.rowCount ?? 0) > 0;
   }
 
-  async getLatestCycleForTenant(tenantId: string) {
+  async getLatestCycleForTenant(tenantId: string, tenantName?: string) {
     const result = await this.db.query<{ id: string; name: string; min_group_size: number }>(
       `select id, name, min_group_size
        from responses.survey_cycles
@@ -244,11 +256,13 @@ export class ResponseRepository {
        limit 1`,
       [tenantId],
     );
-    return result.rows[0] ?? null;
+    const row = result.rows[0];
+    if (!row) return null;
+    return { ...row, name: stripTenantPrefix(row.name, tenantName) };
   }
 
-  async getLatestProtectedReportForTenant(tenantId: string, scope: ReportScope = orgScope) {
-    const cycle = await this.getLatestCycleForTenant(tenantId);
+  async getLatestProtectedReportForTenant(tenantId: string, scope: ReportScope = orgScope, tenantName?: string) {
+    const cycle = await this.getLatestCycleForTenant(tenantId, tenantName);
     if (!cycle) {
       return {
         cycle: null,

@@ -2,10 +2,10 @@ import type { Queryable } from "@/lib/server/db/tenantPool";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import { ResponseRepository } from "@/lib/server/repositories/responseRepository";
 
-export async function getPilotState(params: { db: Queryable; tenantId: string }) {
+export async function getPilotState(params: { db: Queryable; tenantId: string; tenantName?: string }) {
   const responseRepository = new ResponseRepository(params.db);
   const identityRepository = new IdentityRepository(params.db);
-  const report = await responseRepository.getLatestProtectedReportForTenant(params.tenantId);
+  const report = await responseRepository.getLatestProtectedReportForTenant(params.tenantId, undefined, params.tenantName);
   const identity = await identityRepository.getPilotIdentitySummary(params.tenantId, report.cycle?.id ?? null);
 
   // Once a cycle exists, deep-link straight into its Send/Results stage

@@ -10,6 +10,6 @@ export async function GET() {
   }
 
   const { tenant } = session;
-  const state = await withTenantScopedDb(tenant.id, (db) => getPilotState({ db, tenantId: tenant.id }));
+  const state = await withTenantScopedDb(tenant.id, (db) => getPilotState({ db, tenantId: tenant.id, tenantName: tenant.name }));
   return NextResponse.json({ ok: true, tenant, ...state });
 }

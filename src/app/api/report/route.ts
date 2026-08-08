@@ -11,10 +11,10 @@ import { getProtectedServerReport } from "@/lib/serverStore";
  * tenant's latest cycle -- same optional-cycleId convention as
  * /api/invites/outbox and /api/invites/queue.
  */
-async function loadReportForCycle(repo: ResponseRepository, tenantId: string, cycleId: string | null) {
-  if (!cycleId) return repo.getLatestProtectedReportForTenant(tenantId);
+async function loadReportForCycle(repo: ResponseRepository, tenantId: string, cycleId: string | null, tenantName?: string) {
+  if (!cycleId) return repo.getLatestProtectedReportForTenant(tenantId, undefined, tenantName);
 
-  const cycle = await repo.getCycleForTenant(tenantId, cycleId);
+  const cycle = await repo.getCycleForTenant(tenantId, cycleId, tenantName);
   if (!cycle) return { cycle: null, report: { protected: true as const, n: 0, rows: [] } };
 
   return {
@@ -45,13 +45,17 @@ export async function GET(request: NextRequest) {
   const { tenant } = session;
   if (tenantPool) {
     const result = await withTenantContext(tenantPool, tenant.id, (client) =>
-      loadReportForCycle(new ResponseRepository(client), tenant.id, cycleId),
+      loadReportForCycle(new ResponseRepository(client), tenant.id, cycleId, tenant.name),
     );
     return NextResponse.json({ ok: true, tenant, ...result });
   }
   const adminPool = getDatabasePool();
   if (adminPool) {
-    return NextResponse.json({ ok: true, tenant, ...(await loadReportForCycle(new ResponseRepository(adminPool), tenant.id, cycleId)) });
+    return NextResponse.json({
+      ok: true,
+      tenant,
+      ...(await loadReportForCycle(new ResponseRepository(adminPool), tenant.id, cycleId, tenant.name)),
+    });
   }
   return NextResponse.json({ ok: true, cycle: null, report: await getProtectedServerReport() });
 }

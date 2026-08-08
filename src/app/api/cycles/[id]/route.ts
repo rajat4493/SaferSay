@@ -15,7 +15,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 
   const result = await withTenantScopedDb(tenant.id, async (db) => {
     const responseRepo = new ResponseRepository(db);
-    const cycle = await responseRepo.getCycleForTenant(tenant.id, cycleId);
+    const cycle = await responseRepo.getCycleForTenant(tenant.id, cycleId, tenant.name);
     if (!cycle) return null;
 
     const [survey, outbox] = await Promise.all([

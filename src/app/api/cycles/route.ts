@@ -10,7 +10,7 @@ export async function GET() {
   }
 
   const cycles = await withTenantScopedDb(session.tenant.id, (db) =>
-    new ResponseRepository(db).listCyclesForTenant(session.tenant.id),
+    new ResponseRepository(db).listCyclesForTenant(session.tenant.id, session.tenant.name),
   );
 
   return NextResponse.json({ ok: true, cycles });
