@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { ConfidentialitySeal } from "@/components/ConfidentialitySeal";
+import { FirstRunGuide } from "@/components/FirstRunGuide";
 import { SkeletonCard } from "@/components/Skeleton";
 import { SurveyStatusBadge } from "@/components/SurveyStatusBadge";
 import { useToast } from "@/components/ToastProvider";
@@ -26,6 +27,7 @@ export default function SurveysHome() {
   const toast = useToast();
   const [mode, setMode] = useState<ViewMode>("loading");
   const [cycles, setCycles] = useState<SurveyCycle[] | null>(null);
+  const [firstRunCompleted, setFirstRunCompleted] = useState(true);
 
   useEffect(() => {
     fetch("/api/tenants/current")
@@ -42,6 +44,7 @@ export default function SurveysHome() {
           router.replace("/console");
           return;
         }
+        setFirstRunCompleted(Boolean(data.firstRunCompleted));
         setMode("surveys");
       })
       .catch(() => setMode("surveys"));
@@ -80,6 +83,8 @@ export default function SurveysHome() {
   return (
     <AppShell title="Surveys" subtitle="Your active and past surveys. Open one to manage invites, responses, and results.">
       <ConfidentialitySeal />
+
+      {!firstRunCompleted ? <FirstRunGuide /> : null}
 
       <div className="mt-6">
         <div className="flex items-center justify-between">

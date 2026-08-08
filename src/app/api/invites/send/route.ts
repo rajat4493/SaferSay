@@ -48,6 +48,10 @@ export async function POST(request: NextRequest) {
     for (const id of delivery.sentIds) await repo.markOutboxSent(id);
     for (const id of delivery.failedIds) await repo.markOutboxFailed(id);
 
+    if (deliveryType === "invite" && delivery.sent > 0) {
+      await repo.markFirstRunCompleted(tenant.id);
+    }
+
     return {
       cycleId,
       deliveryType,

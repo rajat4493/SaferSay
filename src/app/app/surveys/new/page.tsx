@@ -1,14 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { AppShell, Card } from "@/components/AppShell";
 import { CreateSurveyCycle } from "@/components/CreateSurveyCycle";
 import { PageGuide } from "@/components/PageGuide";
 import { surveyTemplates } from "@/lib/templates";
 
 export default function NewSurveyPage() {
+  const router = useRouter();
   const [selected, setSelected] = useState(surveyTemplates[0].slug);
   const template = surveyTemplates.find((item) => item.slug === selected) ?? surveyTemplates[0];
+  const [, startTransition] = useTransition();
+
+  useEffect(() => {
+    async function checkEmployees() {
+      const response = await fetch("/api/employees?limit=1");
+      const data = (await response.json().catch(() => ({ ok: false }))) as { ok?: boolean; total?: number };
+      if (data.ok && data.total === 0) router.replace("/app/people");
+    }
+    startTransition(() => {
+      void checkEmployees();
+    });
+  }, [router, startTransition]);
 
   return (
     <AppShell title="New survey" subtitle="Template first, then light editing, then launch.">

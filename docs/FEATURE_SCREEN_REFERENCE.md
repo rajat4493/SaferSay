@@ -197,8 +197,9 @@ The landing screen for every non-Owner login. Two-stage client-side load:
 
 **Visible, top to bottom:**
 1. `ConfidentialitySeal` (see §2.6) — "Sealed by design — You see the numbers, never the names. Neither can we." + "How it works →" link to `/app/workspace/security`.
-2. **"Create a new survey"** row: heading + one-line description left, **"+ New survey"** black pill button right → `/app/surveys/new`. This is the page's one primary action.
-3. Survey list, three possible states:
+2. **`FirstRunGuide`** (`src/components/FirstRunGuide.tsx`, new) — only rendered while `firstRunCompleted` (from `GET /api/tenants/current`, step 1's response) is false; a tenant that's already finished first-run never sees it again, not even briefly. See §2.7 for the component itself.
+3. **"Create a new survey"** row: heading + one-line description left, **"+ New survey"** black pill button right → `/app/surveys/new`. This is the page's one primary action.
+4. Survey list, three possible states:
    - **Loading** (`cycles === null`): two `SkeletonCard` placeholders.
    - **Empty** (`cycles.length === 0`): "No surveys yet. Create your first survey to get started."
    - **Populated**: split into "Live survey" (the one cycle with `status === "open"`, shown larger/first if present) and "Past surveys" (everything else). Each is a `SurveyCard` — a full-width clickable card (`.card.card-interactive`, hover = border-color only) showing the survey name, a `SurveyStatusBadge`, and "{n} responses · Created {date}". Clicking → `/app/{cycleId}` (the Build/detail stage).
@@ -210,6 +211,8 @@ The landing screen for every non-Owner login. Two-stage client-side load:
 #### 2.2.2 New survey (Build) — `/app/surveys/new` (`src/app/app/surveys/new/page.tsx`)
 
 The **only** place template selection happens — there's no separate `/app/templates` route (the old standalone destination was retired; a `next.config.ts` redirect sends `/app/templates` here).
+
+**Route guard (coherence-directive addition):** on mount, fetches `GET /api/employees?limit=1` and `router.replace("/app/people")`s if `total === 0` — creating a cycle with zero employees used to be reachable and fail server-side with a generic error; this catches it before the page is even useful, consistent with Gap 1's "load people first" step.
 
 **Layout:** `PageGuide` banner ("Pick a template and create your survey" + "Back: people" link) → two-column grid:
 - Left card: **template picker**, four options (`surveyTemplates` from `src/lib/templates.ts`) — Engagement Check (8Q/5min), eNPS Pulse (4Q/2min), Team Health (8Q/5min), Onboarding Check-In (7Q/4min). Each a clickable row showing name + duration; selected = black border + `var(--bg-active)` fill (neutral, no accent color per the design directive).
@@ -361,6 +364,20 @@ Two static pricing cards (£200/survey flat, £15/month optional history floor) 
 
 Appears on Surveys home and above every Results/report screen — **nowhere else**, per the design directive ("the single distinctive element in the admin... appears here, nowhere else"). `.seal-strip` class: soft off-white background (`--bg-faint`), 1px border, `ShieldCheck` icon in a white tile, the exact approved copy, and a "How it works →" link to `/app/workspace/security`.
 
+### 2.7 `FirstRunGuide` (`src/components/FirstRunGuide.tsx`, coherence-directive Gap 1)
+
+Rendered atop Surveys home only while `firstRunCompleted` is false (§2.2.1). Deliberately **one step at a time**, not a checklist like `PilotGuide` (§2.5) — three steps, not eight:
+
+| Step | Done when | Action |
+|---|---|---|
+| 1. "Load the people who should receive surveys" | `identity.employees > 0` | "Upload employees" → `/app/people` |
+| 2. "Create your first survey" | a cycle exists | "Create survey" → `/app/surveys/new` |
+| 3. "Send it" | `identity.sentInvites > 0` | "Send invites" → `/app/{cycleId}/send` |
+
+Fetches `GET /api/pilot/state` on mount (reusing `getPilotState()`'s existing counts rather than adding new queries) and derives the current step client-side from `done.findIndex((isDone) => !isDone)`. When all three are done, renders plain text "You're set up — your first survey is live." instead of a step card — this is a **client-derived** completion state, separate from the server-side `first_run_completed_at` flag; it can flash briefly on the same page load right after step 3 finishes, before the *next* full page load picks up the persisted flag and Surveys home stops rendering `FirstRunGuide` at all.
+
+**Completion is persisted server-side**, not derived from `/api/pilot/state` on every load: `IdentityRepository.markFirstRunCompleted()` (`identity.tenant_settings.first_run_completed_at`, migration `0016_first_run_tracking.sql`) is called from inside `POST /api/invites/send` and `POST /api/invites/queue`'s `sendNow` branch, gated on `deliveryType === "invite" && delivery.sent > 0`. The upsert is `coalesce`-guarded so a second invite send later in the tenant's life never bumps the timestamp forward. `GET /api/tenants/current` exposes it as `firstRunCompleted`.
+
 ---
 
 ## 3. SEGMENT: PLATFORM OWNER — `/console/*`
@@ -461,7 +478,7 @@ Every route under `src/app/api/`, grouped by what calls it. "Auth" column: **Non
 | Route | Method | Auth | Called from |
 |---|---|---|---|
 | `/api/dev/login` | GET/POST/DELETE | None | `DevLoginPanel` (non-prod only — 404s in production) |
-| `/api/tenants/current` | GET | Session | `useTenantSession` hook (nav role-gating, Surveys home Pure-Owner redirect) |
+| `/api/tenants/current` | GET | Session | `useTenantSession` hook (nav role-gating, Surveys home Pure-Owner redirect), Surveys home `firstRunCompleted` gate |
 | `/api/tenants/settings` | GET/PATCH | Session | `TenantSettingsPanel` |
 | `/api/tenants/bootstrap` | POST | None | **Not called from any UI** — dev/testing utility only |
 | `/api/cycles` | GET | Session | Surveys home |

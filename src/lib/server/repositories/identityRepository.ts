@@ -97,6 +97,30 @@ export class IdentityRepository {
     return Math.min(10, Math.max(3, configured));
   }
 
+  /** Whether this tenant has completed the guided first-run sequence. */
+  async getFirstRunState(tenantId: string): Promise<boolean> {
+    const result = await this.db.query<{ completed: boolean }>(
+      `select (first_run_completed_at is not null) as completed
+       from identity.tenant_settings where tenant_id = $1`,
+      [tenantId],
+    );
+    return result.rows[0]?.completed ?? false;
+  }
+
+  /**
+   * Idempotent: coalesce keeps the first completion timestamp on repeat
+   * calls rather than bumping it forward every time an invite goes out.
+   */
+  async markFirstRunCompleted(tenantId: string) {
+    await this.db.query(
+      `insert into identity.tenant_settings (tenant_id, first_run_completed_at)
+       values ($1, now())
+       on conflict (tenant_id) do update
+       set first_run_completed_at = coalesce(identity.tenant_settings.first_run_completed_at, excluded.first_run_completed_at)`,
+      [tenantId],
+    );
+  }
+
   async listTenants(): Promise<TenantRecord[]> {
     const result = await this.db.query<{ id: string; name: string; slug: string }>(
       "select id, name, slug from identity.tenants order by name asc",
