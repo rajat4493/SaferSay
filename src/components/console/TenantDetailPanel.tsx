@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { ConsoleCard, PlanBadge, formatDate, formatRelative } from "@/components/console/ConsoleUI";
 
@@ -40,11 +41,24 @@ const featureKeys: Array<{ key: string; label: string }> = [
 ];
 
 export function TenantDetailPanel({ tenantId }: { tenantId: string }) {
+  const router = useRouter();
   const [tenant, setTenant] = useState<TenantDetail | null | undefined>(undefined);
   const [savingPlan, setSavingPlan] = useState(false);
   const [savingMinGroup, setSavingMinGroup] = useState(false);
   const [noteDraft, setNoteDraft] = useState("");
   const [addingNote, setAddingNote] = useState(false);
+  const [entering, setEntering] = useState(false);
+
+  async function enterWorkspace() {
+    setEntering(true);
+    await fetch("/api/super-admin/switch", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ tenantId }),
+    });
+    router.push("/app");
+    router.refresh();
+  }
 
   function load() {
     fetch(`/api/super-admin/tenants/${tenantId}`)
@@ -111,7 +125,12 @@ export function TenantDetailPanel({ tenantId }: { tenantId: string }) {
           <h1 className="page-title">{tenant.name}</h1>
           <p className="secondary-text">/{tenant.slug}</p>
         </div>
-        <PlanBadge tier={tenant.planTier} />
+        <div className="flex shrink-0 items-center gap-2.5">
+          <PlanBadge tier={tenant.planTier} />
+          <button onClick={enterWorkspace} disabled={entering} className="btn-secondary">
+            {entering ? "Entering..." : "Enter workspace →"}
+          </button>
+        </div>
       </div>
 
       <div className="grid gap-2.5 lg:grid-cols-2">

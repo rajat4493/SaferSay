@@ -34,7 +34,7 @@ export function ImpersonationBanner() {
         disabled={returning}
         className="shrink-0 whitespace-nowrap rounded-[var(--radius-button)] bg-[var(--red)] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
       >
-        {returning ? "Returning..." : "Return to my workspace"}
+        {returning ? "Returning..." : "Return to console"}
       </button>
     </div>
   );

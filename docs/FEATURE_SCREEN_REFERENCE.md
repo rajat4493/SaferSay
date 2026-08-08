@@ -41,7 +41,7 @@ Permission functions live in `src/lib/permissions.ts` and gate two server-side l
 - `src/app/app/workspace/layout.tsx` → `canAccessWorkspace(role)` (`customer_admin` only), else `redirect("/app")`.
 - `src/app/app/layout.tsx` just requires *any* session (`requireSessionContext`), no role check — every role can reach `/app` itself.
 
-The "Pure Owner" client-side concept (`AppShell.tsx`): a platform Owner who is signed in but **not currently impersonating a tenant** (`isSuperAdmin && !isImpersonating`) sees the entire Surveys/People/Workspace nav collapse to nothing — the redirect logic on the Surveys home page (`src/app/app/page.tsx`) sends them straight to `/console` instead. An Owner only sees tenant-running nav after explicitly entering a tenant (see §Owner Console below) — and as of this writing, **the UI trigger to actually enter a tenant doesn't exist** (see §5 Known Gaps).
+The "Pure Owner" client-side concept (`AppShell.tsx`): a platform Owner who is signed in but **not currently impersonating a tenant** (`isSuperAdmin && !isImpersonating`) sees the entire Surveys/People/Workspace nav collapse to nothing — the redirect logic on the Surveys home page (`src/app/app/page.tsx`) sends them straight to `/console` instead. An Owner sees tenant-running nav after explicitly entering a tenant via the "Enter workspace →" button on Tenant Detail (§3.4).
 
 ### 0.3 Data severance (the confidentiality architecture every screen's copy refers to)
 
@@ -183,7 +183,7 @@ Three nav zones (**Surveys / People / Workspace**), survey-as-object model: inst
 **Right: everything else**, flex column:
 - **Topbar**, `sticky top-0`, white, 1px bottom border, `11px` vertical / `24px` horizontal padding. Left: quiet confidentiality line — `Lock` icon (13px) + **"Confidential — you see numbers, never names"**, 12px/500, `var(--ink-mid)` — hidden below `sm:` breakpoint to save space on phones. Right: "First-run guide" text link (→ `/app/pilot`, hidden below `sm:`), a **26px circular avatar** (black bg, white text, first letter of workspace name, 10px/600 — purely decorative, not a menu trigger), and the Sign Out button.
 - **Content area**, `flex-1 overflow-y-auto`, `px-6 py-7` (`px-4` on mobile), max-width `5xl`, centered. Every page's own `<h1>` (`.page-title`, 22px/600) + subtitle (`.secondary-text`) render here — **not** in the topbar; the topbar stays uniform across every screen.
-- `ImpersonationBanner` renders here too, directly under the title, only when `info.isImpersonating` is true — red card (border/bg/text all `--red-*` tokens), "Viewing **{tenant}** as SaferSay Owner" + a "Return to my workspace" button that `POST`s an empty body to `/api/super-admin/switch` (clears the impersonation cookie) and redirects to `/app`.
+- `ImpersonationBanner` renders here too, directly under the title, only when `info.isImpersonating` is true — red card (border/bg/text all `--red-*` tokens), "Viewing **{tenant}** as SaferSay Owner" + a "Return to console" button that `POST`s an empty body to `/api/super-admin/switch` (clears the impersonation cookie) and redirects to `/app` (which immediately bounces back to `/console` per the Pure-Owner redirect above, now that impersonation is cleared).
 
 **Mobile (below `lg:`):** sidebar is **not** simply hidden — that was a real bug caught during this build (sidebar had `max-lg:hidden` with zero replacement, silently vanishing with no way to navigate at all below 1024px). Fixed with a proper pattern: a `Menu` (hamburger) icon button appears top-left of the topbar; tapping it opens the *same* sidebar content as a fixed-position slide-in drawer (240px wide) over a `bg-black/30` backdrop, with an `X` close button and backdrop-click-to-close. Tapping any nav link inside the drawer also closes it (`onNavigate` callback). Same pattern replicated identically in `OwnerConsoleShell` and `ViewerShell`.
 
@@ -387,7 +387,7 @@ Table view: search box (name, client-side filtered against an already-fetched li
 
 ### 3.4 Tenant detail — `/console/tenants/[id]` (`TenantDetailPanel.tsx`)
 
-"← All tenants" link, then name + slug + `PlanBadge`, then a 2×2 card grid:
+"← All tenants" link, then name + slug + `PlanBadge` + an **"Enter workspace →"** button (`.btn-secondary`) that `POST`s `{tenantId}` to `/api/super-admin/switch` (sets the impersonation cookie) and pushes to `/app` — this is the only UI path into a tenant's actual workspace as the Owner; leaving again goes through the `ImpersonationBanner`'s "Return to console" button (§2.1). Then a 2×2 card grid:
 
 1. **Metadata** — joined date, primary contact email (or "No owner user yet" — derived by finding the earliest-created `customer_admin` user for that tenant), data residency, employee count.
 2. **Survey activity** — latest cycle's name/status/response-counts/completion-rate, or "No survey created yet." Explicit note: "Counts and rates only. No answers or reports are visible here" — the Owner literally cannot see survey content from this screen, only operational metadata, by architectural design (§0.1's "even the vendor can't read this" rule extends to the Owner Console itself).
@@ -473,7 +473,7 @@ Every route under `src/app/api/`, grouped by what calls it. "Auth" column: **Non
 
 Flagging these explicitly rather than letting the doc imply full coverage where it isn't:
 
-1. **Owner "enter this tenant" flow.** `POST /api/super-admin/switch` accepts a `tenantId` and sets an impersonation cookie — the backend and the resulting `ImpersonationBanner` "return to my workspace" exit path both exist and work, but **no button anywhere in `/console` calls it with an actual `tenantId`.** The only current caller (`ImpersonationBanner`) only ever calls it with an empty body to *clear* impersonation. An Owner cannot currently enter a tenant's workspace through the UI at all.
+1. ~~Owner "enter this tenant" flow.~~ **Resolved** — Tenant Detail's "Enter workspace →" button (§3.4) now calls `POST /api/super-admin/switch` with the real `tenantId`.
 2. **`survey_creator` and `auditor` roles.** Fully modeled in `permissions.ts` and the `identity.users.role` constraint, but there's no invite-a-teammate-with-a-role UI anywhere — every real signup becomes `customer_admin`. `getVisibleNavZones("auditor")` returns an empty array; no audit-log viewer screen has been built yet.
 3. **`ServerOpsPanel`** (raw API test buttons for seed/pay/launch/prepare/queue/read-report) is orphaned — the component file exists, nothing imports it.
 4. **Brand Studio color/font customization** was removed during the design-directive build (conflicted with the locked palette); only name/tagline/logo remain, and that data is `localStorage`-only, never synced server-side.
