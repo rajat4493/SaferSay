@@ -18,16 +18,20 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     const cycle = await responseRepo.getCycleForTenant(tenant.id, cycleId, tenant.name);
     if (!cycle) return null;
 
-    const [survey, outbox] = await Promise.all([
-      responseRepo.getRespondentSurveySession(cycleId),
-      new IdentityRepository(db).getInviteOutbox(tenant.id, cycleId),
-    ]);
+    // Sequential, not Promise.all: db is a single shared client under
+    // withTenantScopedDb (tenant-scoped connection), and pg clients can't
+    // run concurrent queries on one connection.
+    const survey = await responseRepo.getRespondentSurveySession(cycleId);
+    const identityRepo = new IdentityRepository(db);
+    const outbox = await identityRepo.getInviteOutbox(tenant.id, cycleId);
+    const participation = await identityRepo.getParticipationSummary(tenant.id, cycleId);
 
     return {
       cycle,
       templateName: survey?.templateName ?? null,
       questions: survey?.questions ?? [],
       outbox: outbox.summary,
+      participation,
     };
   });
 

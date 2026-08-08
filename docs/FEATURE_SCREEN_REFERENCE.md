@@ -246,9 +246,21 @@ Reached by clicking any survey card on the home screen (an *existing* cycle, as 
 
 Same stage-tabs header (stage 2 of 3). Body is entirely the `InviteOutboxPanel` component (`src/components/InviteOutboxPanel.tsx`), passed `cycleId={surveyId}` — the same component the old standalone `/app/integrations` route used to render, now scoped to one specific survey instead of silently acting on "whichever cycle is most recent."
 
-**Panel layout:** header ("Identity-side outbox" label, "Invite outbox" title, one-line description) + a 2-column button grid, then a live summary + row table below.
+**Panel layout (coherence-directive restructure):** header ("Send" label, "Invite outbox" title, one-line description), then **Tier 1** — a single smart-action row — then a collapsed **Tier 2** `<details>` ("Developer / test mode") holding the original seven buttons unchanged, for anyone who needs manual control.
 
-**Seven action buttons**, each an independent `fetch` call:
+**Tier 1 — smart action** (`SendAction`, inline in `InviteOutboxPanel.tsx`): on mount, fetches `GET /api/cycles/[cycleId]` for `cycle.status`, `outbox.sentInvites`, and the new `participation: {issued, spent}` field, then renders exactly one of:
+
+| Condition | Rendered |
+|---|---|
+| `cycle.status === 'closed'` | plain text "Survey closed — no further sending" |
+| `participation.issued === 0` | plain text "No participants yet — upload employees to issue survey tokens." |
+| `participation.issued === participation.spent` | plain text (green) "Everyone has responded" |
+| `sentInvites === 0` | button: "Send invites to N people" (N = issued − spent) |
+| otherwise | button: "Remind N people who haven't responded" |
+
+Clicking the button calls the single new `POST /api/invites/send {cycleId, deliveryType}` endpoint (see below), then re-fetches state so the button/text updates in place — no page reload needed.
+
+**Tier 2 — "Developer / test mode"** (collapsed `<details>`), same seven action buttons as before, each an independent `fetch` call:
 | Button | Style | Calls |
 |---|---|---|
 | Refresh | secondary, 6px radius | `GET /api/invites/outbox?cycleId=` |
@@ -259,17 +271,17 @@ Same stage-tabs header (stage 2 of 3). Body is entirely the `InviteOutboxPanel` 
 | Queue reminders | secondary, **pill** | `POST /api/invites/queue {cycleId, deliveryType:'reminder'}` |
 | Send test reminders | secondary, **pill** | `POST /api/invites/queue {cycleId, deliveryType:'reminder', sendNow:true}` |
 
-(Pill radius reserved for "send/nudge" actions per the design directive; Refresh/Prepare stay rectangular.)
+(Pill radius reserved for "send/nudge" actions per the design directive; Refresh/Prepare stay rectangular.) While a call is in flight: `InlineSpinnerRow`. On completion: a toast, and Tier 1's state is re-fetched too so the two tiers never show stale-relative-to-each-other numbers.
 
-While a call is in flight: `InlineSpinnerRow` (small spinning ring + the action's label, e.g. "Queueing..."). On completion: a toast — success/error based on `data.delivery.failed === 0` when a send happened, or a generic "Prepared."/"Queued." for the non-sending actions.
-
-**Live summary**, 3-column grid of six `Metric` tiles: Pending/Queued/Sent invites, Pending/Queued/Sent reminders — each just a big number (`.data-number`) + label.
-
-**Row table** (up to 12 rows shown), per invited employee: name/email, a "Copy link" button (copies `{origin}{respondentPath}` to clipboard, shows a checkmark for 2s) and an "Open" link (`target="_blank"` to the actual `/s/[token]` URL) — this is how an HR admin can grab a real respondent link during testing, exactly as done during this session's verification pass. Delivery type, delivery status, and token status shown as plain text columns.
+**Live summary** (inside Tier 2), 3-column grid of six `Metric` tiles: Pending/Queued/Sent invites, Pending/Queued/Sent reminders. **Row table** (inside Tier 2, up to 12 rows), per invited employee: name/email, a "Copy link" button (copies `{origin}{respondentPath}` to clipboard, shows a checkmark for 2s) and an "Open" link (`target="_blank"` to the actual `/s/[token]` URL) — this is how an HR admin can grab a real respondent link during testing. Delivery type, delivery status, and token status shown as plain text columns.
 
 **Backend, in depth:**
+- `POST /api/invites/send` (`src/app/api/invites/send/route.ts`, new) — the Tier 1 button's endpoint. Does prepare → queue → send-now in one call on one tenant-scoped connection (prepare/queue loops run sequentially, never `Promise.all`'d — see the `GET /api/cycles/[id]` note below for why), reusing the exact same `IdentityRepository` methods Tier 2's buttons call individually. Returns the same outbox summary/rows shape as the other two routes, plus `participation: {issued, spent}` so the client can re-render Tier 1 from one response. Logs `logInvitesSent`/`logRemindersSent` on `sent > 0`, same aggregate-count-only rule as below.
+- `GET /api/cycles/[id]` (`src/app/api/cycles/[id]/route.ts`) — extended with `participation: {issued, spent}` (`IdentityRepository.getParticipationSummary()`, counting `identity.survey_participants` rows only — never `responses.*`). Its three sub-queries (survey session, outbox, participation) now run as sequential `await`s, not `Promise.all` — `withTenantScopedDb` hands routes a single checked-out client when `DATABASE_URL_APP` is configured, and concurrent queries on one `pg` connection corrupt the query stream (the exact crash class already fixed once in `/api/invites/queue`, see git history — this route had the same latent bug, now closed).
 - `GET/POST /api/invites/outbox` (`src/app/api/invites/outbox/route.ts`) — both accept an optional `cycleId`; if omitted, falls back to `getLatestCycleIdForTenant()` (this fallback convention is why the *old* standalone `/app/integrations` route used to silently drift onto whichever survey was newest — the new per-survey Send page always passes `cycleId` explicitly, closing that gap). `prepareInviteOutbox`/`prepareReminderOutbox` insert `identity.invite_outbox` rows (one per active, not-yet-outboxed employee) in `pending` status.
 - `POST /api/invites/queue` (`src/app/api/invites/queue/route.ts`) — `markOutboxQueued()` flips matching rows to `queued`. If `sendNow: true`: fetches the queued rows (`getQueuedOutboxDeliveries`), calls `sendQueuedInviteDeliveries()` (`src/lib/server/resendDelivery.ts`) which sends real emails via the Resend API (subject/body built in `buildInviteMessage`, includes the respondent's actual survey link), then marks each row `sent` or `failed` individually. **Requires `RESEND_API_KEY`**; in production mode, also refuses to send from the shared `resend.dev` sandbox sender — real domain required. On `sent > 0`, logs an audit event (`logInvitesSent` or `logRemindersSent` depending on delivery type) with an **aggregate count only** — no per-recipient email ever touches the audit log, by design (see §0.3-adjacent "hard rule" in the audit log module's own doc comment: never log anything that could let someone infer who responded).
+
+**Known limitation, not introduced by this change:** if a send attempt fails (e.g. the Resend sandbox sender's "verified recipients only" restriction — confirmed live during this build's verification pass, 5/5 test sends failed with that exact error against a non-owner recipient), the failed `invite_outbox` rows stay in `failed` status. Because `prepareInviteOutbox`'s insert is `on conflict (participant_id, delivery_type) do nothing` and `markOutboxQueued` only picks up rows still in `pending`, clicking the Tier 1 button again does not retry them — this is inherited unchanged from the pre-existing prepare/queue state machine, not something Gap 2 introduced or was scoped to fix. A stuck failed send currently needs Tier 2's manual buttons (or a fixed Resend sender) to recover.
 
 #### 2.2.5 Results — `/app/[surveyId]/results` (`src/app/app/[surveyId]/results/page.tsx`)
 
@@ -284,7 +296,7 @@ Stage 3 of 3. Subtitle on this page is the exact approved copy: **"Sealed — sc
    - Refresh / Export CSV / Share score buttons (CSV export and "share score" clipboard-copy are both pure client-side, generated from the already-fetched report data — no extra network call).
    - **"Commit to one change"** card, shown only once results are unlocked: a text input + "Commit" button that posts a short freeform note the team is committing to act on, plus a list of previously committed notes (author + relative timestamp). This is the "close the loop" feature — turning a number into an action, not just a dashboard.
 3. **"Manage survey"** card, two buttons:
-   - **"Send reminders to non-respondents"** (secondary) — fires the same prepare→queue→send-now sequence as the Send page's reminder buttons, but bundled into one click here. Disabled once the survey is closed.
+   - **"Send reminders to non-respondents"** (secondary) — calls `POST /api/invites/send {cycleId, deliveryType:'reminder'}` (the same Tier 1 endpoint the Send page's smart button uses), one request instead of the two sequential round trips this used to make. Disabled once the survey is closed.
    - **"Close survey & lock responses"** (**red, `.btn-destructive`** — the design directive's one explicit destructive-action color usage) — guarded by a native `window.confirm()` before it does anything ("No one will be able to submit after this."). Disabled once already closed; label switches to "Survey closed" in that state.
 4. "Back to surveys" link.
 
@@ -458,7 +470,8 @@ Every route under `src/app/api/`, grouped by what calls it. "Auth" column: **Non
 | `/api/cycles/[id]/close` | POST | Session | Results tab |
 | `/api/cycles/launch`, `/api/cycles/pay`, `/api/cycles/seed` | POST | Session | `ServerOpsPanel` only — **that component is orphaned, not rendered anywhere** |
 | `/api/employees`, `/api/employees/[id]/status`, `/api/employees/import` | GET/POST | Session | People zone |
-| `/api/invites/outbox`, `/api/invites/queue` | GET/POST | Session | Send tab, Results tab (reminders) |
+| `/api/invites/send` | POST | Session | Send tab (Tier 1 smart button), Results tab (reminders) |
+| `/api/invites/outbox`, `/api/invites/queue` | GET/POST | Session | Send tab (Tier 2 "Developer / test mode") |
 | `/api/report`, `/api/report/action` | GET/POST | Session (report also blocks impersonating Owners explicitly, 403) | Results tab, `/viewer` |
 | `/api/pilot/state` | GET | Session | `/app/pilot` |
 | `/api/readiness` | GET | **None** | Go-live page's underlying data source (fetched server-side, not via this API, but the API itself is also publicly reachable) |

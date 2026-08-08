@@ -701,6 +701,24 @@ export class IdentityRepository {
     return result.rows;
   }
 
+  /**
+   * Total tokens issued for a cycle vs. how many have been spent (=
+   * responded) -- sourced from identity.survey_participants only, never
+   * responses.*. Drives the Send tab's single smart-action button: once
+   * issued === spent, everyone eligible has responded.
+   */
+  async getParticipationSummary(tenantId: string, cycleId: string): Promise<{ issued: number; spent: number }> {
+    const result = await this.db.query<{ issued: string; spent: string }>(
+      `select count(*)::text as issued,
+              count(*) filter (where token_status = 'spent')::text as spent
+       from identity.survey_participants
+       where tenant_id = $1 and cycle_id = $2`,
+      [tenantId, cycleId],
+    );
+    const row = result.rows[0];
+    return { issued: Number(row?.issued ?? 0), spent: Number(row?.spent ?? 0) };
+  }
+
   async getLatestCycleIdForTenant(tenantId: string) {
     const result = await this.db.query<{ id: string }>(
       `select cycle_id as id

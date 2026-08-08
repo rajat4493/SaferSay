@@ -1,0 +1,75 @@
+import { NextResponse, type NextRequest } from "next/server";
+import { getSessionContext } from "@/lib/server/authSession";
+import { withTenantScopedDb } from "@/lib/server/db/tenantPool";
+import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
+import { sendQueuedInviteDeliveries } from "@/lib/server/resendDelivery";
+import { logInvitesSent, logRemindersSent } from "@/lib/server/auditLog";
+
+/**
+ * The Send tab's one-button action: prepare -> queue -> send-now in a
+ * single call, instead of the admin chaining /api/invites/outbox and
+ * /api/invites/queue themselves (two separate round trips left a window
+ * where a second click, or the results page's own reminder button, could
+ * race the first request -- see docs/COHERENCE_PLAN.md Gap 2).
+ */
+export async function POST(request: NextRequest) {
+  const session = await getSessionContext();
+  if (!session) {
+    return NextResponse.json({ ok: false, error: "Unauthorized invite send access." }, { status: 401 });
+  }
+
+  const body = (await request.json().catch(() => ({}))) as {
+    cycleId?: string;
+    deliveryType?: "invite" | "reminder";
+  };
+  const deliveryType = body.deliveryType ?? "invite";
+  const { tenant, userId } = session;
+
+  const result = await withTenantScopedDb(tenant.id, async (db) => {
+    const repo = new IdentityRepository(db);
+    const cycleId = body.cycleId ?? (await repo.getLatestCycleIdForTenant(tenant.id));
+    if (!cycleId) return null;
+
+    const prepared =
+      deliveryType === "invite" ? await repo.prepareInviteOutbox(tenant.id, cycleId) : await repo.prepareReminderOutbox(tenant.id, cycleId);
+    const queued = await repo.markOutboxQueued(tenant.id, cycleId, deliveryType);
+    if (queued > 0 && deliveryType === "invite") {
+      await repo.emitOnboardingEvent(tenant.id, userId, "queue");
+    }
+    if (prepared > 0 && deliveryType === "invite") {
+      await repo.emitOnboardingEvent(tenant.id, userId, "outbox");
+    }
+
+    const deliveries = await repo.getQueuedOutboxDeliveries(tenant.id, cycleId, deliveryType);
+    const delivery = await sendQueuedInviteDeliveries({ tenant, deliveries });
+    // Sequential, not Promise.all: db is a single shared client under
+    // withTenantScopedDb (tenant-scoped connection), and pg clients can't
+    // run concurrent queries on one connection.
+    for (const id of delivery.sentIds) await repo.markOutboxSent(id);
+    for (const id of delivery.failedIds) await repo.markOutboxFailed(id);
+
+    return {
+      cycleId,
+      deliveryType,
+      prepared,
+      queued,
+      delivery: { sent: delivery.sent, failed: delivery.failed, errors: delivery.errors.slice(0, 5) },
+      ...(await repo.getInviteOutbox(tenant.id, cycleId)),
+      participation: await repo.getParticipationSummary(tenant.id, cycleId),
+    };
+  });
+
+  if (!result) {
+    return NextResponse.json({ ok: false, error: "Create a survey cycle before sending invites." }, { status: 400 });
+  }
+
+  if (result.delivery.sent > 0) {
+    if (deliveryType === "invite") {
+      await logInvitesSent(tenant.id, session.role, session.email, result.cycleId, result.delivery.sent);
+    } else {
+      await logRemindersSent(tenant.id, session.role, session.email, result.cycleId, result.delivery.sent);
+    }
+  }
+
+  return NextResponse.json({ ok: result.delivery.failed === 0, tenant, ...result });
+}

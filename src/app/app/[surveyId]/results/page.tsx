@@ -29,15 +29,10 @@ export default function SurveyResultsPage() {
   async function sendReminders() {
     setSendingReminders(true);
     try {
-      await fetch("/api/invites/outbox", {
+      const response = await fetch("/api/invites/send", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ cycleId: surveyId, includeReminders: true }),
-      });
-      const response = await fetch("/api/invites/queue", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ cycleId: surveyId, deliveryType: "reminder", sendNow: true }),
+        body: JSON.stringify({ cycleId: surveyId, deliveryType: "reminder" }),
       });
       const data = (await response.json().catch(() => ({}))) as {
         delivery?: { sent: number; failed: number };
