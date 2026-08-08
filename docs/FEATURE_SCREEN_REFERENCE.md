@@ -439,9 +439,9 @@ Table view: search box (name, client-side filtered against an already-fetched li
 3. **Plan & features** — three plan-tier buttons (Standard/Growth/Enterprise, selected = black fill) that `PATCH` immediately on click, plus three feature checkboxes (custom questions / manager hierarchy import / custom workspace branding) that also `PATCH` immediately on toggle. A confidentiality-threshold slider identical to the tenant-side one (min 3, max 10) — **this is the same underlying `min_group_size` value the tenant's own Workspace/Settings page controls; either side can change it.**
 4. **Billing** — placeholder card, "Stripe isn't connected yet."
 
-Below the grid: **Support notes** — a freeform note input + list of prior notes (author, relative time) for this specific tenant. Explicit copy: "Operational notes only — never a path to this tenant's data."
+Below the grid: **Members** (coherence-directive Gap 5, new) — read-only list of every real teammate on this tenant (email, join date, role label — same "HR Admin / Survey Creator / Viewer" labels as the tenant-side Team screen, §2.4.3), explicit copy: "team management happens inside the tenant's own workspace, not here." Deliberately **accepted members only** — a tenant's not-yet-accepted `pending_invites` rows aren't shown; that's tenant-side visibility, not an Owner-side concern. Then **Support notes** — a freeform note input + list of prior notes (author, relative time) for this specific tenant. Explicit copy: "Operational notes only — never a path to this tenant's data."
 
-**Backend:** `GET/PATCH /api/super-admin/tenants/[id]` (`src/app/api/super-admin/tenants/[id]/route.ts`) — a single `PATCH` handler accepts any combination of `planTier`/`features`/`minGroupSize`/`note` in one body and applies whichever fields are present.
+**Backend:** `GET/PATCH /api/super-admin/tenants/[id]` (`src/app/api/super-admin/tenants/[id]/route.ts`) — a single `PATCH` handler accepts any combination of `planTier`/`features`/`minGroupSize`/`note` in one body and applies whichever fields are present. `IdentityRepository.getTenantDetail()` now also queries `identity.users` directly (`select email, role, created_at ... where tenant_id = $1`) for the `members` array on the same response — no new endpoint, no new round trip.
 
 ### 3.5 Billing — `/console/billing` (`BillingPanel.tsx`)
 

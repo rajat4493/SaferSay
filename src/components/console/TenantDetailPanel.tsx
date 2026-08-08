@@ -26,6 +26,14 @@ type TenantDetail = {
     completionRate: number;
   } | null;
   supportNotes: Array<{ id: string; authorEmail: string; note: string; createdAt: string }>;
+  members: Array<{ email: string; role: string; joinedAt: string }>;
+};
+
+const roleLabels: Record<string, string> = {
+  customer_admin: "HR Admin",
+  survey_creator: "Survey Creator",
+  auditor: "Viewer",
+  employee: "Employee",
 };
 
 const planTiers: Array<{ value: "standard" | "growth" | "enterprise"; label: string }> = [
@@ -199,6 +207,26 @@ export function TenantDetailPanel({ tenantId }: { tenantId: string }) {
           <p className="mt-3 secondary-text">Stripe isn&apos;t connected yet — subscription status will appear here once billing is live.</p>
         </ConsoleCard>
       </div>
+
+      <ConsoleCard>
+        <h2 className="meta-label">Members</h2>
+        <p className="mt-1 text-xs text-[var(--ink-faint)]">Who has access, read-only — team management happens inside the tenant&apos;s own workspace, not here.</p>
+        <div className="mt-3 space-y-2">
+          {tenant.members.length === 0 ? (
+            <p className="secondary-text">No members yet.</p>
+          ) : (
+            tenant.members.map((member) => (
+              <div key={member.email} className="flex items-center justify-between gap-3 rounded-[var(--radius-input)] border border-[var(--border)] p-3 text-[13px]">
+                <div>
+                  <p className="font-medium text-[var(--ink)]">{member.email}</p>
+                  <p className="mt-0.5 text-xs text-[var(--ink-faint)]">Joined {formatDate(member.joinedAt)}</p>
+                </div>
+                <span className="secondary-text">{roleLabels[member.role] ?? member.role}</span>
+              </div>
+            ))
+          )}
+        </div>
+      </ConsoleCard>
 
       <ConsoleCard>
         <h2 className="meta-label">Support notes</h2>

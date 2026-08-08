@@ -337,6 +337,14 @@ export class IdentityRepository {
       [tenantId],
     );
 
+    const membersResult = await this.db.query<{ email: string; role: UserRole; created_at: string }>(
+      `select email, role, created_at::text as created_at
+       from identity.users
+       where tenant_id = $1
+       order by created_at asc`,
+      [tenantId],
+    );
+
     return {
       id: tenant.id,
       name: tenant.name,
@@ -355,6 +363,7 @@ export class IdentityRepository {
         note: row.note,
         createdAt: row.created_at,
       })),
+      members: membersResult.rows.map((row) => ({ email: row.email, role: row.role, joinedAt: row.created_at })),
     };
   }
 

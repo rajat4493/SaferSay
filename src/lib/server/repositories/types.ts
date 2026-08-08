@@ -96,6 +96,8 @@ export type TenantDetail = {
     completionRate: number;
   } | null;
   supportNotes: TenantSupportNote[];
+  /** Real, accepted members only -- not pending invites (that's a tenant-side, not Owner-side, concern). */
+  members: Array<{ email: string; role: UserRole; joinedAt: string }>;
 };
 
 export type PlatformAttentionItem = {
