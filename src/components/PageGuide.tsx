@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Info } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 type GuideAction = {
   href: string;
@@ -21,30 +21,19 @@ export function PageGuide({
   actions?: GuideAction[];
 }) {
   return (
-    <section className="mb-5 rounded-[1.75rem] border border-[var(--brand-border)] bg-white/85 p-5 shadow-sm">
+    <section className="card mb-[9px]">
       <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
         <div className="max-w-3xl">
-          <div className="inline-flex items-center gap-2 rounded-full bg-[var(--brand-accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--brand-accent)]">
-            <Info size={14} />
-            {label}
-          </div>
-          <h2 className="mt-3 text-xl font-semibold">{title}</h2>
-          <p className="mt-2 text-sm leading-6 text-[var(--brand-muted)]">{body}</p>
+          <p className="meta-label">{label}</p>
+          <h2 className="section-title mt-2">{title}</h2>
+          <p className="mt-1.5 secondary-text">{body}</p>
         </div>
         {actions.length > 0 ? (
           <div className="flex flex-wrap gap-2">
             {actions.map((action) => (
-              <Link
-                key={action.href}
-                href={action.href}
-                className={`inline-flex h-11 items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold ${
-                  action.primary
-                    ? "bg-[var(--brand-ink)] text-white"
-                    : "border border-[var(--brand-border)] bg-white text-[var(--brand-ink)]"
-                }`}
-              >
+              <Link key={action.href} href={action.href} className={action.primary ? "btn-primary btn-pill" : "btn-secondary btn-pill"}>
                 {action.label}
-                <ArrowRight size={15} />
+                <ArrowRight size={14} strokeWidth={1.8} />
               </Link>
             ))}
           </div>

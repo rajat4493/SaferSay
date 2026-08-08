@@ -80,50 +80,36 @@ export function EmployeeDirectory({ refreshKey = 0 }: { refreshKey?: number }) {
   }
 
   return (
-    <Card className="mt-4">
+    <Card className="mt-[9px]">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
-          <h2 className="text-xl font-semibold">Employee directory</h2>
-          <p className="mt-1 text-sm text-[var(--brand-muted)]">
+          <h2 className="section-title">Employee directory</h2>
+          <p className="mt-1 secondary-text">
             {total} total, {activeCount} shown active. Search, deactivate, or reactivate people here.
           </p>
         </div>
         <div className="relative">
-          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--brand-muted)]" />
+          <Search size={14} strokeWidth={1.8} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--ink-faint)]" />
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search name, email, or team"
-            className="h-10 w-full rounded-[var(--radius-pill)] border border-[var(--brand-border)] bg-white pl-9 pr-4 text-sm outline-none focus:border-[var(--brand-accent)] sm:w-64"
+            className="admin-input h-9 w-full pl-8 sm:w-64"
           />
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-dashed border-[var(--brand-border)] bg-[var(--brand-bg)] p-3">
-        <input
-          value={newEmail}
-          onChange={(event) => setNewEmail(event.target.value)}
-          placeholder="new.person@company.com"
-          className="h-9 min-w-0 flex-1 rounded-[var(--radius-pill)] border border-[var(--brand-border)] bg-white px-3 text-sm outline-none focus:border-[var(--brand-accent)]"
-        />
-        <input
-          value={newName}
-          onChange={(event) => setNewName(event.target.value)}
-          placeholder="Name (optional)"
-          className="h-9 min-w-0 flex-1 rounded-[var(--radius-pill)] border border-[var(--brand-border)] bg-white px-3 text-sm outline-none focus:border-[var(--brand-accent)]"
-        />
-        <button
-          onClick={addPerson}
-          disabled={adding || !newEmail.trim()}
-          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[var(--radius-pill)] bg-[var(--brand-ink)] px-4 text-xs font-semibold text-white disabled:opacity-50"
-        >
-          <Plus size={13} />
+      <div className="mt-4 flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-dashed border-[var(--border)] bg-[var(--bg)] p-3">
+        <input value={newEmail} onChange={(event) => setNewEmail(event.target.value)} placeholder="new.person@company.com" className="admin-input h-9 min-w-0 flex-1" />
+        <input value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="Name (optional)" className="admin-input h-9 min-w-0 flex-1" />
+        <button onClick={addPerson} disabled={adding || !newEmail.trim()} className="btn-primary h-9 shrink-0">
+          <Plus size={13} strokeWidth={1.8} />
           {adding ? "Adding..." : "Add person"}
         </button>
-        {addStatus ? <p className="w-full text-xs font-semibold text-[var(--brand-muted)]">{addStatus}</p> : null}
+        {addStatus ? <p className="w-full secondary-text font-medium">{addStatus}</p> : null}
       </div>
 
-      <div className="mt-4 max-h-96 overflow-auto rounded-2xl border border-[var(--brand-border)] bg-white">
+      <div className="mt-4 max-h-96 overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-white">
         {loading ? (
           <>
             <SkeletonRow />
@@ -131,16 +117,13 @@ export function EmployeeDirectory({ refreshKey = 0 }: { refreshKey?: number }) {
             <SkeletonRow />
           </>
         ) : employees.length === 0 ? (
-          <p className="p-4 text-sm text-[var(--brand-muted)]">No employees match this search.</p>
+          <p className="p-4 secondary-text">No employees match this search.</p>
         ) : (
           employees.map((employee) => (
-            <div
-              key={employee.id}
-              className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-[var(--brand-border)] p-3 text-sm last:border-b-0"
-            >
+            <div key={employee.id} className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-[var(--border)] p-3 text-[13px] last:border-b-0">
               <div>
-                <div className="font-semibold">{employee.name || employee.email}</div>
-                <div className="text-[var(--brand-muted)]">
+                <div className="font-medium text-[var(--ink)]">{employee.name || employee.email}</div>
+                <div className="text-[var(--ink-mid)]">
                   {employee.email}
                   {employee.team ? ` · ${employee.team}` : ""}
                   {employee.location ? ` · ${employee.location}` : ""}
@@ -148,19 +131,15 @@ export function EmployeeDirectory({ refreshKey = 0 }: { refreshKey?: number }) {
               </div>
               <div className="flex items-center gap-2">
                 <span
-                  className={`rounded-[var(--radius-pill)] px-2.5 py-1 text-xs font-semibold ${
+                  className={`rounded-[var(--radius-pill)] border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] ${
                     employee.employmentStatus === "active"
-                      ? "bg-[var(--brand-accent-soft)] text-[var(--brand-accent)]"
-                      : "bg-[var(--brand-border)] text-[var(--brand-muted)]"
+                      ? "border-[var(--green-border)] bg-[var(--green-bg)] text-[var(--green)]"
+                      : "border-[var(--border)] bg-[var(--bg-active)] text-[var(--ink-mid)]"
                   }`}
                 >
                   {employee.employmentStatus}
                 </span>
-                <button
-                  onClick={() => toggleStatus(employee)}
-                  disabled={updatingId === employee.id}
-                  className="rounded-[var(--radius-pill)] border border-[var(--brand-border)] bg-white px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
-                >
+                <button onClick={() => toggleStatus(employee)} disabled={updatingId === employee.id} className="btn-secondary px-3 py-1.5 text-xs">
                   {employee.employmentStatus === "active" ? "Deactivate" : "Reactivate"}
                 </button>
               </div>

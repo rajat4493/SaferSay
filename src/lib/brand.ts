@@ -1,62 +1,18 @@
+/**
+ * Workspace identity only -- name, tagline, logo. Color and font are no
+ * longer tenant-customizable: the admin surface uses one fixed token
+ * system (see globals.css) so the crisp, white, tool-register look is
+ * consistent everywhere. Per-tenant chrome recoloring was removed because
+ * it directly conflicted with that locked palette.
+ */
 export type BrandTheme = {
   name: string;
   tagline: string;
   logoDataUrl: string | null;
-  font: "Geist" | "Inter" | "System";
-  colors: {
-    background: string;
-    surface: string;
-    ink: string;
-    muted: string;
-    accent: string;
-    accentSoft: string;
-    border: string;
-  };
 };
 
 export const defaultBrand: BrandTheme = {
   name: "SaferSay",
   tagline: "Easy to start. Easy to leave. Easy to understand.",
   logoDataUrl: null,
-  font: "Geist",
-  colors: {
-    background: "#fbfaf7",
-    surface: "#ffffff",
-    ink: "#16241f",
-    muted: "#5f6e68",
-    accent: "#0e6e59",
-    accentSoft: "#e7f1ed",
-    border: "#eae6dd",
-  },
-};
-
-export const presetThemes: Record<string, BrandTheme["colors"]> = {
-  Violet: defaultBrand.colors,
-  Slate: {
-    background: "#f3f5f6",
-    surface: "#ffffff",
-    ink: "#101418",
-    muted: "#5d6670",
-    accent: "#2f5f86",
-    accentSoft: "#e4eef6",
-    border: "#dce3e8",
-  },
-  Coral: {
-    background: "#f8f2ef",
-    surface: "#fffaf7",
-    ink: "#1d1715",
-    muted: "#6b5d58",
-    accent: "#b4513e",
-    accentSoft: "#f5e2dc",
-    border: "#e8d9d2",
-  },
-  Graphite: {
-    background: "#f2f1ee",
-    surface: "#fbfbfa",
-    ink: "#151515",
-    muted: "#66625d",
-    accent: "#3f3f46",
-    accentSoft: "#e8e7e3",
-    border: "#dedbd4",
-  },
 };

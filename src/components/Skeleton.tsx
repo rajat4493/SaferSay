@@ -1,14 +1,10 @@
 /**
- * Loading placeholders matching the Ink & Cream design tokens -- replaces
- * plain "Loading..." text (flagged repeatedly in the UX audit) with a
- * shape that previews the content about to arrive.
+ * Loading placeholders matching the admin token system -- replaces plain
+ * "Loading..." text with a shape that previews the content about to
+ * arrive.
  */
 export function SkeletonBlock({ className = "" }: { className?: string }) {
-  return (
-    <div
-      className={`animate-pulse rounded-[var(--radius-input)] bg-[var(--brand-line-soft)] motion-reduce:animate-none ${className}`}
-    />
-  );
+  return <div className={`animate-pulse rounded-[var(--radius-input)] bg-[var(--bg-active)] motion-reduce:animate-none ${className}`} />;
 }
 
 export function SkeletonText({ lines = 1, className = "" }: { lines?: number; className?: string }) {
@@ -23,9 +19,7 @@ export function SkeletonText({ lines = 1, className = "" }: { lines?: number; cl
 
 export function SkeletonCard({ className = "" }: { className?: string }) {
   return (
-    <div
-      className={`rounded-[var(--radius-card)] border border-[var(--brand-glass-border)] bg-[var(--brand-glass-strong)] p-5 shadow-[var(--shadow-soft)] ${className}`}
-    >
+    <div className={`card ${className}`}>
       <SkeletonBlock className="h-4 w-1/3" />
       <div className="mt-4">
         <SkeletonText lines={2} />
@@ -36,7 +30,7 @@ export function SkeletonCard({ className = "" }: { className?: string }) {
 
 export function SkeletonRow({ className = "" }: { className?: string }) {
   return (
-    <div className={`flex items-center gap-3 border-b border-[var(--brand-border)] p-3 last:border-b-0 ${className}`}>
+    <div className={`flex items-center gap-3 border-b border-[var(--border)] p-3 last:border-b-0 ${className}`}>
       <SkeletonBlock className="h-9 w-9 shrink-0 rounded-full" />
       <div className="flex-1 space-y-1.5">
         <SkeletonBlock className="h-3.5 w-1/3" />
@@ -49,8 +43,8 @@ export function SkeletonRow({ className = "" }: { className?: string }) {
 /** Small inline spinner + label used for button-progress text ("Sending..."). */
 export function InlineSpinnerRow({ label }: { label: string }) {
   return (
-    <p className="mt-4 flex items-center gap-2 text-sm font-semibold text-[var(--brand-muted)]">
-      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--brand-border)] border-t-[var(--brand-accent)] motion-reduce:animate-none" />
+    <p className="mt-4 flex items-center gap-2 secondary-text font-medium">
+      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--border)] border-t-[var(--ink)] motion-reduce:animate-none" />
       {label}...
     </p>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, Info, X } from "lucide-react";
+import { X } from "lucide-react";
 
 type ToastVariant = "success" | "error" | "info";
 
@@ -28,7 +28,8 @@ const ToastContext = createContext<ToastContextValue | null>(null);
  * App-wide toast notifications -- the "did it work" feedback the UX audit
  * flagged as missing (no success/error confirmation after saves, invite
  * sends, imports). Mounted once in the root layout so every surface can
- * call useToast() without its own provider.
+ * call useToast() without its own provider. Plain text, no icons, action
+ * language -- "Survey created." not "Survey created successfully!"
  */
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -63,23 +64,21 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-const variantStyles: Record<ToastVariant, { icon: typeof CheckCircle2; classes: string }> = {
-  success: { icon: CheckCircle2, classes: "border-[var(--brand-accent-soft)] bg-[var(--brand-accent)] text-white" },
-  error: { icon: AlertTriangle, classes: "border-[#e3b3a8] bg-[#9a392d] text-white" },
-  info: { icon: Info, classes: "border-[var(--brand-border)] bg-[var(--brand-ink)] text-white" },
+const variantClasses: Record<ToastVariant, string> = {
+  success: "border-[var(--ink)] bg-[var(--ink)] text-white",
+  info: "border-[var(--ink)] bg-[var(--ink)] text-white",
+  error: "border-[var(--red-border)] bg-[var(--red-bg)] text-[var(--red)]",
 };
 
 function ToastCard({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }) {
-  const { icon: Icon, classes } = variantStyles[toast.variant];
   return (
     <div
       role="status"
-      className={`pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-[var(--radius-card)] border px-4 py-3 shadow-[var(--shadow-elevated)] ${classes}`}
+      className={`pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-[var(--radius-card)] border px-4 py-3 ${variantClasses[toast.variant]}`}
     >
-      <Icon size={18} className="mt-0.5 shrink-0" />
-      <p className="flex-1 text-sm font-semibold leading-5">{toast.message}</p>
-      <button onClick={onDismiss} aria-label="Dismiss notification" className="shrink-0 opacity-80 hover:opacity-100">
-        <X size={16} />
+      <p className="flex-1 text-[13px] font-medium leading-5">{toast.message}</p>
+      <button onClick={onDismiss} aria-label="Dismiss notification" className="shrink-0 opacity-70 hover:opacity-100">
+        <X size={15} strokeWidth={1.8} />
       </button>
     </div>
   );

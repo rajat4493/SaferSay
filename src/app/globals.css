@@ -1,48 +1,74 @@
 @import "tailwindcss";
 
-/* Design tokens -- docs/strategy/SAFERSAY_DESIGN_SYSTEM.md §1.
-   Single source of truth for look & feel. Brand Studio overrides
-   --brand-bg/surface/ink/muted/accent/accent-soft/border/font per tenant
-   at runtime (see BrandProvider.tsx); everything else here (radius,
-   shadow, the amber attention color, typography scale) is platform-wide
-   and not tenant-customizable. */
+/* SAFERSAY DESIGN IMPLEMENTATION -- two surfaces, two registers.
+   Admin (behind login, HR/Owner): crisp white tool-register, Stripe/
+   Tally/Linear. Taker (/s/[token]): warm-gray moment-register, Oura/
+   iA Writer. They must never share a palette -- the contrast is
+   intentional. Admin tokens live at :root as the app-wide default;
+   the taker surface re-scopes the same variable NAMES to warm-gray
+   values inside .taker-surface, so taker components can use var(--bg),
+   var(--ink), etc. and automatically get the right register. */
 :root {
-  --background: #fbfaf7;
-  --foreground: #16241f;
+  --background: #f6f6f7;
+  --foreground: #0f0f0f;
 
-  /* Brand-overridable (defaults = SaferSay's own identity, src/lib/brand.ts) */
-  --brand-bg: #fbfaf7;
+  /* Admin token system -- fixed, not tenant-customizable. No other
+     colours belong in admin UI chrome. */
+  --bg: #f6f6f7;
+  --bg-subtle: #ededef;
+  --bg-faint: #fafafa; /* seal strip */
+  --bg-hover: #f5f5f5; /* nav / secondary-button hover fill */
+  --bg-active: #f0f0f0; /* nav active fill, progress/score track, dividers */
+  --ink: #0f0f0f;
+  --ink-hover: #262626; /* primary button hover */
+  --ink-mid: #525252;
+  --ink-soft: #737373;
+  --ink-faint: #a0a0a0;
+  --border: #e4e4e6;
+  --border-hover: #a0a0a0;
+  --green: #16a34a;
+  --green-bg: #f0fdf4;
+  --green-border: #bbf7d0;
+  --red: #ef4444;
+  --red-bg: #fef2f2;
+  --red-border: #fecaca;
+
+  --font-body: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  --radius-card: 8px;
+  --radius-input: 6px;
+  --radius-button: 6px;
+  --radius-shell: 8px;
+  --radius-pill: 100px;
+  --shadow-soft: none;
+  --shadow-elevated: none;
+
+  /* --brand-* aliases -- kept pointing at the new admin tokens so any
+     not-yet-swept component still renders correctly (no shadows, no
+     accent colour, tight radii) rather than breaking. Being removed
+     file by file; not meant as a long-term parallel system. */
+  --brand-bg: var(--bg);
   --brand-surface: #ffffff;
-  --brand-ink: #16241f;
-  --brand-muted: #5f6e68;
-  --brand-accent: #0e6e59;
-  --brand-accent-soft: #e7f1ed;
-  --brand-border: #eae6dd;
-  --brand-font: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-
-  /* Platform-wide, not brand-customizable */
-  --brand-accent-deep: #0a5344;
-  --brand-ink-faint: #8a968f;
-  --brand-line-soft: #f1eee7;
-  --brand-amber: #b4701f;
-  --brand-amber-soft: #f8eedd;
+  --brand-ink: var(--ink);
+  --brand-muted: var(--ink-mid);
+  --brand-accent: var(--ink);
+  --brand-accent-deep: var(--ink-hover);
+  --brand-accent-soft: var(--bg-active);
+  --brand-border: var(--border);
+  --brand-ink-faint: var(--ink-faint);
+  --brand-line-soft: var(--bg-hover);
+  --brand-amber: var(--red);
+  --brand-amber-soft: var(--red-bg);
+  --brand-font: var(--font-body);
+  --brand-glass-surface: #ffffff;
+  --brand-glass-border: var(--border);
+  --brand-glass-strong: #ffffff;
+  /* --font-display still resolves to Bricolage (loaded in layout.tsx) --
+     the public landing page (out of scope for this directive) uses it for
+     its hero headline. Admin/taker components stop referencing
+     --font-display directly instead of removing the font here, so the
+     landing page is unaffected. */
   --font-display: var(--font-bricolage), var(--font-inter), ui-sans-serif, sans-serif;
-
-  /* Flat white cards with a hairline border, per the design system's
-     "Tally-clean restraint" -- not glassmorphism. Kept as CSS vars (rather
-     than rewriting every consuming className) so existing backdrop-blur
-     classes become inert on an opaque surface instead of needing removal. */
-  --brand-glass-surface: var(--brand-surface);
-  --brand-glass-border: var(--brand-border);
-  --brand-glass-strong: var(--brand-surface);
-
-  --shadow-soft: 0 1px 2px rgba(22, 36, 31, 0.04);
-  --shadow-elevated: 0 12px 30px -18px rgba(22, 36, 31, 0.28);
-  --radius-card: 1rem;
-  --radius-input: 0.6875rem;
-  --radius-button: 0.625rem;
-  --radius-shell: 1.25rem;
-  --radius-pill: 999px;
 }
 
 @theme inline {
@@ -53,9 +79,9 @@
 }
 
 body {
-  background: var(--brand-bg);
-  color: var(--brand-ink);
-  font-family: var(--brand-font);
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
 }
 
 button {
@@ -63,13 +89,315 @@ button {
 }
 
 ::selection {
-  background: var(--brand-accent-soft);
-  color: var(--brand-ink);
+  background: var(--bg-active);
+  color: var(--ink);
 }
 
 :focus-visible {
-  outline: 2px solid var(--brand-accent);
+  outline: 2px solid var(--ink);
   outline-offset: 2px;
+}
+
+input[type="range"],
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--ink);
+}
+
+/* ---- Admin type scale ---- */
+.page-title {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.4px;
+  line-height: 1.15;
+  color: var(--ink);
+}
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  line-height: 1.2;
+  color: var(--ink);
+}
+.secondary-text {
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--ink-mid);
+}
+.meta-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  line-height: 1.4;
+}
+.label-text {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  line-height: 1.4;
+}
+.data-number {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+/* ---- Admin components ---- */
+.card {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 18px 20px;
+}
+.card-interactive {
+  transition: border-color 0.15s ease;
+}
+.card-interactive:hover {
+  border-color: var(--border-hover);
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--ink);
+  color: #ffffff;
+  border: 1px solid var(--ink);
+  border-radius: var(--radius-button);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 7px 15px;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.btn-primary:hover {
+  background: var(--ink-hover);
+  border-color: var(--ink-hover);
+}
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #ffffff;
+  color: var(--ink-mid);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-button);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 7px 15px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.btn-secondary:hover {
+  background: var(--bg-hover);
+  color: var(--ink);
+}
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn-destructive {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #ffffff;
+  color: var(--red);
+  border: 1px solid var(--red-border);
+  border-radius: var(--radius-button);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 7px 15px;
+  transition: background-color 0.15s ease;
+}
+.btn-destructive:hover {
+  background: var(--red-bg);
+}
+.btn-pill {
+  border-radius: var(--radius-pill);
+}
+
+.admin-input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-input);
+  background: #ffffff;
+  padding: 8px 12px;
+  font-size: 14px;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.admin-input:focus {
+  border-color: var(--ink-faint);
+}
+
+.live-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--green);
+  background: var(--green-bg);
+  border: 1px solid var(--green-border);
+  border-radius: var(--radius-pill);
+  padding: 4px 10px 4px 8px;
+}
+.live-dot {
+  position: relative;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+}
+.live-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--green);
+  animation: live-pulse 1.8s ease-out infinite;
+}
+@keyframes live-pulse {
+  0% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.4);
+  }
+}
+
+.seal-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--bg-faint);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 12px 14px;
+}
+
+.progress-track {
+  height: 4px;
+  background: var(--bg-active);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--ink);
+  border-radius: var(--radius-pill);
+}
+
+/* ---- Taker surface -- warm-gray, moment-register ----
+   Re-scopes the shared variable names, so taker components written
+   against var(--bg)/var(--ink)/etc. automatically render in the warm
+   register instead of admin's crisp white one. Never mixed with admin
+   chrome. */
+.taker-surface {
+  --bg: #f7f6f3;
+  --ink: #111110;
+  --ink-mid: #6b6860;
+  --ink-soft: #9b9890;
+  --border: #e2e0da;
+  --green: #1a7a55;
+  --green-bg: #f0f7f3;
+  --red: #c0392b;
+  --red-bg: #fdf0ef;
+  background: var(--bg);
+  color: var(--ink);
+  min-height: 100vh;
+}
+
+/* The iA Writer rule: chrome recedes, the question is the only thing
+   at full contrast. Non-negotiable per the design directive. */
+.taker-chrome {
+  opacity: 0.65;
+}
+
+.taker-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: border-color 0.15s ease, transform 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+.taker-option:hover {
+  border-color: #b8b5ad;
+  transform: translateX(2px);
+}
+.taker-option[data-selected="true"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #ffffff;
+}
+
+.taker-key-badge {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 600;
+}
+.taker-option[data-selected="true"] .taker-key-badge {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: var(--ink);
+}
+
+.taker-progress-track {
+  height: 2px;
+  background: var(--border);
+}
+.taker-progress-fill {
+  height: 100%;
+  background: var(--ink);
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes taker-question-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.taker-question-enter {
+  animation: taker-question-in 0.4s cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 
 @keyframes marquee {

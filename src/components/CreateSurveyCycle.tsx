@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDown, ArrowUp, Rocket, ShieldCheck } from "lucide-react";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import { surveyTemplates, type SurveyTemplate } from "@/lib/templates";
 import { useToast } from "@/components/ToastProvider";
 
@@ -84,53 +84,42 @@ export function CreateSurveyCycle({ templateSlug }: { templateSlug: string }) {
     setSubmitting(false);
 
     if (!response.ok || !result.cycle) {
-      const message = result.error ?? "Survey cycle could not be created.";
+      const message = result.error ?? "Survey could not be created.";
       setStatus(message);
       toast.show({ variant: "error", message });
       return;
     }
 
-    toast.show({
-      variant: "success",
-      message: `Survey created. ${result.cycle.tokensIssued} secure invite links prepared.`,
-    });
+    toast.show({ variant: "success", message: `Survey created. ${result.cycle.tokensIssued} secure invite links prepared.` });
     router.push(`/app/${result.cycle.cycleId}/send`);
   }
 
   return (
-    <div className="mt-5 rounded-3xl border border-[var(--brand-border)] bg-white/75 p-5">
+    <div className="card mt-[9px]">
       <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
         <div className="max-w-2xl">
-          <div className="inline-flex items-center gap-2 rounded-full bg-[var(--brand-accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--brand-accent)]">
-            <ShieldCheck size={14} />
-            Server-side launch prep
-          </div>
-          <h2 className="mt-3 text-xl font-semibold">Create draft cycle</h2>
-          <p className="mt-2 text-sm leading-6 text-[var(--brand-muted)]">
-            Creates a Supabase survey cycle from {template.name} and issues one secure token per active employee.
+          <p className="meta-label">Server-side launch prep</p>
+          <h2 className="section-title mt-2">Create draft cycle</h2>
+          <p className="mt-1.5 secondary-text">
+            Creates a survey cycle from {template.name} and issues one secure token per active employee.
           </p>
         </div>
-        <div className="grid gap-3 sm:grid-cols-[minmax(220px,1fr)_auto]">
+        <div className="grid gap-2 sm:grid-cols-[minmax(220px,1fr)_auto]">
           <input
             value={cycleName}
             onChange={(event) => setCycleName(event.target.value)}
             placeholder={`${template.name} - July pulse`}
-            className="h-11 rounded-full border border-[var(--brand-border)] bg-white px-4 text-sm outline-none focus:border-[var(--brand-accent)]"
+            className="admin-input"
           />
-          <button
-            onClick={createCycle}
-            disabled={submitting}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[var(--brand-ink)] px-5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Rocket size={16} />
+          <button onClick={createCycle} disabled={submitting} className="btn-primary">
             {submitting ? "Creating..." : "Create"}
           </button>
         </div>
       </div>
 
-      <div className="mt-5 border-t border-[var(--brand-border)] pt-5">
-        <h3 className="text-sm font-semibold">Customize questions ({includedCount} included)</h3>
-        <p className="mt-1 text-xs text-[var(--brand-muted)]">
+      <div className="mt-5 border-t border-[var(--border)] pt-5">
+        <h3 className="text-[14px] font-medium text-[var(--ink)]">Customize questions ({includedCount} included)</h3>
+        <p className="mt-1 secondary-text">
           Uncheck questions you don&apos;t need, edit wording, or reorder before creating the cycle. Leave everything as-is to use the
           template unchanged.
         </p>
@@ -138,24 +127,18 @@ export function CreateSurveyCycle({ templateSlug }: { templateSlug: string }) {
           {questions.map((question, index) => (
             <div
               key={question.id}
-              className={`flex items-start gap-3 rounded-2xl border p-3 text-sm ${
-                question.included ? "border-[var(--brand-border)] bg-white" : "border-[var(--brand-border)] bg-[var(--brand-bg)] opacity-60"
+              className={`flex items-start gap-3 rounded-[var(--radius-input)] border p-3 text-sm ${
+                question.included ? "border-[var(--border)] bg-white" : "border-[var(--border)] bg-[var(--bg)] opacity-60"
               }`}
             >
-              <input
-                type="checkbox"
-                checked={question.included}
-                onChange={() => toggleIncluded(index)}
-                className="mt-1 h-4 w-4"
-                aria-label={`Include question ${index + 1}`}
-              />
+              <input type="checkbox" checked={question.included} onChange={() => toggleIncluded(index)} className="mt-1 h-4 w-4" aria-label={`Include question ${index + 1}`} />
               <div className="flex-1">
-                <div className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--brand-muted)]">{question.construct}</div>
+                <div className="label-text">{question.construct}</div>
                 <input
                   value={question.text}
                   onChange={(event) => editText(index, event.target.value)}
                   disabled={!question.included}
-                  className="mt-1 w-full rounded-xl border border-transparent bg-transparent px-1 py-1 text-sm outline-none focus:border-[var(--brand-accent)] disabled:cursor-not-allowed"
+                  className="mt-1 w-full rounded-[var(--radius-input)] border border-transparent bg-transparent px-1 py-1 text-[14px] text-[var(--ink)] outline-none focus:border-[var(--border)] disabled:cursor-not-allowed"
                 />
               </div>
               <div className="flex flex-col gap-1">
@@ -163,19 +146,19 @@ export function CreateSurveyCycle({ templateSlug }: { templateSlug: string }) {
                   type="button"
                   onClick={() => move(index, -1)}
                   disabled={index === 0}
-                  className="rounded-full border border-[var(--brand-border)] p-1 disabled:cursor-not-allowed disabled:opacity-30"
+                  className="rounded-[var(--radius-input)] border border-[var(--border)] p-1 text-[var(--ink-mid)] hover:bg-[var(--bg-hover)] disabled:cursor-not-allowed disabled:opacity-30"
                   aria-label="Move question up"
                 >
-                  <ArrowUp size={14} />
+                  <ArrowUp size={13} strokeWidth={1.8} />
                 </button>
                 <button
                   type="button"
                   onClick={() => move(index, 1)}
                   disabled={index === questions.length - 1}
-                  className="rounded-full border border-[var(--brand-border)] p-1 disabled:cursor-not-allowed disabled:opacity-30"
+                  className="rounded-[var(--radius-input)] border border-[var(--border)] p-1 text-[var(--ink-mid)] hover:bg-[var(--bg-hover)] disabled:cursor-not-allowed disabled:opacity-30"
                   aria-label="Move question down"
                 >
-                  <ArrowDown size={14} />
+                  <ArrowDown size={13} strokeWidth={1.8} />
                 </button>
               </div>
             </div>
@@ -183,7 +166,7 @@ export function CreateSurveyCycle({ templateSlug }: { templateSlug: string }) {
         </div>
       </div>
 
-      {status ? <p className="mt-4 rounded-2xl bg-[var(--brand-bg)] p-3 text-sm font-semibold text-[var(--brand-muted)]">{status}</p> : null}
+      {status ? <p className="mt-4 rounded-[var(--radius-input)] bg-[var(--bg)] p-3 secondary-text font-medium">{status}</p> : null}
     </div>
   );
 }

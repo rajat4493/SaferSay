@@ -1,26 +1,32 @@
 /** Cycle status values from responses.survey_cycles (db/migrations/0001). */
 export type SurveyStatus = "draft" | "scheduled" | "open" | "closed";
 
-const statusConfig: Record<SurveyStatus, { label: string; classes: string; pulse?: boolean }> = {
-  draft: { label: "Draft", classes: "bg-[var(--brand-line-soft)] text-[var(--brand-muted)]" },
-  scheduled: { label: "Scheduled", classes: "bg-[var(--brand-amber-soft)] text-[var(--brand-amber)]" },
-  open: { label: "Live", classes: "bg-[var(--brand-accent-soft)] text-[var(--brand-accent)]", pulse: true },
-  closed: { label: "Closed", classes: "bg-[var(--brand-border)] text-[var(--brand-muted)]" },
+const neutralLabels: Record<Exclude<SurveyStatus, "open">, string> = {
+  draft: "Draft",
+  scheduled: "Scheduled",
+  closed: "Closed",
 };
 
+/**
+ * Green is reserved for the live survey state only (design directive:
+ * "Live status tag: Green only... Used only for live survey state").
+ * Every other status is a plain neutral pill -- no amber, no other
+ * colour in admin chrome.
+ */
 export function SurveyStatusBadge({ status, className = "" }: { status: string; className?: string }) {
-  const config = statusConfig[status as SurveyStatus] ?? { label: status, classes: "bg-[var(--brand-line-soft)] text-[var(--brand-muted)]" };
+  if (status === "open") {
+    return (
+      <span className={`live-tag ${className}`}>
+        <span className="live-dot" />
+        Live
+      </span>
+    );
+  }
+
+  const label = neutralLabels[status as Exclude<SurveyStatus, "open">] ?? status;
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] px-2.5 py-1 text-xs font-semibold ${config.classes} ${className}`}
-    >
-      {config.pulse ? (
-        <span className="relative flex h-1.5 w-1.5">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--brand-accent)] opacity-75 motion-reduce:animate-none" />
-          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[var(--brand-accent)]" />
-        </span>
-      ) : null}
-      {config.label}
+    <span className={`inline-flex items-center rounded-[var(--radius-pill)] bg-[var(--bg-active)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--ink-mid)] ${className}`}>
+      {label}
     </span>
   );
 }

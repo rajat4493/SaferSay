@@ -14,7 +14,9 @@ describe("real respondent survey flow", () => {
     const page = readFileSync("src/app/s/[token]/page.tsx", "utf8");
     expect(page).toContain("/api/respondent/session");
     expect(page).toContain("/api/respondent/submit");
-    expect(page).toContain("Your answers are stored separately from identity");
+    // Wise-style confidentiality screen copy (design directive) -- still
+    // asserts the same severed-storage claim, just the approved wording.
+    expect(page).toContain("stored completely separately from your identity");
   });
 
   it("keeps response submission behind the severed repository service", () => {

@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ChevronRight, Lock, Send } from "lucide-react";
+import { ArrowLeft, Lock, Send } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { ProtectedReportPanel } from "@/components/ProtectedReportPanel";
-import { SurveyStatusBadge } from "@/components/SurveyStatusBadge";
+import { SurveyStageTabs } from "@/components/SurveyStageTabs";
 import { useToast } from "@/components/ToastProvider";
 
 export default function SurveyResultsPage() {
@@ -82,54 +82,29 @@ export default function SurveyResultsPage() {
   }
 
   return (
-    <AppShell
-      title="Results"
-      subtitle="Aggregate, k-anonymity-protected insights from your survey responses."
-    >
-      <div className="space-y-6">
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <div className="flex items-center gap-2 rounded-[var(--radius-pill)] bg-[var(--brand-accent-soft)] px-3 py-1 font-semibold text-[var(--brand-accent)]">
-            Stage 3 of 3
-          </div>
-          {status ? <SurveyStatusBadge status={status} /> : null}
-          <ChevronRight size={16} className="text-[var(--brand-muted)]" />
-          <span className="text-[var(--brand-muted)]">Build</span>
-          <ChevronRight size={16} className="text-[var(--brand-muted)]" />
-          <span className="text-[var(--brand-muted)]">Send</span>
-          <ChevronRight size={16} className="text-[var(--brand-muted)]" />
-          <span className="font-semibold text-[var(--brand-accent)]">Results</span>
-        </div>
+    <AppShell title="Results" subtitle="Sealed — scores only, sources never">
+      <div className="space-y-[9px]">
+        <SurveyStageTabs active="Results" status={status ?? undefined} />
 
         <ProtectedReportPanel cycleId={surveyId} />
 
-        <div className="rounded-[var(--radius-card)] border border-[var(--brand-glass-border)] bg-[var(--brand-glass-strong)] p-6 shadow-[var(--shadow-soft)] backdrop-blur-xl">
-          <h2 className="text-lg font-semibold">Manage survey</h2>
-          <div className="mt-4 space-y-3">
-            <button
-              onClick={sendReminders}
-              disabled={sendingReminders || status === "closed"}
-              className="flex w-full items-center gap-2 rounded-[var(--radius-button)] border border-[var(--brand-line)] px-4 py-2 text-left text-sm font-medium transition hover:bg-[var(--brand-line-soft)] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Send size={15} />
+        <div className="card">
+          <h2 className="section-title">Manage survey</h2>
+          <div className="mt-4 space-y-2">
+            <button onClick={sendReminders} disabled={sendingReminders || status === "closed"} className="btn-secondary w-full justify-start">
+              <Send size={14} strokeWidth={1.8} />
               {sendingReminders ? "Sending..." : "Send reminders to non-respondents"}
             </button>
-            <button
-              onClick={closeSurvey}
-              disabled={closing || status === "closed"}
-              className="flex w-full items-center gap-2 rounded-[var(--radius-button)] border border-[var(--brand-line)] px-4 py-2 text-left text-sm font-medium transition hover:bg-[var(--brand-amber-soft)] hover:text-[var(--brand-amber)] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Lock size={15} />
+            <button onClick={closeSurvey} disabled={closing || status === "closed"} className="btn-destructive w-full justify-start">
+              <Lock size={14} strokeWidth={1.8} />
               {status === "closed" ? "Survey closed" : closing ? "Closing..." : "Close survey & lock responses"}
             </button>
           </div>
         </div>
 
         <div className="flex justify-start">
-          <button
-            onClick={() => router.push("/app")}
-            className="inline-flex items-center gap-2 rounded-[var(--radius-button)] border border-[var(--brand-line)] px-5 py-2 text-sm font-semibold text-[var(--brand-ink)] transition hover:bg-[var(--brand-line-soft)]"
-          >
-            <ArrowLeft size={16} />
+          <button onClick={() => router.push("/app")} className="btn-secondary">
+            <ArrowLeft size={14} strokeWidth={1.8} />
             Back to surveys
           </button>
         </div>

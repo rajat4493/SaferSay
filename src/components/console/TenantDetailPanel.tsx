@@ -36,7 +36,7 @@ const planTiers: Array<{ value: "standard" | "growth" | "enterprise"; label: str
 const featureKeys: Array<{ key: string; label: string }> = [
   { key: "customQuestions", label: "Custom question editing" },
   { key: "csvManagerHierarchy", label: "Manager hierarchy import" },
-  { key: "brandStudio", label: "Brand Studio white-labeling" },
+  { key: "brandStudio", label: "Custom workspace branding" },
 ];
 
 export function TenantDetailPanel({ tenantId }: { tenantId: string }) {
@@ -93,31 +93,31 @@ export function TenantDetailPanel({ tenantId }: { tenantId: string }) {
   }
 
   if (tenant === undefined) {
-    return <p className="text-sm text-[var(--brand-muted)]">Loading tenant...</p>;
+    return <p className="secondary-text">Loading tenant...</p>;
   }
   if (tenant === null) {
-    return <p className="text-sm text-[var(--brand-muted)]">Tenant not found.</p>;
+    return <p className="secondary-text">Tenant not found.</p>;
   }
 
   return (
-    <div className="space-y-4">
-      <Link href="/console/tenants" className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--brand-muted)] hover:text-[var(--brand-ink)]">
-        <ArrowLeft size={15} />
+    <div className="space-y-[9px]">
+      <Link href="/console/tenants" className="inline-flex items-center gap-1.5 secondary-text font-medium hover:text-[var(--ink)]">
+        <ArrowLeft size={14} strokeWidth={1.8} />
         All tenants
       </Link>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{tenant.name}</h1>
-          <p className="text-sm text-[var(--brand-muted)]">/{tenant.slug}</p>
+          <h1 className="page-title">{tenant.name}</h1>
+          <p className="secondary-text">/{tenant.slug}</p>
         </div>
         <PlanBadge tier={tenant.planTier} />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-2.5 lg:grid-cols-2">
         <ConsoleCard>
-          <h2 className="text-sm font-semibold uppercase tracking-[0.08em] text-[var(--brand-muted)]">Metadata</h2>
-          <dl className="mt-3 space-y-2 text-sm">
+          <h2 className="meta-label">Metadata</h2>
+          <dl className="mt-3 space-y-2 text-[13px]">
             <Row label="Joined" value={formatDate(tenant.createdAt)} />
             <Row label="Primary contact" value={tenant.primaryContactEmail ?? "No owner user yet"} />
             <Row label="Data residency" value={tenant.dataResidencyRegion} />
@@ -126,35 +126,30 @@ export function TenantDetailPanel({ tenantId }: { tenantId: string }) {
         </ConsoleCard>
 
         <ConsoleCard>
-          <h2 className="text-sm font-semibold uppercase tracking-[0.08em] text-[var(--brand-muted)]">Survey activity</h2>
+          <h2 className="meta-label">Survey activity</h2>
           {tenant.latestCycle ? (
-            <dl className="mt-3 space-y-2 text-sm">
+            <dl className="mt-3 space-y-2 text-[13px]">
               <Row label="Latest survey" value={tenant.latestCycle.name} />
               <Row label="Status" value={tenant.latestCycle.status} />
-              <Row
-                label="Responses"
-                value={`${tenant.latestCycle.respondedCount} of ${tenant.latestCycle.participantCount} responded`}
-              />
+              <Row label="Responses" value={`${tenant.latestCycle.respondedCount} of ${tenant.latestCycle.participantCount} responded`} />
               <Row label="Completion rate" value={`${Math.round(tenant.latestCycle.completionRate * 100)}%`} />
             </dl>
           ) : (
-            <p className="mt-3 text-sm text-[var(--brand-muted)]">No survey created yet.</p>
+            <p className="mt-3 secondary-text">No survey created yet.</p>
           )}
-          <p className="mt-4 text-xs text-[var(--brand-muted)]">Counts and rates only. No answers or reports are visible here.</p>
+          <p className="mt-4 text-xs text-[var(--ink-faint)]">Counts and rates only. No answers or reports are visible here.</p>
         </ConsoleCard>
 
         <ConsoleCard>
-          <h2 className="text-sm font-semibold uppercase tracking-[0.08em] text-[var(--brand-muted)]">Plan & features</h2>
+          <h2 className="meta-label">Plan &amp; features</h2>
           <div className="mt-3 flex gap-2">
             {planTiers.map((tier) => (
               <button
                 key={tier.value}
                 onClick={() => updatePlan(tier.value)}
                 disabled={savingPlan}
-                className={`flex-1 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
-                  tenant.planTier === tier.value
-                    ? "border-[var(--brand-ink)] bg-[var(--brand-ink)] text-white"
-                    : "border-[var(--brand-border)] bg-white text-[var(--brand-ink)]"
+                className={`flex-1 rounded-[var(--radius-input)] border px-3 py-2 text-[13px] font-medium transition ${
+                  tenant.planTier === tier.value ? "border-[var(--ink)] bg-[var(--ink)] text-white" : "border-[var(--border)] bg-white text-[var(--ink)] hover:bg-[var(--bg-hover)]"
                 }`}
               >
                 {tier.label}
@@ -163,69 +158,46 @@ export function TenantDetailPanel({ tenantId }: { tenantId: string }) {
           </div>
           <div className="mt-4 space-y-2">
             {featureKeys.map((feature) => (
-              <label key={feature.key} className="flex items-center justify-between rounded-xl border border-[var(--brand-border)] px-3 py-2 text-sm">
+              <label key={feature.key} className="flex items-center justify-between rounded-[var(--radius-input)] border border-[var(--border)] px-3 py-2 text-[13px] text-[var(--ink)]">
                 {feature.label}
-                <input
-                  type="checkbox"
-                  checked={Boolean(tenant.features[feature.key])}
-                  onChange={() => toggleFeature(feature.key)}
-                  disabled={savingPlan}
-                  className="h-4 w-4"
-                />
+                <input type="checkbox" checked={Boolean(tenant.features[feature.key])} onChange={() => toggleFeature(feature.key)} disabled={savingPlan} className="h-4 w-4" />
               </label>
             ))}
           </div>
 
-          <div className="mt-4 border-t border-[var(--brand-border)] pt-4">
-            <label className="text-sm font-semibold">Confidentiality threshold (min group size)</label>
+          <div className="mt-4 border-t border-[var(--border)] pt-4">
+            <label className="text-[13px] font-medium text-[var(--ink)]">Confidentiality threshold (min group size)</label>
             <div className="mt-2 flex items-center gap-3">
-              <input
-                type="range"
-                min={3}
-                max={10}
-                value={tenant.minGroupSize}
-                disabled={savingMinGroup}
-                onChange={(event) => updateMinGroup(Number(event.target.value))}
-                className="flex-1"
-              />
-              <span className="w-8 text-sm font-semibold">{tenant.minGroupSize}</span>
+              <input type="range" min={3} max={10} value={tenant.minGroupSize} disabled={savingMinGroup} onChange={(event) => updateMinGroup(Number(event.target.value))} className="flex-1" />
+              <span className="data-number w-8 text-[14px]">{tenant.minGroupSize}</span>
             </div>
-            <p className="mt-1 text-xs text-[var(--brand-muted)]">Floor of 3 enforced. Never disableable.</p>
+            <p className="mt-1 text-xs text-[var(--ink-faint)]">Floor of 3 enforced. Never disableable.</p>
           </div>
         </ConsoleCard>
 
         <ConsoleCard>
-          <h2 className="text-sm font-semibold uppercase tracking-[0.08em] text-[var(--brand-muted)]">Billing</h2>
-          <p className="mt-3 text-sm text-[var(--brand-muted)]">Stripe isn&apos;t connected yet — subscription status will appear here once billing is live.</p>
+          <h2 className="meta-label">Billing</h2>
+          <p className="mt-3 secondary-text">Stripe isn&apos;t connected yet — subscription status will appear here once billing is live.</p>
         </ConsoleCard>
       </div>
 
       <ConsoleCard>
-        <h2 className="text-sm font-semibold uppercase tracking-[0.08em] text-[var(--brand-muted)]">Support notes</h2>
-        <p className="mt-1 text-xs text-[var(--brand-muted)]">Operational notes only — never a path to this tenant&apos;s data.</p>
+        <h2 className="meta-label">Support notes</h2>
+        <p className="mt-1 text-xs text-[var(--ink-faint)]">Operational notes only — never a path to this tenant&apos;s data.</p>
         <div className="mt-3 flex gap-2">
-          <input
-            value={noteDraft}
-            onChange={(event) => setNoteDraft(event.target.value)}
-            placeholder="Add a note for this tenant..."
-            className="h-10 flex-1 rounded-xl border border-[var(--brand-border)] px-3 text-sm outline-none focus:border-[var(--brand-accent)]"
-          />
-          <button
-            onClick={submitNote}
-            disabled={addingNote || !noteDraft.trim()}
-            className="h-10 shrink-0 rounded-xl bg-[var(--brand-ink)] px-4 text-sm font-semibold text-white disabled:opacity-50"
-          >
+          <input value={noteDraft} onChange={(event) => setNoteDraft(event.target.value)} placeholder="Add a note for this tenant..." className="admin-input h-9 flex-1" />
+          <button onClick={submitNote} disabled={addingNote || !noteDraft.trim()} className="btn-primary shrink-0">
             Add
           </button>
         </div>
-        <div className="mt-4 space-y-3">
+        <div className="mt-4 space-y-2">
           {tenant.supportNotes.length === 0 ? (
-            <p className="text-sm text-[var(--brand-muted)]">No notes yet.</p>
+            <p className="secondary-text">No notes yet.</p>
           ) : (
             tenant.supportNotes.map((note) => (
-              <div key={note.id} className="rounded-xl border border-[var(--brand-border)] p-3 text-sm">
-                <p>{note.note}</p>
-                <p className="mt-1 text-xs text-[var(--brand-muted)]">
+              <div key={note.id} className="rounded-[var(--radius-input)] border border-[var(--border)] p-3 text-[13px]">
+                <p className="text-[var(--ink)]">{note.note}</p>
+                <p className="mt-1 text-xs text-[var(--ink-faint)]">
                   {note.authorEmail} · {formatRelative(note.createdAt)}
                 </p>
               </div>
@@ -240,8 +212,8 @@ export function TenantDetailPanel({ tenantId }: { tenantId: string }) {
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <dt className="text-[var(--brand-muted)]">{label}</dt>
-      <dd className="font-semibold">{value}</dd>
+      <dt className="text-[var(--ink-mid)]">{label}</dt>
+      <dd className="font-medium text-[var(--ink)]">{value}</dd>
     </div>
   );
 }

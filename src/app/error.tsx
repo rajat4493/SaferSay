@@ -17,23 +17,20 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
 
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
-      <div className="w-full max-w-md rounded-[var(--radius-card)] border border-[var(--brand-border)] bg-[var(--brand-surface)] p-8 text-center shadow-[var(--shadow-soft)]">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[var(--brand-amber-soft)] text-[var(--brand-amber)]">
-          <AlertTriangle size={22} />
+      <div className="card w-full max-w-md text-center">
+        <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[var(--red-bg)] text-[var(--red)]">
+          <AlertTriangle size={20} strokeWidth={1.8} />
         </div>
-        <h1 className="mt-4 text-xl font-semibold">Something went wrong</h1>
-        <p className="mt-2 text-sm leading-6 text-[var(--brand-muted)]">
+        <h1 className="page-title mt-4 text-[18px]">Something went wrong</h1>
+        <p className="mt-2 secondary-text">
           We hit an unexpected error. Nothing was lost -- try again, or reach us at{" "}
-          <a href="mailto:support@safersay.com" className="font-semibold text-[var(--brand-accent)] underline">
+          <a href="mailto:support@safersay.com" className="font-medium text-[var(--ink)] underline">
             support@safersay.com
           </a>{" "}
           if it keeps happening.
         </p>
-        {error.digest ? <p className="mt-3 text-xs text-[var(--brand-ink-faint)]">Reference: {error.digest}</p> : null}
-        <button
-          onClick={reset}
-          className="mt-6 inline-flex h-11 items-center justify-center rounded-[var(--radius-pill)] bg-[var(--brand-accent)] px-6 text-sm font-semibold text-white transition hover:bg-[var(--brand-accent-deep)]"
-        >
+        {error.digest ? <p className="mt-3 text-xs text-[var(--ink-faint)]">Reference: {error.digest}</p> : null}
+        <button onClick={reset} className="btn-primary mt-6">
           Try again
         </button>
       </div>

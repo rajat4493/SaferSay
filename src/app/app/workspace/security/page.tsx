@@ -15,28 +15,28 @@ export default function WorkspaceSecurityPage() {
   return (
     <AppShell title="Security & Confidentiality" subtitle="Plain-English controls for HR, with architecture guardrails for production.">
       <ConfidentialitySeal />
-      <div className="mt-5 grid gap-4 md:grid-cols-2">
+      <div className="grid gap-2.5 md:grid-cols-2">
         {controls.map(([title, text]) => (
           <Card key={title}>
-            <h2 className="text-xl font-semibold">{title}</h2>
-            <p className="mt-2 text-sm leading-6 text-[var(--brand-muted)]">{text}</p>
+            <h2 className="section-title">{title}</h2>
+            <p className="mt-2 secondary-text">{text}</p>
           </Card>
         ))}
       </div>
-      <Card className="mt-4">
-        <h2 className="text-xl font-semibold">Production safety status</h2>
-        <p className="mt-2 text-sm leading-6 text-[var(--brand-muted)]">
-          Local/mock mode is for development only. Production requires Supabase EU Postgres,
-          real auth, Stripe, Resend, token secret, and privacy contact configured.
+      <Card className="mt-[9px]">
+        <h2 className="section-title">Production safety status</h2>
+        <p className="mt-2 secondary-text">
+          Local/mock mode is for development only. Production requires Supabase EU Postgres, real auth, Stripe, Resend, token secret, and
+          privacy contact configured.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
-          <Link href="/app/workspace/go-live" className="rounded-full bg-[var(--brand-accent)] px-4 py-2 text-sm font-semibold text-white">
+          <Link href="/app/workspace/go-live" className="btn-primary">
             Check go-live readiness
           </Link>
-          <Link href="/privacy" className="rounded-full border border-[var(--brand-border)] bg-white px-4 py-2 text-sm font-semibold">
+          <Link href="/privacy" className="btn-secondary">
             Privacy notice
           </Link>
-          <Link href="/dpa" className="rounded-full border border-[var(--brand-border)] bg-white px-4 py-2 text-sm font-semibold">
+          <Link href="/dpa" className="btn-secondary">
             DPA placeholder
           </Link>
         </div>

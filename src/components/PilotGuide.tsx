@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { Check, Circle, RefreshCw } from "lucide-react";
 import { Card } from "@/components/AppShell";
+import { SkeletonText } from "@/components/Skeleton";
 
 type PilotState = {
   ok?: boolean;
@@ -38,32 +39,32 @@ export function PilotGuide({ compact = false }: { compact?: boolean }) {
     <Card>
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
         <div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-[var(--brand-accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--brand-accent)]">
-            First run
-          </div>
-          <h2 className="mt-3 text-xl font-semibold">Pilot guide</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--brand-muted)]">
-            Follow this checklist to run one real confidential survey from upload to safe report.
-          </p>
+          <p className="meta-label">First run</p>
+          <h2 className="section-title mt-2">Pilot guide</h2>
+          <p className="mt-1.5 max-w-2xl secondary-text">Follow this checklist to run one real confidential survey from upload to safe report.</p>
         </div>
-        <button onClick={load} className="inline-flex items-center gap-2 rounded-full border border-[var(--brand-border)] bg-white px-4 py-2 text-sm font-semibold">
-          <RefreshCw size={14} />
+        <button onClick={load} className="btn-secondary shrink-0">
+          <RefreshCw size={13} strokeWidth={1.8} />
           Refresh
         </button>
       </div>
 
-      {loading ? <p className="mt-5 text-sm font-semibold text-[var(--brand-muted)]">Checking pilot status...</p> : null}
-      {state?.error ? <p className="mt-5 text-sm font-semibold text-[#9a392d]">{state.error}</p> : null}
+      {loading ? (
+        <div className="mt-5">
+          <SkeletonText lines={2} />
+        </div>
+      ) : null}
+      {state?.error ? <p className="mt-5 secondary-text font-medium text-[var(--red)]">{state.error}</p> : null}
 
       {next ? (
-        <div className="mt-5 rounded-3xl border border-[var(--brand-border)] bg-white p-4">
-          <p className="text-xs font-semibold uppercase text-[var(--brand-muted)]">Next click</p>
+        <div className="mt-5 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--bg)] p-4">
+          <p className="meta-label">Next click</p>
           <div className="mt-2 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
             <div>
-              <h3 className="text-lg font-semibold">{next.label}</h3>
-              <p className="mt-1 text-sm text-[var(--brand-muted)]">{next.detail}</p>
+              <h3 className="text-[14px] font-medium text-[var(--ink)]">{next.label}</h3>
+              <p className="mt-1 secondary-text">{next.detail}</p>
             </div>
-            <Link href={next.href} className="rounded-full bg-[var(--brand-ink)] px-5 py-3 text-center text-sm font-semibold text-white">
+            <Link href={next.href} className="btn-primary btn-pill shrink-0 text-center">
               {next.action}
             </Link>
           </div>
@@ -71,17 +72,19 @@ export function PilotGuide({ compact = false }: { compact?: boolean }) {
       ) : null}
 
       {steps ? (
-        <div className="mt-5 grid gap-3">
+        <div className="mt-5 grid gap-2">
           {steps.map((step, index) => (
-            <Link key={step.key} href={step.href} className="grid gap-3 rounded-2xl border border-[var(--brand-border)] bg-white p-4 text-sm md:grid-cols-[32px_1fr_auto] md:items-center">
-              <div className={`grid h-8 w-8 place-items-center rounded-full ${step.done ? "bg-[var(--brand-accent-soft)] text-[var(--brand-accent)]" : "bg-[var(--brand-bg)] text-[var(--brand-muted)]"}`}>
-                {step.done ? <Check size={16} /> : <Circle size={14} />}
+            <Link key={step.key} href={step.href} className="card card-interactive grid gap-3 text-[13px] md:grid-cols-[28px_1fr_auto] md:items-center">
+              <div className={`grid h-7 w-7 place-items-center rounded-full ${step.done ? "border border-[var(--green-border)] bg-[var(--green-bg)] text-[var(--green)]" : "bg-[var(--bg)] text-[var(--ink-faint)]"}`}>
+                {step.done ? <Check size={14} strokeWidth={2} /> : <Circle size={12} strokeWidth={1.8} />}
               </div>
               <div>
-                <div className="font-semibold">{index + 1}. {step.label}</div>
-                <div className="mt-1 text-[var(--brand-muted)]">{step.detail}</div>
+                <div className="font-medium text-[var(--ink)]">
+                  {index + 1}. {step.label}
+                </div>
+                <div className="mt-1 text-[var(--ink-mid)]">{step.detail}</div>
               </div>
-              <span className="font-semibold text-[var(--brand-accent)]">{step.action}</span>
+              <span className="font-medium text-[var(--ink)]">{step.action}</span>
             </Link>
           ))}
         </div>

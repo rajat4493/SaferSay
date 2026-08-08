@@ -21,44 +21,42 @@ export function SettingsPanel() {
   }, []);
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold tracking-tight">Settings</h1>
+    <div className="space-y-[9px]">
+      <h1 className="page-title">Settings</h1>
 
       <ConsoleCard>
-        <h2 className="text-sm font-semibold uppercase tracking-[0.08em] text-[var(--brand-muted)]">Platform admins</h2>
+        <h2 className="meta-label">Platform admins</h2>
         {settings === undefined ? (
-          <p className="mt-3 text-sm text-[var(--brand-muted)]">Loading...</p>
+          <p className="mt-3 secondary-text">Loading...</p>
         ) : settings === null || settings.platformOwners.length === 0 ? (
-          <p className="mt-3 text-sm text-[var(--brand-muted)]">No SUPER_ADMIN_EMAILS configured.</p>
+          <p className="mt-3 secondary-text">No SUPER_ADMIN_EMAILS configured.</p>
         ) : (
-          <ul className="mt-3 space-y-1.5 text-sm">
+          <ul className="mt-3 space-y-1.5 text-[13px] text-[var(--ink)]">
             {settings.platformOwners.map((email) => (
-              <li key={email} className="rounded-xl border border-[var(--brand-border)] px-3 py-2">
+              <li key={email} className="rounded-[var(--radius-input)] border border-[var(--border)] px-3 py-2">
                 {email}
               </li>
             ))}
           </ul>
         )}
-        <p className="mt-3 text-xs text-[var(--brand-muted)]">
-          Managed via the SUPER_ADMIN_EMAILS environment variable — not yet editable from this screen.
-        </p>
+        <p className="mt-3 text-xs text-[var(--ink-faint)]">Managed via the SUPER_ADMIN_EMAILS environment variable — not yet editable from this screen.</p>
       </ConsoleCard>
 
       <ConsoleCard>
-        <h2 className="text-sm font-semibold uppercase tracking-[0.08em] text-[var(--brand-muted)]">Global config</h2>
+        <h2 className="meta-label">Global config</h2>
         {settings ? (
-          <dl className="mt-3 space-y-2 text-sm">
+          <dl className="mt-3 space-y-2 text-[13px]">
             <div className="flex items-center justify-between">
-              <dt className="text-[var(--brand-muted)]">Runtime mode</dt>
-              <dd className="font-semibold">{settings.runtimeMode}</dd>
+              <dt className="text-[var(--ink-mid)]">Runtime mode</dt>
+              <dd className="font-medium text-[var(--ink)]">{settings.runtimeMode}</dd>
             </div>
             <div className="flex items-center justify-between">
-              <dt className="text-[var(--brand-muted)]">Default data residency</dt>
-              <dd className="font-semibold">{settings.dataResidencyDefault}</dd>
+              <dt className="text-[var(--ink-mid)]">Default data residency</dt>
+              <dd className="font-medium text-[var(--ink)]">{settings.dataResidencyDefault}</dd>
             </div>
             <div className="flex items-center justify-between">
-              <dt className="text-[var(--brand-muted)]">Legal entity</dt>
-              <dd className="font-semibold">{settings.legalEntityName ?? "—"}</dd>
+              <dt className="text-[var(--ink-mid)]">Legal entity</dt>
+              <dd className="font-medium text-[var(--ink)]">{settings.legalEntityName ?? "—"}</dd>
             </div>
           </dl>
         ) : null}

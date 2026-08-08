@@ -1,8 +1,9 @@
 "use client";
 
-import { BarChart3, Building2, FileText, Home, MessageSquareText, ShieldCheck, Users } from "lucide-react";
+import { Building2, FileText, Home, Menu, MessageSquareText, Users, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { BrandMark } from "@/components/BrandMark";
 import { useBrand } from "@/components/BrandProvider";
 
@@ -17,59 +18,78 @@ const nav = [
 export function ViewerShell({ children, title, subtitle }: { children: React.ReactNode; title: string; subtitle: string }) {
   const pathname = usePathname();
   const { brand } = useBrand();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  const sidebarContent = (
+    <>
+      <div className="flex items-center justify-between px-4 pt-4 pb-3">
+        <Link href="/" className="flex items-center gap-2.5">
+          <BrandMark />
+          <div>
+            <span className="text-[14px] font-semibold leading-none text-[var(--ink)]">{brand.name}</span>
+            <p className="mt-0.5 text-[11px] text-[var(--ink-faint)]">Viewer portal</p>
+          </div>
+        </Link>
+        <button onClick={() => setMobileNavOpen(false)} aria-label="Close menu" className="text-[var(--ink-mid)] lg:hidden">
+          <X size={18} strokeWidth={1.8} />
+        </button>
+      </div>
+      <nav className="flex-1 px-2.5 py-2">
+        {nav.map((item) => {
+          const active = pathname === item.href;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={() => setMobileNavOpen(false)}
+              className={`flex items-center gap-2.5 rounded-[var(--radius-input)] px-2.5 py-[7px] text-[13px] transition ${
+                active ? "bg-[var(--bg-active)] font-medium text-[var(--ink)]" : "font-normal text-[var(--ink-mid)] hover:bg-[var(--bg-hover)] hover:text-[var(--ink)]"
+              }`}
+            >
+              <item.icon size={15} strokeWidth={1.8} />
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+      <div className="mt-auto border-t border-[var(--bg-active)] px-4 py-3">
+        <Link href="/app" className="secondary-text font-medium text-[var(--ink-mid)] hover:text-[var(--ink)]">
+          ← Back to admin
+        </Link>
+      </div>
+    </>
+  );
 
   return (
-    <main className="min-h-screen bg-[var(--brand-bg)] text-[var(--brand-ink)]">
-      <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-        <nav className="flex items-center justify-between rounded-full border border-white/80 bg-white/75 px-4 py-3 shadow-[0_20px_70px_rgba(22,22,22,0.08)]">
-          <Link href="/" className="flex items-center gap-3">
-            <BrandMark />
+    <div className="flex min-h-screen bg-[var(--bg)] text-[var(--ink)]">
+      <aside className="sticky top-0 hidden h-screen w-[200px] shrink-0 flex-col border-r border-[var(--border)] bg-white lg:flex">{sidebarContent}</aside>
+
+      {mobileNavOpen ? (
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setMobileNavOpen(false)} />
+          <aside className="absolute inset-y-0 left-0 flex w-[240px] flex-col border-r border-[var(--border)] bg-white">{sidebarContent}</aside>
+        </div>
+      ) : null}
+
+      <div className="flex-1 overflow-y-auto px-4 py-7 sm:px-6">
+        <div className="mx-auto max-w-5xl">
+          <div className="mb-6 flex items-start justify-between gap-3 border-b border-[var(--border)] pb-5">
             <div>
-              <div className="flex items-center gap-2">
-                <span className="font-semibold leading-none">{brand.name}</span>
-                <span className="inline-flex items-center rounded-[var(--radius-pill)] bg-[var(--brand-accent-soft)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--brand-accent)]">
-                  Viewer
-                </span>
-              </div>
-              <div className="mt-1 text-xs text-[var(--brand-muted)]">Manager / HRBP portal</div>
+              <p className="meta-label">Threshold-safe viewer access</p>
+              <h1 className="page-title mt-2">{title}</h1>
+              <p className="mt-1.5 secondary-text">{subtitle}</p>
             </div>
-          </Link>
-          <Link href="/app" className="rounded-full border border-[var(--brand-border)] bg-white px-4 py-2 text-sm font-semibold">Admin</Link>
-        </nav>
-
-        <div className="mt-5 grid gap-4 lg:grid-cols-[240px_1fr]">
-          <aside className="rounded-[2rem] border border-[var(--brand-border)] bg-white/70 p-3">
-            {nav.map((item) => {
-              const active = pathname === item.href;
-              return (
-                <Link key={item.href} href={item.href} className={`flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold ${active ? "bg-[var(--brand-accent-soft)] text-[var(--brand-accent)]" : "text-[var(--brand-muted)] hover:bg-white"}`}>
-                  <item.icon size={17} />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </aside>
-
-          <section className="rounded-[2rem] border border-white/80 bg-white/65 p-5 shadow-[0_35px_100px_rgba(22,22,22,0.12)]">
-            <div className="flex items-start justify-between gap-4 border-b border-[var(--brand-border)] pb-5">
-              <div>
-                <div className="inline-flex items-center gap-2 rounded-full bg-[var(--brand-accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--brand-accent)]">
-                  <ShieldCheck size={14} />
-                  Threshold-safe viewer access
-                </div>
-                <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em]">{title}</h1>
-                <p className="mt-2 text-sm leading-6 text-[var(--brand-muted)]">{subtitle}</p>
-              </div>
-              <BarChart3 className="hidden text-[var(--brand-accent)] sm:block" />
-            </div>
-            <div className="pt-5">{children}</div>
-          </section>
+            <button onClick={() => setMobileNavOpen(true)} aria-label="Open menu" className="mt-1 shrink-0 text-[var(--ink-mid)] lg:hidden">
+              <Menu size={18} strokeWidth={1.8} />
+            </button>
+          </div>
+          {children}
         </div>
       </div>
-    </main>
+    </div>
   );
 }
 
 export function ViewerCard({ children }: { children: React.ReactNode }) {
-  return <div className="rounded-3xl border border-[var(--brand-border)] bg-[var(--brand-surface)] p-5 shadow-sm">{children}</div>;
+  return <div className="card">{children}</div>;
 }

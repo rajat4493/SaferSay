@@ -16,7 +16,7 @@ type Settings = {
 const featureLabels: Record<string, string> = {
   customQuestions: "Custom question editing",
   csvManagerHierarchy: "Manager hierarchy import",
-  brandStudio: "Brand Studio white-labeling",
+  brandStudio: "Custom workspace branding",
 };
 
 export function TenantSettingsPanel() {
@@ -78,74 +78,62 @@ export function TenantSettingsPanel() {
 
   if (settings === undefined) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-[9px]">
         <SkeletonCard />
         <SkeletonCard />
       </div>
     );
   }
-  if (settings === null) return <p className="text-sm text-[var(--brand-muted)]">Couldn&apos;t load settings.</p>;
+  if (settings === null) return <p className="secondary-text">Couldn&apos;t load settings.</p>;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-[9px]">
       <Card>
-        <h2 className="text-xl font-semibold">Confidentiality threshold</h2>
-        <p className="mt-1 text-sm leading-6 text-[var(--brand-muted)]">
-          The minimum number of responses required before any group&apos;s results unlock. You can tune this within a safe range, but it can never go below 3 — that&apos;s the point at which &quot;confidential&quot; stops meaning anything.
+        <h2 className="section-title">Confidentiality threshold</h2>
+        <p className="mt-1.5 secondary-text">
+          The minimum number of responses required before any group&apos;s results unlock. You can tune this within a safe range, but it
+          can never go below 3 — that&apos;s the point at which &quot;confidential&quot; stops meaning anything.
         </p>
         <div className="mt-4 flex items-center gap-3">
-          <input
-            type="range"
-            min={3}
-            max={10}
-            value={settings.minGroupSize}
-            disabled={saving}
-            onChange={(event) => updateMinGroupSize(Number(event.target.value))}
-            className="flex-1"
-          />
-          <span className="w-10 text-lg font-semibold">{settings.minGroupSize}</span>
+          <input type="range" min={3} max={10} value={settings.minGroupSize} disabled={saving} onChange={(event) => updateMinGroupSize(Number(event.target.value))} className="flex-1" />
+          <span className="data-number w-10 text-[16px]">{settings.minGroupSize}</span>
         </div>
       </Card>
 
       <Card>
-        <h2 className="text-xl font-semibold">Plan & features</h2>
-        <p className="mt-1 text-sm text-[var(--brand-muted)] capitalize">Current plan: <span className="font-semibold">{settings.planTier}</span></p>
-        <div className="mt-3 space-y-1.5 text-sm">
+        <h2 className="section-title">Plan &amp; features</h2>
+        <p className="mt-1.5 secondary-text capitalize">
+          Current plan: <span className="font-semibold text-[var(--ink)]">{settings.planTier}</span>
+        </p>
+        <div className="mt-3 space-y-1.5 text-[13px]">
           {Object.entries(featureLabels).map(([key, label]) => (
-            <div key={key} className="flex items-center justify-between rounded-xl border border-[var(--brand-border)] px-3 py-2">
+            <div key={key} className="flex items-center justify-between rounded-[var(--radius-input)] border border-[var(--border)] px-3 py-2 text-[var(--ink)]">
               {label}
-              <span className={`text-xs font-semibold ${settings.features[key] ? "text-[var(--brand-accent)]" : "text-[var(--brand-muted)]"}`}>
+              <span className={`text-xs font-semibold ${settings.features[key] ? "text-[var(--green)]" : "text-[var(--ink-faint)]"}`}>
                 {settings.features[key] ? "Included" : "Not included"}
               </span>
             </div>
           ))}
         </div>
-        <p className="mt-3 text-xs text-[var(--brand-muted)]">
-          To change your plan or feature set, contact SaferSay — this is set by your account, not editable here.
-        </p>
+        <p className="mt-3 text-xs text-[var(--ink-faint)]">To change your plan or feature set, contact SaferSay — this is set by your account, not editable here.</p>
       </Card>
 
       <Card>
-        <h2 className="text-xl font-semibold">Branding</h2>
-        <p className="mt-1 text-sm text-[var(--brand-muted)]">Logo, name, and theme live in Brand Studio.</p>
-        <Link href="/app/brand" className="mt-3 inline-flex h-10 items-center rounded-[var(--radius-pill)] border border-[var(--brand-border)] bg-white px-4 text-sm font-semibold">
-          Open Brand Studio
+        <h2 className="section-title">Branding</h2>
+        <p className="mt-1.5 secondary-text">Workspace name, tagline, and logo live in Brand.</p>
+        <Link href="/app/brand" className="btn-secondary btn-pill mt-3">
+          Open Brand
         </Link>
       </Card>
 
       <Card>
-        <h2 className="text-xl font-semibold">Data export & deletion</h2>
-        <p className="mt-1 text-sm leading-6 text-[var(--brand-muted)]">
-          Your data is always exportable, never held hostage. Report exports are available from the Reports page once unlocked.
-        </p>
+        <h2 className="section-title">Data export &amp; deletion</h2>
+        <p className="mt-1.5 secondary-text">Your data is always exportable, never held hostage. Report exports are available from the Results tab once unlocked.</p>
         <div className="mt-4 flex flex-wrap gap-2">
-          <button onClick={exportEmployeesCsv} className="h-10 rounded-[var(--radius-pill)] border border-[var(--brand-border)] bg-white px-4 text-sm font-semibold">
+          <button onClick={exportEmployeesCsv} className="btn-secondary btn-pill">
             Export employee list (CSV)
           </button>
-          <a
-            href="mailto:privacy@safersay.com?subject=Account%20deletion%20request"
-            className="h-10 inline-flex items-center rounded-[var(--radius-pill)] border border-[var(--brand-border)] bg-white px-4 text-sm font-semibold"
-          >
+          <a href="mailto:privacy@safersay.com?subject=Account%20deletion%20request" className="btn-secondary btn-pill">
             Request account deletion
           </a>
         </div>

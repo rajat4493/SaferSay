@@ -20,7 +20,7 @@ const tiers = [
     value: "enterprise",
     label: "Enterprise",
     description: "For larger, white-labeled deployments.",
-    includes: ["Everything in Growth", "Brand Studio white-labeling", "Priority support"],
+    includes: ["Everything in Growth", "Custom workspace branding", "Priority support"],
   },
 ] as const;
 
@@ -42,27 +42,23 @@ export function PlansFeaturesPanel() {
   }, []);
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold tracking-tight">Plans & Features</h1>
-      <p className="text-sm text-[var(--brand-muted)]">
-        What each tier includes. Assign a tenant&apos;s plan and toggle individual features from that tenant&apos;s detail page.
-      </p>
+    <div className="space-y-[9px]">
+      <h1 className="page-title">Plans &amp; Features</h1>
+      <p className="secondary-text">What each tier includes. Assign a tenant&apos;s plan and toggle individual features from that tenant&apos;s detail page.</p>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-2.5 lg:grid-cols-3">
         {tiers.map((tier) => (
           <ConsoleCard key={tier.value}>
             <div className="flex items-center justify-between">
               <PlanBadge tier={tier.value} />
-              <span className="text-sm font-semibold text-[var(--brand-muted)]">
-                {distribution ? `${distribution[tier.value] ?? 0} tenants` : "…"}
-              </span>
+              <span className="secondary-text font-medium">{distribution ? `${distribution[tier.value] ?? 0} tenants` : "…"}</span>
             </div>
-            <h2 className="mt-3 text-lg font-semibold">{tier.label}</h2>
-            <p className="mt-1 text-sm text-[var(--brand-muted)]">{tier.description}</p>
-            <ul className="mt-4 space-y-1.5 text-sm">
+            <h2 className="section-title mt-3">{tier.label}</h2>
+            <p className="mt-1 secondary-text">{tier.description}</p>
+            <ul className="mt-4 space-y-1.5 text-[13px] text-[var(--ink-mid)]">
               {tier.includes.map((item) => (
                 <li key={item} className="flex items-start gap-2">
-                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-[var(--brand-ink)]" />
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-[var(--ink)]" />
                   {item}
                 </li>
               ))}

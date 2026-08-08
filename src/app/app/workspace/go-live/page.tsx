@@ -13,30 +13,36 @@ export default function WorkspaceGoLivePage() {
         title="Use this page before a real customer pilot"
         body="This is the production checklist. It tells you which secrets, services, and safety checks are configured before SaferSay is used with a real company."
       />
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-2.5 lg:grid-cols-3">
         <Card>
-          <h2 className="text-3xl font-semibold">{getRuntimeMode()}</h2>
-          <p className="text-sm text-[var(--brand-muted)]">Current runtime mode</p>
+          <div className="data-number">{getRuntimeMode()}</div>
+          <p className="secondary-text">Current runtime mode</p>
         </Card>
         <Card>
-          <h2 className="text-3xl font-semibold">{checks.length - missing.length}/{checks.length}</h2>
-          <p className="text-sm text-[var(--brand-muted)]">Required checks configured</p>
+          <div className="data-number">
+            {checks.length - missing.length}/{checks.length}
+          </div>
+          <p className="secondary-text">Required checks configured</p>
         </Card>
         <Card>
-          <h2 className="text-3xl font-semibold">{missing.length === 0 ? "Ready" : "Blocked"}</h2>
-          <p className="text-sm text-[var(--brand-muted)]">Production launch status</p>
+          <div className={`data-number ${missing.length === 0 ? "text-[var(--green)]" : "text-[var(--red)]"}`}>{missing.length === 0 ? "Ready" : "Blocked"}</div>
+          <p className="secondary-text">Production launch status</p>
         </Card>
       </div>
 
-      <div className="mt-5 grid gap-3">
+      <div className="mt-[9px] grid gap-2">
         {checks.map((check) => (
           <Card key={check.key}>
             <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
               <div>
-                <h2 className="text-lg font-semibold">{check.label}</h2>
-                <p className="mt-1 text-sm text-[var(--brand-muted)]">{check.purpose}</p>
+                <h2 className="text-[14px] font-medium text-[var(--ink)]">{check.label}</h2>
+                <p className="mt-1 secondary-text">{check.purpose}</p>
               </div>
-              <span className={`rounded-full px-3 py-1 text-sm font-semibold ${check.configured ? "bg-[var(--brand-accent-soft)] text-[var(--brand-accent)]" : "bg-[var(--brand-amber-soft)] text-[var(--brand-amber)]"}`}>
+              <span
+                className={`rounded-[var(--radius-pill)] border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] ${
+                  check.configured ? "border-[var(--green-border)] bg-[var(--green-bg)] text-[var(--green)]" : "border-[var(--red-border)] bg-[var(--red-bg)] text-[var(--red)]"
+                }`}
+              >
                 {check.configured ? "Configured" : "Placeholder"}
               </span>
             </div>

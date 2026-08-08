@@ -5,10 +5,12 @@ import {
   Bell,
   CreditCard,
   LayoutGrid,
+  Menu,
   Search,
   Settings,
   Sliders,
   Users,
+  X,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -32,76 +34,86 @@ export function OwnerConsoleShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [searchDraft, setSearchDraft] = useState("");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   function runSearch() {
     const query = searchDraft.trim();
     router.push(query ? `/console/tenants?q=${encodeURIComponent(query)}` : "/console/tenants");
   }
 
-  return (
-    <div className="min-h-screen bg-[var(--brand-bg)] text-[var(--brand-ink)]">
-      <div className="grid min-h-screen lg:grid-cols-[240px_1fr]">
-        <aside className="border-r border-[var(--brand-border)] bg-white/70 backdrop-blur-xl">
-          <div className="flex h-16 items-center gap-2 border-b border-[var(--brand-border)] px-5">
-            {/* Always the platform's own mark, never a tenant's Brand Studio logo -- this console is not white-labeled. */}
-            <Image src="/safersay-mark.svg" alt="SaferSay" width={28} height={28} className="rounded-[0.5rem]" />
-            <span className="text-sm font-semibold tracking-tight">SaferSay Console</span>
-          </div>
-          <nav className="space-y-1 p-3">
-            {navItems.map((item) => {
-              const active = pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
-                    active
-                      ? "bg-[var(--brand-ink)] text-white"
-                      : "text-[var(--brand-muted)] hover:bg-black/5"
-                  }`}
-                >
-                  <item.icon size={16} />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
-        </aside>
-
-        <div className="flex min-h-screen flex-col">
-          <header className="flex h-16 items-center justify-between gap-4 border-b border-[var(--brand-border)] bg-white/70 px-6 backdrop-blur-xl">
-            <div className="flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--brand-muted)]">
-              <span
-                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 ${
-                  environment === "Production"
-                    ? "bg-emerald-100 text-emerald-700"
-                    : "bg-amber-100 text-amber-700"
-                }`}
-              >
-                <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                {environment}
-              </span>
-            </div>
-            <div className="relative flex-1 max-w-md">
-              <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--brand-muted)]" />
-              <input
-                type="text"
-                value={searchDraft}
-                onChange={(event) => setSearchDraft(event.target.value)}
-                onKeyDown={(event) => event.key === "Enter" && runSearch()}
-                placeholder="Search tenants..."
-                className="h-9 w-full rounded-full border border-[var(--brand-border)] bg-white/80 pl-9 pr-3 text-sm text-[var(--brand-ink)] placeholder:text-[var(--brand-muted)]"
-              />
-            </div>
-            <div className="flex shrink-0 items-center gap-3">
-              <span className="rounded-full bg-[var(--brand-accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--brand-accent)]">
-                Owner
-              </span>
-              <SignOutButton />
-            </div>
-          </header>
-          <main className="flex-1 p-6">{children}</main>
+  const sidebarContent = (
+    <>
+      <div className="flex items-center justify-between px-4 pt-4 pb-3">
+        <div className="flex items-center gap-2.5">
+          {/* Always the platform's own mark, never a tenant's Brand Studio logo -- this console is not white-labeled. */}
+          <Image src="/safersay-mark.svg" alt="SaferSay" width={22} height={22} className="rounded-[6px]" />
+          <span className="text-[14px] font-semibold leading-none text-[var(--ink)]">Console</span>
         </div>
+        <button onClick={() => setMobileNavOpen(false)} aria-label="Close menu" className="text-[var(--ink-mid)] lg:hidden">
+          <X size={18} strokeWidth={1.8} />
+        </button>
+      </div>
+      <nav className="flex-1 px-2.5 py-2">
+        {navItems.map((item) => {
+          const active = pathname === item.href;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={() => setMobileNavOpen(false)}
+              className={`flex items-center gap-2.5 rounded-[var(--radius-input)] px-2.5 py-[7px] text-[13px] transition ${
+                active ? "bg-[var(--bg-active)] font-medium text-[var(--ink)]" : "font-normal text-[var(--ink-mid)] hover:bg-[var(--bg-hover)] hover:text-[var(--ink)]"
+              }`}
+            >
+              <item.icon size={15} strokeWidth={1.8} />
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+      <div className="mt-auto border-t border-[var(--bg-active)] px-4 py-3">
+        <p className="text-[11.5px] text-[var(--ink-faint)]">Owner</p>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="flex min-h-screen bg-[var(--bg)] text-[var(--ink)]">
+      <aside className="sticky top-0 hidden h-screen w-[200px] shrink-0 flex-col border-r border-[var(--border)] bg-white lg:flex">{sidebarContent}</aside>
+
+      {mobileNavOpen ? (
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setMobileNavOpen(false)} />
+          <aside className="absolute inset-y-0 left-0 flex w-[240px] flex-col border-r border-[var(--border)] bg-white">{sidebarContent}</aside>
+        </div>
+      ) : null}
+
+      <div className="flex min-h-screen flex-1 flex-col">
+        <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--border)] bg-white px-4 py-[11px] sm:gap-4 sm:px-6">
+          <button onClick={() => setMobileNavOpen(true)} aria-label="Open menu" className="shrink-0 text-[var(--ink-mid)] lg:hidden">
+            <Menu size={18} strokeWidth={1.8} />
+          </button>
+          <span
+            className={`hidden shrink-0 items-center gap-1.5 rounded-[var(--radius-pill)] border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] sm:inline-flex ${
+              environment === "Production" ? "border-[var(--green-border)] bg-[var(--green-bg)] text-[var(--green)]" : "border-[var(--border)] bg-[var(--bg-active)] text-[var(--ink-mid)]"
+            }`}
+          >
+            {environment}
+          </span>
+          <div className="relative max-w-md flex-1">
+            <Search size={14} strokeWidth={1.8} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--ink-faint)]" />
+            <input
+              type="text"
+              value={searchDraft}
+              onChange={(event) => setSearchDraft(event.target.value)}
+              onKeyDown={(event) => event.key === "Enter" && runSearch()}
+              placeholder="Search tenants..."
+              className="admin-input h-9 pl-8"
+            />
+          </div>
+          <SignOutButton />
+        </header>
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
       </div>
     </div>
   );

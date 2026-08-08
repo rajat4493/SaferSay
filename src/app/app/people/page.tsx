@@ -10,10 +10,7 @@ export default function PeoplePage() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   return (
-    <AppShell
-      title="People"
-      subtitle="Manage your employee directory. This page tracks identity and participation only — never response content."
-    >
+    <AppShell title="People" subtitle="Participation lives here. Answers do not.">
       <PageGuide
         label="Step 1"
         title="Load the people who should receive surveys"

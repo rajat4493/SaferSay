@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Upload, FileCheck2 } from "lucide-react";
+import { FileCheck2 } from "lucide-react";
 import { parseEmployeeCsv } from "@/lib/csvEmployees";
 
 const sampleCsv = `email,name,team,location
@@ -40,7 +40,7 @@ export function EmployeeCsvImport({ onImported }: { onImported?: () => void } = 
       setStatus(result.errors?.[0] ?? result.error ?? "Import failed.");
       return;
     }
-    setStatus(`${result.imported ?? 0} employees imported into the secure identity store.`);
+    setStatus(`${result.imported ?? 0} employees imported.`);
     onImported?.();
   }
 
@@ -51,21 +51,18 @@ export function EmployeeCsvImport({ onImported }: { onImported?: () => void } = 
   }
 
   return (
-    <div className="mt-5 rounded-3xl border border-[var(--brand-border)] bg-white/75 p-5">
+    <div className="card mt-[9px]">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
         <div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-[var(--brand-accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--brand-accent)]">
-            <Upload size={14} />
-            CSV import
-          </div>
-          <h2 className="mt-3 text-xl font-semibold">Load employees</h2>
-          <p className="mt-2 text-sm leading-6 text-[var(--brand-muted)]">Use columns: email, name, team, location.</p>
+          <p className="meta-label">CSV import</p>
+          <h2 className="section-title mt-2">Load employees</h2>
+          <p className="mt-1.5 secondary-text">Use columns: email, name, team, location.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button onClick={useSampleCsv} className="inline-flex h-11 items-center justify-center rounded-full border border-[var(--brand-border)] bg-white px-5 text-sm font-semibold">
+          <button onClick={useSampleCsv} className="btn-secondary">
             Use sample CSV
           </button>
-          <label className="inline-flex h-11 cursor-pointer items-center justify-center rounded-full bg-[var(--brand-ink)] px-5 text-sm font-semibold text-white">
+          <label className="btn-primary cursor-pointer">
             Choose CSV
             <input type="file" accept=".csv,text/csv" onChange={(event) => loadFile(event.target.files?.[0])} className="hidden" />
           </label>
@@ -73,46 +70,44 @@ export function EmployeeCsvImport({ onImported }: { onImported?: () => void } = 
       </div>
 
       {fileName ? (
-        <div className="mt-4 flex items-center gap-2 text-sm font-semibold text-[var(--brand-muted)]">
-          <FileCheck2 size={16} />
+        <div className="mt-4 flex items-center gap-2 secondary-text font-medium">
+          <FileCheck2 size={15} strokeWidth={1.8} />
           {fileName}
         </div>
       ) : null}
 
       {csv ? (
         <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_220px]">
-          <div className="overflow-hidden rounded-2xl border border-[var(--brand-border)] bg-white">
-            <div className="grid grid-cols-4 gap-3 border-b border-[var(--brand-border)] bg-[var(--brand-bg)] p-3 text-xs font-semibold uppercase text-[var(--brand-muted)]">
+          <div className="overflow-hidden rounded-[var(--radius-card)] border border-[var(--border)] bg-white">
+            <div className="grid grid-cols-4 gap-3 border-b border-[var(--border)] bg-[var(--bg)] p-3 meta-label">
               <span>Email</span>
               <span>Name</span>
               <span>Team</span>
               <span>Location</span>
             </div>
             {preview.employees.slice(0, 6).map((employee) => (
-              <div key={employee.email} className="grid grid-cols-4 gap-3 border-b border-[var(--brand-border)] p-3 text-sm last:border-b-0">
-                <span className="truncate font-semibold">{employee.email}</span>
-                <span className="truncate text-[var(--brand-muted)]">{employee.name ?? "-"}</span>
-                <span className="truncate text-[var(--brand-muted)]">{employee.team ?? "-"}</span>
-                <span className="truncate text-[var(--brand-muted)]">{employee.location ?? "-"}</span>
+              <div key={employee.email} className="grid grid-cols-4 gap-3 border-b border-[var(--border)] p-3 text-[13px] last:border-b-0">
+                <span className="truncate font-medium text-[var(--ink)]">{employee.email}</span>
+                <span className="truncate text-[var(--ink-mid)]">{employee.name ?? "-"}</span>
+                <span className="truncate text-[var(--ink-mid)]">{employee.team ?? "-"}</span>
+                <span className="truncate text-[var(--ink-mid)]">{employee.location ?? "-"}</span>
               </div>
             ))}
           </div>
-          <div className="rounded-2xl border border-[var(--brand-border)] bg-[var(--brand-bg)] p-4">
-            <div className="text-3xl font-semibold">{preview.employees.length}</div>
-            <p className="text-sm text-[var(--brand-muted)]">valid employees</p>
+          <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--bg)] p-4">
+            <div className="data-number">{preview.employees.length}</div>
+            <p className="secondary-text">valid employees</p>
             {preview.errors.length > 0 ? (
-              <div className="mt-3 space-y-2 text-sm font-semibold text-[#9a392d]">
-                {preview.errors.slice(0, 4).map((error) => <p key={error}>{error}</p>)}
+              <div className="mt-3 space-y-2 text-[13px] font-medium text-[var(--red)]">
+                {preview.errors.slice(0, 4).map((error) => (
+                  <p key={error}>{error}</p>
+                ))}
               </div>
             ) : null}
-            <button
-              disabled={!canImport || submitting}
-              onClick={importEmployees}
-              className="mt-4 w-full rounded-full bg-[var(--brand-accent)] px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#b8b0a6]"
-            >
+            <button disabled={!canImport || submitting} onClick={importEmployees} className="btn-primary mt-4 w-full">
               {submitting ? "Importing..." : "Import"}
             </button>
-            {status ? <p className="mt-3 text-sm font-semibold text-[var(--brand-muted)]">{status}</p> : null}
+            {status ? <p className="mt-3 secondary-text font-medium">{status}</p> : null}
           </div>
         </div>
       ) : null}

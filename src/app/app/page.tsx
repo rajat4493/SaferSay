@@ -67,60 +67,56 @@ export default function SurveysHome() {
   }, [mode]);
 
   if (mode === "loading") {
-    return <AppShell title="Surveys" subtitle=" "><div className="h-40" /></AppShell>;
+    return (
+      <AppShell title="Surveys" subtitle=" ">
+        <div className="h-40" />
+      </AppShell>
+    );
   }
 
   const liveSurvey = cycles?.find((cycle) => cycle.status === "open");
   const otherSurveys = cycles?.filter((cycle) => cycle.id !== liveSurvey?.id) ?? [];
 
   return (
-    <AppShell
-      title="Surveys"
-      subtitle="Your active and past surveys. Open one to manage invites, responses, and results."
-    >
+    <AppShell title="Surveys" subtitle="Your active and past surveys. Open one to manage invites, responses, and results.">
       <ConfidentialitySeal />
 
-      <div className="mt-8">
+      <div className="mt-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold">Create a new survey</h2>
-            <p className="mt-1 text-sm text-[var(--brand-muted)]">
-              Pick a template, customize questions, and send confidential invite links.
-            </p>
+            <h2 className="section-title">Create a new survey</h2>
+            <p className="mt-1 secondary-text">Pick a template, customize questions, and send confidential invite links.</p>
           </div>
-          <Link
-            href="/app/surveys/new"
-            className="inline-flex items-center gap-2 rounded-[var(--radius-button)] bg-[var(--brand-accent)] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[var(--brand-accent-deep)]"
-          >
-            <Plus size={16} />
+          <Link href="/app/surveys/new" className="btn-primary">
+            <Plus size={14} strokeWidth={1.8} />
             New survey
           </Link>
         </div>
       </div>
 
       {cycles === null ? (
-        <div className="mt-8 grid gap-4 md:grid-cols-2">
+        <div className="mt-6 grid gap-2.5 md:grid-cols-2">
           <SkeletonCard />
           <SkeletonCard />
         </div>
       ) : cycles.length === 0 ? (
-        <div className="mt-8">
-          <h2 className="text-lg font-semibold">Your surveys</h2>
-          <p className="mt-2 text-sm text-[var(--brand-muted)]">No surveys yet. Create your first survey to get started.</p>
+        <div className="mt-6">
+          <h2 className="section-title">Your surveys</h2>
+          <p className="mt-2 secondary-text">No surveys yet. Create your first survey to get started.</p>
         </div>
       ) : (
         <>
           {liveSurvey ? (
-            <div className="mt-8">
-              <h2 className="text-lg font-semibold">Live survey</h2>
-              <SurveyCard cycle={liveSurvey} featured className="mt-3" />
+            <div className="mt-6">
+              <h2 className="section-title">Live survey</h2>
+              <SurveyCard cycle={liveSurvey} featured className="mt-2.5" />
             </div>
           ) : null}
 
           {otherSurveys.length > 0 ? (
-            <div className="mt-8">
-              <h2 className="text-lg font-semibold">{liveSurvey ? "Past surveys" : "Your surveys"}</h2>
-              <div className="mt-3 space-y-2">
+            <div className="mt-6">
+              <h2 className="section-title">{liveSurvey ? "Past surveys" : "Your surveys"}</h2>
+              <div className="mt-2.5 space-y-2">
                 {otherSurveys.map((cycle) => (
                   <SurveyCard key={cycle.id} cycle={cycle} />
                 ))}
@@ -135,17 +131,14 @@ export default function SurveysHome() {
 
 function SurveyCard({ cycle, featured, className = "" }: { cycle: SurveyCycle; featured?: boolean; className?: string }) {
   return (
-    <Link
-      href={`/app/${cycle.id}`}
-      className={`block rounded-[var(--radius-card)] border border-[var(--brand-glass-border)] bg-[var(--brand-glass-strong)] p-5 shadow-[var(--shadow-soft)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-elevated)] ${className}`}
-    >
+    <Link href={`/app/${cycle.id}`} className={`card card-interactive block ${className}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h3 className={`truncate font-semibold ${featured ? "text-xl" : "text-base"}`}>{cycle.name}</h3>
+            <h3 className={`truncate ${featured ? "text-[16px] font-semibold" : "text-[14px] font-medium"} text-[var(--ink)]`}>{cycle.name}</h3>
             <SurveyStatusBadge status={cycle.status} />
           </div>
-          <p className="mt-1 text-sm text-[var(--brand-muted)]">
+          <p className="mt-1 secondary-text">
             {cycle.responseCount} {cycle.responseCount === 1 ? "response" : "responses"} · Created{" "}
             {new Date(cycle.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
           </p>
