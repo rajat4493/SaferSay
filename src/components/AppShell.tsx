@@ -150,9 +150,17 @@ export function AppShell({ children, title, subtitle }: { children: React.ReactN
       </nav>
 
       <div className="mt-auto border-t border-[var(--bg-active)] px-4 py-3">
-        <div className="truncate text-[13px] font-medium text-[var(--ink)]">{info?.tenantName ?? brand.name}</div>
-        <div className="mt-0.5">
-          <RoleTag />
+        <div className="flex items-center gap-2.5">
+          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--ink)] text-[11px] font-semibold text-white">
+            {(info?.tenantName ?? brand.name).slice(0, 1).toUpperCase()}
+          </div>
+          <div className="min-w-0">
+            <div className="truncate text-[13px] font-medium text-[var(--ink)]">{info?.tenantName ?? brand.name}</div>
+            <RoleTag />
+          </div>
+        </div>
+        <div className="mt-2.5">
+          <SignOutButton fullWidth />
         </div>
       </div>
     </>
@@ -183,13 +191,9 @@ export function AppShell({ children, title, subtitle }: { children: React.ReactN
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-3 sm:gap-4">
-            <Link href="/app/pilot" className="hidden secondary-text font-medium text-[var(--ink-mid)] hover:text-[var(--ink)] sm:inline">
+            <Link href="/app/pilot" className="secondary-text font-medium text-[var(--ink-mid)] hover:text-[var(--ink)]">
               First-run guide
             </Link>
-            <div className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full bg-[var(--ink)] text-[10px] font-semibold text-white">
-              {(info?.tenantName ?? brand.name).slice(0, 1).toUpperCase()}
-            </div>
-            <SignOutButton />
           </div>
         </header>
 
