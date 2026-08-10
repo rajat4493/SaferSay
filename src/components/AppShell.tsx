@@ -7,6 +7,7 @@ import {
   Lock,
   LockKeyhole,
   Menu,
+  ScrollText,
   Settings,
   UserPlus,
   Users,
@@ -21,13 +22,15 @@ import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import { RoleTag } from "@/components/RoleTag";
 import { SignOutButton } from "@/components/SignOutButton";
 import { useTenantSession } from "@/lib/useTenantSession";
-import { canAccessPeople, canAccessWorkspace } from "@/lib/permissions";
+import { canAccessAuditLog, canAccessPeople, canAccessSecurityProof, canAccessWorkspace } from "@/lib/permissions";
+import type { UserRole } from "@/lib/server/repositories/types";
 
 type NavItemConfig = {
   href: string;
   label: string;
   icon: typeof Home;
   hideForPureOwner?: boolean;
+  visible?: (role: UserRole) => boolean;
 };
 
 type NavGroupConfig = {
@@ -56,9 +59,19 @@ const navGroups: NavGroupConfig[] = [
     hideForPureOwner: true,
     items: [
       { href: "/app/workspace/settings", label: "Settings", icon: Settings, hideForPureOwner: true },
-      { href: "/app/workspace/security", label: "Security", icon: LockKeyhole, hideForPureOwner: true },
       { href: "/app/workspace/billing", label: "Billing", icon: CreditCard, hideForPureOwner: true },
       { href: "/app/workspace/team", label: "Team", icon: UserPlus, hideForPureOwner: true },
+    ],
+  },
+  {
+    // Not gated on Workspace access: auditor (Viewer) has security-proof and
+    // audit-log access per permissions.ts but no Workspace access. Security
+    // is a public page (/security), shown here as an in-app shortcut.
+    label: "Trust",
+    hideForPureOwner: true,
+    items: [
+      { href: "/security", label: "Security", icon: LockKeyhole, hideForPureOwner: true, visible: canAccessSecurityProof },
+      { href: "/app/audit-log", label: "Audit log", icon: ScrollText, hideForPureOwner: true, visible: canAccessAuditLog },
     ],
   },
 ];
@@ -87,7 +100,11 @@ export function AppShell({ children, title, subtitle }: { children: React.ReactN
     })
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => !(pureOwnerMode && item.hideForPureOwner)),
+      items: group.items.filter((item) => {
+        if (pureOwnerMode && item.hideForPureOwner) return false;
+        if (item.visible && info && !item.visible(info.role)) return false;
+        return true;
+      }),
     }))
     .filter((group) => group.items.length > 0);
 

@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from "crypto";
 import type { Queryable } from "@/lib/server/db/tenantPool";
 import { hashServerToken } from "@/lib/server/tokenHashing";
 import {
+  AuditLogRecord,
   CycleAction,
   EmployeeImportRecord,
   EmployeeRecord,
@@ -100,6 +101,39 @@ export class IdentityRepository {
     return Math.min(10, Math.max(3, configured));
   }
 
+  /** Operator-action audit trail for this tenant only -- never respondent data (see auditLog.ts's hard rule). */
+  async getAuditLogs(tenantId: string, limit = 100): Promise<AuditLogRecord[]> {
+    const result = await this.db.query<{
+      id: string;
+      actor_role: string;
+      actor_id: string;
+      action: string;
+      target_type: string | null;
+      target_id: string | null;
+      safe_counts: Record<string, number> | null;
+      details: string | null;
+      created_at: string;
+    }>(
+      `select id, actor_role, actor_id, action, target_type, target_id, safe_counts, details, created_at
+       from identity.audit_logs
+       where tenant_id = $1
+       order by created_at desc
+       limit $2`,
+      [tenantId, Math.min(500, Math.max(1, limit))],
+    );
+    return result.rows.map((row) => ({
+      id: row.id,
+      actorRole: row.actor_role,
+      actorId: row.actor_id,
+      action: row.action,
+      targetType: row.target_type,
+      targetId: row.target_id,
+      safeCounts: row.safe_counts,
+      details: row.details,
+      createdAt: row.created_at,
+    }));
+  }
+
   /** Whether this tenant has completed the guided first-run sequence. */
   async getFirstRunState(tenantId: string): Promise<boolean> {
     const result = await this.db.query<{ completed: boolean }>(
@@ -135,7 +169,7 @@ export class IdentityRepository {
     }>(
       `select id, tenant_id, email, role, invited_by_email, created_at
        from identity.pending_invites
-       where email = $1 and accepted_at is null
+       where lower(email) = lower($1) and accepted_at is null
        limit 1`,
       [email],
     );

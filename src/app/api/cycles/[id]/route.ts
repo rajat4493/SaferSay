@@ -3,11 +3,15 @@ import { getSessionContext } from "@/lib/server/authSession";
 import { withTenantScopedDb } from "@/lib/server/db/tenantPool";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import { ResponseRepository } from "@/lib/server/repositories/responseRepository";
+import { canViewSurveyResults } from "@/lib/permissions";
 
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await getSessionContext();
   if (!session) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
+  }
+  if (!canViewSurveyResults(session.role)) {
+    return NextResponse.json({ ok: false, error: "You don't have permission to view this survey." }, { status: 403 });
   }
 
   const { id: cycleId } = await context.params;

@@ -6,6 +6,8 @@ import { AppShell, Card } from "@/components/AppShell";
 import { CreateSurveyCycle } from "@/components/CreateSurveyCycle";
 import { PageGuide } from "@/components/PageGuide";
 import { surveyTemplates } from "@/lib/templates";
+import { canCreateSurvey } from "@/lib/permissions";
+import type { UserRole } from "@/lib/server/repositories/types";
 
 export default function NewSurveyPage() {
   const router = useRouter();
@@ -14,13 +16,20 @@ export default function NewSurveyPage() {
   const [, startTransition] = useTransition();
 
   useEffect(() => {
-    async function checkEmployees() {
+    async function checkAccess() {
+      const sessionResponse = await fetch("/api/tenants/current");
+      const sessionData = (await sessionResponse.json().catch(() => ({ ok: false }))) as { ok?: boolean; role?: UserRole };
+      if (sessionData.ok && !canCreateSurvey(sessionData.role as UserRole)) {
+        router.replace("/app");
+        return;
+      }
+
       const response = await fetch("/api/employees?limit=1");
       const data = (await response.json().catch(() => ({ ok: false }))) as { ok?: boolean; total?: number };
       if (data.ok && data.total === 0) router.replace("/app/people");
     }
     startTransition(() => {
-      void checkEmployees();
+      void checkAccess();
     });
   }, [router, startTransition]);
 

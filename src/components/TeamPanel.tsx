@@ -94,7 +94,7 @@ export function TeamPanel() {
   return (
     <Card className="mt-[9px]">
       <h2 className="section-title">Team</h2>
-      <p className="mt-1 secondary-text">Invite teammates by email and role. They get full access the moment they sign in with that email.</p>
+      <p className="mt-1 secondary-text">Invite teammates by email and role. They get that role&apos;s access the moment they sign in with that email.</p>
 
       <div className="mt-4 flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-dashed border-[var(--border)] bg-[var(--bg)] p-3">
         <input
@@ -151,6 +151,44 @@ export function TeamPanel() {
             </div>
           ))
         )}
+      </div>
+
+      <p className="mt-5 meta-label">What will they see?</p>
+      <div className="mt-2 overflow-x-auto rounded-[var(--radius-card)] border border-[var(--border)]">
+        <table className="w-full text-left text-[13px]">
+          <thead>
+            <tr className="border-b border-[var(--border)] text-[var(--ink-faint)]">
+              <th className="p-3 font-medium">Role</th>
+              <th className="p-3 font-medium">Surveys</th>
+              <th className="p-3 font-medium">People</th>
+              <th className="p-3 font-medium">Reports</th>
+              <th className="p-3 font-medium">Workspace</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="border-b border-[var(--border)] text-[var(--ink-mid)] last:border-b-0">
+              <td className="p-3 font-medium text-[var(--ink)]">HR Admin</td>
+              <td className="p-3">Full</td>
+              <td className="p-3">Full</td>
+              <td className="p-3">Full</td>
+              <td className="p-3">Full</td>
+            </tr>
+            <tr className="border-b border-[var(--border)] text-[var(--ink-mid)] last:border-b-0">
+              <td className="p-3 font-medium text-[var(--ink)]">Survey Creator</td>
+              <td className="p-3">Full</td>
+              <td className="p-3">Full</td>
+              <td className="p-3">Full</td>
+              <td className="p-3">—</td>
+            </tr>
+            <tr className="text-[var(--ink-mid)]">
+              <td className="p-3 font-medium text-[var(--ink)]">Viewer</td>
+              <td className="p-3">—</td>
+              <td className="p-3">—</td>
+              <td className="p-3">View only</td>
+              <td className="p-3">—</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </Card>
   );

@@ -3,10 +3,14 @@ import { getSessionContext, isPlatformOwnerImpersonating } from "@/lib/server/au
 import { withTenantScopedDb } from "@/lib/server/db/tenantPool";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import { ResponseRepository } from "@/lib/server/repositories/responseRepository";
+import { canRunSurvey, canViewSurveyResults } from "@/lib/permissions";
 
 export async function GET(request: NextRequest) {
   const session = await getSessionContext();
   if (!session) return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
+  if (!canViewSurveyResults(session.role)) {
+    return NextResponse.json({ ok: false, error: "You don't have permission to view this." }, { status: 403 });
+  }
 
   const cycleId = request.nextUrl.searchParams.get("cycleId");
   if (!cycleId) return NextResponse.json({ ok: false, error: "cycleId is required." }, { status: 400 });
@@ -20,6 +24,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const session = await getSessionContext();
   if (!session) return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
+  if (!canRunSurvey(session.role)) {
+    return NextResponse.json({ ok: false, error: "You don't have permission to commit to an action." }, { status: 403 });
+  }
 
   if (isPlatformOwnerImpersonating(session)) {
     return NextResponse.json({ ok: false, error: "Platform owners cannot act on tenant reports." }, { status: 403 });

@@ -2,11 +2,15 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getSessionContext } from "@/lib/server/authSession";
 import { withTenantScopedDb } from "@/lib/server/db/tenantPool";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
+import { canImportEmployees } from "@/lib/permissions";
 
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await getSessionContext();
   if (!session) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
+  }
+  if (!canImportEmployees(session.role)) {
+    return NextResponse.json({ ok: false, error: "You don't have permission to manage employees." }, { status: 403 });
   }
 
   const { id } = await context.params;

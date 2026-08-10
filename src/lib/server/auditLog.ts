@@ -1,3 +1,4 @@
+import { getDatabasePool } from "@/lib/server/db/pool";
 import type { UserRole } from "@/lib/server/repositories/types";
 
 /**
@@ -38,7 +39,9 @@ export type AuditLogAction =
   | "employee_removed"
   | "report_exported"
   | "threshold_changed"
-  | "settings_updated";
+  | "settings_updated"
+  | "team_invite_sent"
+  | "team_member_removed";
 
 export type AuditLogTargetType = "survey" | "workspace" | "people_list" | null;
 
@@ -133,23 +136,31 @@ export async function logAuditEvent(entry: AuditLogEntry): Promise<void> {
     }
   }
 
-  try {
-    // TODO: Insert into identity.audit_logs table via Supabase client
-    // const { error } = await supabase.from("audit_logs").insert({
-    //   tenant_id: entry.tenantId,
-    //   actor_role: entry.actorRole,
-    //   actor_id: entry.actorId,
-    //   action: entry.action,
-    //   target_type: entry.targetType || null,
-    //   target_id: entry.targetId || null,
-    //   safe_counts: entry.safeCounts || null,
-    // });
-    // if (error) throw error;
+  console.log(`[AUDIT] ${entry.actorRole} (${entry.actorId}): ${entry.action}`, {
+    target: entry.targetId ? `${entry.targetType}:${entry.targetId}` : "workspace",
+    counts: entry.safeCounts,
+  });
 
-    console.log(`[AUDIT] ${entry.actorRole} (${entry.actorId}): ${entry.action}`, {
-      target: entry.targetId ? `${entry.targetType}:${entry.targetId}` : "workspace",
-      counts: entry.safeCounts,
-    });
+  // No DATABASE_URL (local/mock mode): console line above is the only record.
+  const pool = getDatabasePool();
+  if (!pool) return;
+
+  try {
+    await pool.query(
+      `insert into identity.audit_logs
+         (tenant_id, actor_role, actor_id, action, target_type, target_id, safe_counts, details)
+       values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        entry.tenantId,
+        entry.actorRole,
+        entry.actorId,
+        entry.action,
+        entry.targetType ?? null,
+        entry.targetId ?? null,
+        entry.safeCounts ? JSON.stringify(entry.safeCounts) : null,
+        entry.details ?? null,
+      ],
+    );
   } catch (error) {
     console.error(`Audit log insertion failed: ${error}`);
     throw error;
@@ -273,5 +284,44 @@ export async function logSurveyClosed(
     action: "survey_closed",
     targetType: "survey",
     targetId: surveyId,
+  });
+}
+
+/**
+ * Helper: Log a team invite (role only -- never the invited email, which
+ * would trip validateDetailsNoPII and isn't an operator action anyway).
+ */
+export async function logTeamInviteSent(
+  tenantId: string,
+  actorRole: UserRole,
+  actorId: string,
+  invitedRole: UserRole
+): Promise<void> {
+  await logAuditEvent({
+    tenantId,
+    actorRole,
+    actorId,
+    action: "team_invite_sent",
+    targetType: "workspace",
+    details: `role: ${invitedRole}`,
+  });
+}
+
+/**
+ * Helper: Log a team member/invite removal (role only, same reasoning as above).
+ */
+export async function logTeamMemberRemoved(
+  tenantId: string,
+  actorRole: UserRole,
+  actorId: string,
+  removedRole: UserRole
+): Promise<void> {
+  await logAuditEvent({
+    tenantId,
+    actorRole,
+    actorId,
+    action: "team_member_removed",
+    targetType: "workspace",
+    details: `role: ${removedRole}`,
   });
 }

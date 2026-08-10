@@ -82,6 +82,16 @@ export function runtimeChecks(): RuntimeCheck[] {
       requiredForProduction: true,
       purpose: "GDPR privacy notice and DPA contact.",
     },
+    {
+      key: "SENTRY_DSN",
+      label: "Error monitoring",
+      configured: Boolean(process.env.SENTRY_DSN && process.env.NEXT_PUBLIC_SENTRY_DSN),
+      // Informational, not a hard gate -- the app already ran without it.
+      // Strongly recommended before real client data flows through, but
+      // shouldn't make assertProductionReady() start throwing retroactively.
+      requiredForProduction: false,
+      purpose: "Server and browser crash reporting, so you find out before a client does.",
+    },
   ];
 }
 

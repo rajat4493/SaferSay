@@ -4,6 +4,7 @@ import { withTenantScopedDb } from "@/lib/server/db/tenantPool";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import { sendQueuedInviteDeliveries } from "@/lib/server/resendDelivery";
 import { logInvitesSent, logRemindersSent } from "@/lib/server/auditLog";
+import { canRunSurvey } from "@/lib/permissions";
 
 /**
  * The Send tab's one-button action: prepare -> queue -> send-now in a
@@ -16,6 +17,9 @@ export async function POST(request: NextRequest) {
   const session = await getSessionContext();
   if (!session) {
     return NextResponse.json({ ok: false, error: "Unauthorized invite send access." }, { status: 401 });
+  }
+  if (!canRunSurvey(session.role)) {
+    return NextResponse.json({ ok: false, error: "You don't have permission to send invites." }, { status: 403 });
   }
 
   const body = (await request.json().catch(() => ({}))) as {

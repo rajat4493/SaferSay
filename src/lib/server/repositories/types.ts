@@ -31,6 +31,18 @@ export type PendingInviteRecord = {
   createdAt: string;
 };
 
+export type AuditLogRecord = {
+  id: string;
+  actorRole: string;
+  actorId: string;
+  action: string;
+  targetType: string | null;
+  targetId: string | null;
+  safeCounts: Record<string, number> | null;
+  details: string | null;
+  createdAt: string;
+};
+
 export type TeamMember = {
   id: string;
   email: string;

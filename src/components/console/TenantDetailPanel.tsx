@@ -56,16 +56,29 @@ export function TenantDetailPanel({ tenantId }: { tenantId: string }) {
   const [noteDraft, setNoteDraft] = useState("");
   const [addingNote, setAddingNote] = useState(false);
   const [entering, setEntering] = useState(false);
+  const [enterError, setEnterError] = useState("");
 
   async function enterWorkspace() {
     setEntering(true);
-    await fetch("/api/super-admin/switch", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ tenantId }),
-    });
-    router.push("/app");
-    router.refresh();
+    setEnterError("");
+    try {
+      const response = await fetch("/api/super-admin/switch", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ tenantId }),
+      });
+      const data = (await response.json().catch(() => ({ ok: false }))) as { ok?: boolean; error?: string };
+      if (!data.ok) {
+        setEnterError(data.error ?? "Couldn't enter that workspace.");
+        setEntering(false);
+        return;
+      }
+      router.push("/app");
+      router.refresh();
+    } catch {
+      setEnterError("Couldn't enter that workspace — check your connection and try again.");
+      setEntering(false);
+    }
   }
 
   function load() {
@@ -133,11 +146,14 @@ export function TenantDetailPanel({ tenantId }: { tenantId: string }) {
           <h1 className="page-title">{tenant.name}</h1>
           <p className="secondary-text">/{tenant.slug}</p>
         </div>
-        <div className="flex shrink-0 items-center gap-2.5">
-          <PlanBadge tier={tenant.planTier} />
-          <button onClick={enterWorkspace} disabled={entering} className="btn-secondary">
-            {entering ? "Entering..." : "Enter workspace →"}
-          </button>
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          <div className="flex items-center gap-2.5">
+            <PlanBadge tier={tenant.planTier} />
+            <button onClick={enterWorkspace} disabled={entering} className="btn-secondary">
+              {entering ? "Entering..." : "Enter workspace →"}
+            </button>
+          </div>
+          {enterError ? <p className="text-xs font-medium text-[var(--red)]">{enterError}</p> : null}
         </div>
       </div>
 

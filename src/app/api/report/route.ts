@@ -4,6 +4,7 @@ import { getDatabasePool } from "@/lib/server/db/pool";
 import { getTenantPool, withTenantContext } from "@/lib/server/db/tenantPool";
 import { ResponseRepository } from "@/lib/server/repositories/responseRepository";
 import { getProtectedServerReport } from "@/lib/serverStore";
+import { canViewSurveyResults } from "@/lib/permissions";
 
 /**
  * Reads a specific cycle's report when ?cycleId= is given (the
@@ -27,6 +28,9 @@ export async function GET(request: NextRequest) {
   const session = await getSessionContext();
   if (!session) {
     return NextResponse.json({ ok: false, error: "Unauthorized report access." }, { status: 401 });
+  }
+  if (!canViewSurveyResults(session.role)) {
+    return NextResponse.json({ ok: false, error: "You don't have permission to view reports." }, { status: 403 });
   }
 
   if (isPlatformOwnerImpersonating(session)) {

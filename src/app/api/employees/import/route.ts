@@ -4,11 +4,15 @@ import { getSessionContext } from "@/lib/server/authSession";
 import { withTenantScopedDb } from "@/lib/server/db/tenantPool";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import { logEmployeeImport } from "@/lib/server/auditLog";
+import { canImportEmployees } from "@/lib/permissions";
 
 export async function POST(request: NextRequest) {
   const session = await getSessionContext();
   if (!session) {
     return NextResponse.json({ ok: false, error: "Unauthorized employee import." }, { status: 401 });
+  }
+  if (!canImportEmployees(session.role)) {
+    return NextResponse.json({ ok: false, error: "You don't have permission to import employees." }, { status: 403 });
   }
 
   const body = (await request.json().catch(() => ({}))) as { csv?: string };

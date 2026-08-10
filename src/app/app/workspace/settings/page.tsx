@@ -9,7 +9,7 @@ export default function WorkspaceSettingsPage() {
         label="Workspace"
         title="Tune your confidentiality threshold and manage your data"
         body="This page never shows survey answers -- it configures the wall that protects them."
-        actions={[{ href: "/app/workspace/security", label: "How confidentiality works" }]}
+        actions={[{ href: "/security", label: "How confidentiality works" }]}
       />
       <div className="mt-[9px]">
         <TenantSettingsPanel />

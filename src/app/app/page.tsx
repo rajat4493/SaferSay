@@ -10,6 +10,8 @@ import { FirstRunGuide } from "@/components/FirstRunGuide";
 import { SkeletonCard } from "@/components/Skeleton";
 import { SurveyStatusBadge } from "@/components/SurveyStatusBadge";
 import { useToast } from "@/components/ToastProvider";
+import { canCreateSurvey } from "@/lib/permissions";
+import type { UserRole } from "@/lib/server/repositories/types";
 
 type ViewMode = "loading" | "surveys";
 
@@ -28,6 +30,7 @@ export default function SurveysHome() {
   const [mode, setMode] = useState<ViewMode>("loading");
   const [cycles, setCycles] = useState<SurveyCycle[] | null>(null);
   const [firstRunCompleted, setFirstRunCompleted] = useState(true);
+  const [canCreate, setCanCreate] = useState(false);
 
   useEffect(() => {
     fetch("/api/tenants/current")
@@ -45,6 +48,7 @@ export default function SurveysHome() {
           return;
         }
         setFirstRunCompleted(Boolean(data.firstRunCompleted));
+        setCanCreate(canCreateSurvey(data.role as UserRole));
         setMode("surveys");
       })
       .catch(() => setMode("surveys"));
@@ -84,20 +88,22 @@ export default function SurveysHome() {
     <AppShell title="Surveys" subtitle="Your active and past surveys. Open one to manage invites, responses, and results.">
       <ConfidentialitySeal />
 
-      {!firstRunCompleted ? <FirstRunGuide /> : null}
+      {!firstRunCompleted && canCreate ? <FirstRunGuide /> : null}
 
-      <div className="mt-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="section-title">Create a new survey</h2>
-            <p className="mt-1 secondary-text">Pick a template, customize questions, and send confidential invite links.</p>
+      {canCreate ? (
+        <div className="mt-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="section-title">Create a new survey</h2>
+              <p className="mt-1 secondary-text">Pick a template, customize questions, and send confidential invite links.</p>
+            </div>
+            <Link href="/app/surveys/new" className="btn-primary">
+              <Plus size={14} strokeWidth={1.8} />
+              New survey
+            </Link>
           </div>
-          <Link href="/app/surveys/new" className="btn-primary">
-            <Plus size={14} strokeWidth={1.8} />
-            New survey
-          </Link>
         </div>
-      </div>
+      ) : null}
 
       {cycles === null ? (
         <div className="mt-6 grid gap-2.5 md:grid-cols-2">
