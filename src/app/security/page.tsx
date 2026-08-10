@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { BackToAppLink } from "@/components/BackToAppLink";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
 
 // Public, unauthenticated by design -- an HR admin forwards this link
@@ -18,10 +17,7 @@ export default function SecurityPage() {
   return (
     <main className="min-h-screen bg-[var(--bg)] px-4 py-10 text-[var(--ink)] sm:px-6">
       <div className="mx-auto max-w-3xl">
-        <Link href="/" className="inline-flex items-center gap-1.5 secondary-text font-medium hover:text-[var(--ink)]">
-          <ArrowLeft size={14} strokeWidth={1.8} />
-          Back to SaferSay
-        </Link>
+        <BackToAppLink />
 
         <h1 className="page-title mt-4">How we protect your team&apos;s answers</h1>
         <p className="mt-1.5 secondary-text">Plain-English explanation for HR leads, DPOs, and employee representatives.</p>
