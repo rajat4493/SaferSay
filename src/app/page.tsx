@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { ArrowRight, EyeOff, Power, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { BrandMark } from "@/components/BrandMark";
@@ -9,6 +10,14 @@ const tickerItems = ["Easy to start.", "Easy to leave.", "Easy to understand.", 
 
 export default function Home() {
   const { brand } = useBrand();
+  const [signedIn, setSignedIn] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/tenants/current")
+      .then((response) => response.json())
+      .then((data: { ok?: boolean }) => setSignedIn(Boolean(data.ok)))
+      .catch(() => setSignedIn(false));
+  }, []);
 
   return (
     <main className="min-h-screen bg-[var(--brand-ink)] text-white">
@@ -21,8 +30,11 @@ export default function Home() {
               <div className="mt-1 text-xs text-white/60">{brand.tagline}</div>
             </div>
           </div>
-          <Link href="/login" className="rounded-[var(--radius-pill)] bg-white px-5 py-3 text-sm font-semibold text-[var(--brand-ink)]">
-            Login
+          <Link
+            href={signedIn ? "/app" : "/login"}
+            className="rounded-[var(--radius-pill)] bg-white px-5 py-3 text-sm font-semibold text-[var(--brand-ink)]"
+          >
+            {signedIn ? "Go to app" : "Login"}
           </Link>
         </nav>
 
