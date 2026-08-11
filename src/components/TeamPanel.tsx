@@ -17,16 +17,16 @@ type TeamMember = {
 };
 
 const roleLabels: Record<string, string> = {
-  customer_admin: "HR Admin",
-  survey_creator: "Survey Creator",
-  auditor: "Viewer",
+  customer_admin: "Workspace Owner",
+  survey_creator: "Survey Admin",
+  auditor: "Report Viewer",
   employee: "Employee",
 };
 
 const inviteRoles: Array<{ value: TeamRole; label: string }> = [
-  { value: "customer_admin", label: "HR Admin" },
-  { value: "survey_creator", label: "Survey Creator" },
-  { value: "auditor", label: "Viewer" },
+  { value: "customer_admin", label: "Workspace Owner" },
+  { value: "survey_creator", label: "Survey Admin" },
+  { value: "auditor", label: "Report Viewer" },
 ];
 
 export function TeamPanel() {
@@ -168,21 +168,21 @@ export function TeamPanel() {
           </thead>
           <tbody>
             <tr className="border-b border-[var(--border)] text-[var(--ink-mid)] last:border-b-0">
-              <td className="p-3 font-medium text-[var(--ink)]">HR Admin</td>
+              <td className="p-3 font-medium text-[var(--ink)]">Workspace Owner</td>
               <td className="p-3">Full</td>
               <td className="p-3">Full</td>
               <td className="p-3">Full</td>
               <td className="p-3">Full</td>
             </tr>
             <tr className="border-b border-[var(--border)] text-[var(--ink-mid)] last:border-b-0">
-              <td className="p-3 font-medium text-[var(--ink)]">Survey Creator</td>
+              <td className="p-3 font-medium text-[var(--ink)]">Survey Admin</td>
               <td className="p-3">Full</td>
               <td className="p-3">Full</td>
               <td className="p-3">Full</td>
               <td className="p-3">—</td>
             </tr>
             <tr className="text-[var(--ink-mid)]">
-              <td className="p-3 font-medium text-[var(--ink)]">Viewer</td>
+              <td className="p-3 font-medium text-[var(--ink)]">Report Viewer</td>
               <td className="p-3">View only</td>
               <td className="p-3">—</td>
               <td className="p-3">View only</td>

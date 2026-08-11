@@ -30,9 +30,9 @@ type TenantDetail = {
 };
 
 const roleLabels: Record<string, string> = {
-  customer_admin: "HR Admin",
-  survey_creator: "Survey Creator",
-  auditor: "Viewer",
+  customer_admin: "Workspace Owner",
+  survey_creator: "Survey Admin",
+  auditor: "Report Viewer",
   employee: "Employee",
 };
 

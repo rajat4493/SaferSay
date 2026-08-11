@@ -2,13 +2,19 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Calendar, FileEdit, Lock, Send } from "lucide-react";
+import { ArrowLeft, Calendar, CheckCircle2, FileEdit, Lock, Send } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { ProtectedReportPanel } from "@/components/ProtectedReportPanel";
 import { SurveyStageTabs } from "@/components/SurveyStageTabs";
 import { useToast } from "@/components/ToastProvider";
 
 type CycleSummary = { id: string; name: string };
+
+// Three states a survey's results page can be in -- the page framing
+// (banner + which actions are shown) follows this, not just the raw
+// cycle status, so "closed with results ready" and "open but still
+// collecting" don't look like the same screen.
+type ResultsState = "collecting" | "ready" | "closed";
 
 export default function SurveyResultsPage() {
   const params = useParams();
@@ -19,6 +25,7 @@ export default function SurveyResultsPage() {
   const [closing, setClosing] = useState(false);
   const [sendingReminders, setSendingReminders] = useState(false);
   const [cycles, setCycles] = useState<CycleSummary[]>([]);
+  const [protectedReport, setProtectedReport] = useState<boolean | null>(null);
 
   useEffect(() => {
     fetch(`/api/cycles/${surveyId}`)
@@ -28,6 +35,18 @@ export default function SurveyResultsPage() {
       })
       .catch(() => undefined);
   }, [surveyId]);
+
+  useEffect(() => {
+    fetch(`/api/report?cycleId=${encodeURIComponent(surveyId)}`)
+      .then((response) => response.json())
+      .then((data: { ok?: boolean; report?: { protected: boolean } }) => {
+        if (data.ok && data.report) setProtectedReport(data.report.protected);
+      })
+      .catch(() => undefined);
+  }, [surveyId]);
+
+  const resultsState: ResultsState | null =
+    status === null || protectedReport === null ? null : status === "closed" ? "closed" : protectedReport ? "collecting" : "ready";
 
   useEffect(() => {
     fetch("/api/cycles")
@@ -120,25 +139,43 @@ export default function SurveyResultsPage() {
       <div className="space-y-[9px]">
         <SurveyStageTabs active="Results" status={status ?? undefined} />
 
+        {resultsState ? <ResultsStateBanner state={resultsState} /> : null}
+
         <ProtectedReportPanel cycleId={surveyId} />
 
-        <div className="card">
-          <h2 className="section-title">Manage survey</h2>
-          <div className="mt-4 space-y-2">
-            <button onClick={() => router.push(`/app/${surveyId}/actions/update`)} className="btn-secondary w-full justify-start">
-              <FileEdit size={14} strokeWidth={1.8} />
-              Draft an update to the team
-            </button>
-            <button onClick={sendReminders} disabled={sendingReminders || status === "closed"} className="btn-secondary w-full justify-start">
-              <Send size={14} strokeWidth={1.8} />
-              {sendingReminders ? "Sending..." : "Send reminders to non-respondents"}
-            </button>
-            <button onClick={closeSurvey} disabled={closing || status === "closed"} className="btn-destructive w-full justify-start">
-              <Lock size={14} strokeWidth={1.8} />
-              {status === "closed" ? "Survey closed" : closing ? "Closing..." : "Close survey & lock responses"}
-            </button>
+        {resultsState === "closed" ? (
+          <div className="card">
+            <h2 className="section-title">This survey is closed</h2>
+            <p className="mt-2 secondary-text">Responses are locked. Close the loop with your team, then start your next survey when you&apos;re ready.</p>
+            <div className="mt-4 space-y-2">
+              <button onClick={() => router.push(`/app/${surveyId}/actions/update`)} className="btn-secondary w-full justify-start">
+                <FileEdit size={14} strokeWidth={1.8} />
+                Draft an update to the team
+              </button>
+              <button onClick={() => router.push("/app/surveys/new")} className="btn-primary w-full justify-start">
+                Start your next survey
+              </button>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="card">
+            <h2 className="section-title">Manage survey</h2>
+            <div className="mt-4 space-y-2">
+              <button onClick={() => router.push(`/app/${surveyId}/actions/update`)} className="btn-secondary w-full justify-start">
+                <FileEdit size={14} strokeWidth={1.8} />
+                Draft an update to the team
+              </button>
+              <button onClick={sendReminders} disabled={sendingReminders} className="btn-secondary w-full justify-start">
+                <Send size={14} strokeWidth={1.8} />
+                {sendingReminders ? "Sending..." : "Send reminders to non-respondents"}
+              </button>
+              <button onClick={closeSurvey} disabled={closing} className="btn-destructive w-full justify-start">
+                <Lock size={14} strokeWidth={1.8} />
+                {closing ? "Closing..." : "Close survey & lock responses"}
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="flex justify-start">
           <button onClick={() => router.push("/app/surveys")} className="btn-secondary">
@@ -148,5 +185,38 @@ export default function SurveyResultsPage() {
         </div>
       </div>
     </AppShell>
+  );
+}
+
+const stateBannerCopy: Record<ResultsState, { title: string; body: string; icon: typeof Send }> = {
+  collecting: {
+    title: "Collecting responses",
+    body: "Results stay hidden until enough people have responded to keep individuals unidentifiable.",
+    icon: Send,
+  },
+  ready: {
+    title: "Results ready",
+    body: "Enough responses are in. The aggregate report below is unlocked.",
+    icon: CheckCircle2,
+  },
+  closed: {
+    title: "Closed",
+    body: "This survey is locked. No further responses can be submitted.",
+    icon: Lock,
+  },
+};
+
+function ResultsStateBanner({ state }: { state: ResultsState }) {
+  const { title, body, icon: Icon } = stateBannerCopy[state];
+  return (
+    <div className="card flex items-start gap-3 py-3.5">
+      <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--bg-active)] text-[var(--ink-mid)]">
+        <Icon size={14} strokeWidth={1.8} />
+      </span>
+      <div>
+        <p className="text-[13.5px] font-medium text-[var(--ink)]">{title}</p>
+        <p className="mt-0.5 text-[12.5px] leading-[1.5] text-[var(--ink-soft)]">{body}</p>
+      </div>
+    </div>
   );
 }
