@@ -14,6 +14,7 @@ export function DevLoginPanel() {
   const [available, setAvailable] = useState(false);
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/dev/login")
@@ -24,6 +25,7 @@ export function DevLoginPanel() {
   async function submit() {
     if (!email.trim()) return;
     setSubmitting(true);
+    setError(null);
     try {
       const response = await fetch("/api/dev/login", {
         method: "POST",
@@ -31,7 +33,8 @@ export function DevLoginPanel() {
         body: JSON.stringify({ email: email.trim() }),
       });
       if (!response.ok) {
-        setAvailable(false);
+        const data = (await response.json().catch(() => ({}))) as { error?: string };
+        setError(data.error ?? "That email couldn't be used to sign in. Check it and try again.");
         return;
       }
       router.push(searchParams.get("next") ?? "/app");
@@ -63,6 +66,7 @@ export function DevLoginPanel() {
           {submitting ? "..." : "Sign in"}
         </button>
       </div>
+      {error ? <p className="mt-2 text-amber-800">{error}</p> : null}
     </div>
   );
 }

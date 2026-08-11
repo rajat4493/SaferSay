@@ -1,4 +1,4 @@
-import { MessageSquare, Clock, Target } from "lucide-react";
+import { EyeOff, MessageSquare, Clock, Target } from "lucide-react";
 
 export type SynthesisTheme = {
   icon: typeof MessageSquare;
@@ -28,7 +28,32 @@ const placeholderThemes: SynthesisTheme[] = [
   },
 ];
 
-export function AiSynthesisCard({ themes = placeholderThemes, onViewAll }: { themes?: SynthesisTheme[]; onViewAll?: () => void }) {
+export function AiSynthesisCard({
+  themes = placeholderThemes,
+  onViewAll,
+  locked = false,
+}: {
+  themes?: SynthesisTheme[];
+  onViewAll?: () => void;
+  locked?: boolean;
+}) {
+  if (locked) {
+    return (
+      <div className="card">
+        <div className="flex items-center justify-between">
+          <h2 className="section-title">AI Synthesis</h2>
+          <span className="badge-beta">Beta</span>
+        </div>
+        <div className="mt-3 flex items-center gap-2 text-[14px] font-medium text-[var(--ink)]">
+          <EyeOff size={16} strokeWidth={1.8} /> Locked with the rest of the report
+        </div>
+        <p className="mt-2 text-[12.5px] leading-[1.5] text-[var(--ink-mid)]">
+          Themes will generate once enough responses exist to keep individuals unidentifiable.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="card">
       <div className="flex items-center justify-between">
