@@ -134,7 +134,7 @@ export function ProtectedReportPanel({ mode = "admin", cycleId }: { mode?: "admi
     <>
       <div className="grid gap-3 md:grid-cols-2">
         <PsychologicalSafetyCard n={report?.n ?? 0} minGroupSize={minGroupSize} protectedState={report?.protected ?? true} score={overallScore} />
-        <AiSynthesisCard />
+        <AiSynthesisCard locked={!report || report.protected} />
       </div>
 
       <ConfidentialitySeal />

@@ -16,7 +16,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SignOutButton } from "@/components/SignOutButton";
 
 const navItems = [
@@ -30,13 +30,22 @@ const navItems = [
   { href: "/console/settings", label: "Settings", icon: Settings },
 ];
 
-const environment = process.env.NODE_ENV === "production" ? "Production" : "Development";
-
 export function OwnerConsoleShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [searchDraft, setSearchDraft] = useState("");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  // Reflects SAFERSAY_RUNTIME_MODE (server-only), not NODE_ENV -- Vercel
+  // builds set NODE_ENV=production on every deployment including preview,
+  // so that check always said "Production" regardless of runtime mode.
+  const [environment, setEnvironment] = useState<"Production" | "Development" | null>(null);
+
+  useEffect(() => {
+    fetch("/api/readiness")
+      .then((response) => response.json())
+      .then((data: { mode?: string }) => setEnvironment(data.mode === "production" ? "Production" : "Development"))
+      .catch(() => undefined);
+  }, []);
 
   function runSearch() {
     const query = searchDraft.trim();
@@ -95,13 +104,15 @@ export function OwnerConsoleShell({ children }: { children: React.ReactNode }) {
           <button onClick={() => setMobileNavOpen(true)} aria-label="Open menu" className="shrink-0 text-[var(--ink-mid)] lg:hidden">
             <Menu size={18} strokeWidth={1.8} />
           </button>
-          <span
-            className={`hidden shrink-0 items-center gap-1.5 rounded-[var(--radius-pill)] border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] sm:inline-flex ${
-              environment === "Production" ? "border-[var(--green-border)] bg-[var(--green-bg)] text-[var(--green)]" : "border-[var(--border)] bg-[var(--bg-active)] text-[var(--ink-mid)]"
-            }`}
-          >
-            {environment}
-          </span>
+          {environment ? (
+            <span
+              className={`hidden shrink-0 items-center gap-1.5 rounded-[var(--radius-pill)] border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] sm:inline-flex ${
+                environment === "Production" ? "border-[var(--green-border)] bg-[var(--green-bg)] text-[var(--green)]" : "border-[var(--border)] bg-[var(--bg-active)] text-[var(--ink-mid)]"
+              }`}
+            >
+              {environment}
+            </span>
+          ) : null}
           <div className="relative max-w-md flex-1">
             <Search size={14} strokeWidth={1.8} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--ink-faint)]" />
             <input

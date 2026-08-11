@@ -182,7 +182,7 @@ export function TeamPanel() {
             </tr>
             <tr className="text-[var(--ink-mid)]">
               <td className="p-3 font-medium text-[var(--ink)]">Viewer</td>
-              <td className="p-3">—</td>
+              <td className="p-3">View only</td>
               <td className="p-3">—</td>
               <td className="p-3">View only</td>
               <td className="p-3">—</td>

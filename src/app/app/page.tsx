@@ -111,7 +111,7 @@ export default function HomePage() {
             </>
           ) : (
             <>
-              <h2 className="section-title text-[15px]">No live survey right now</h2>
+              <h2 className="section-title text-[15px]">No active survey</h2>
               <p className="mt-2 secondary-text">Start a new survey to hear from your team.</p>
               {canCreate ? (
                 <Link href="/app/surveys/new" className="btn-primary mt-4 w-full justify-center">

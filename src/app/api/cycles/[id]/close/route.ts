@@ -23,7 +23,9 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     return NextResponse.json({ ok: false, error: "Survey was not found or is already closed." }, { status: 400 });
   }
 
-  await logSurveyClosed(tenant.id, session.role, session.email, cycleId);
+  logSurveyClosed(tenant.id, session.role, session.email, cycleId).catch((error) => {
+    console.error(`Audit log for survey_closed (${cycleId}) failed:`, error);
+  });
 
   return NextResponse.json({ ok: true });
 }

@@ -18,6 +18,7 @@ export default function NewSurveyPage() {
   );
   const template = surveyTemplates.find((item) => item.slug === selected) ?? surveyTemplates[0];
   const [, startTransition] = useTransition();
+  const [accessChecked, setAccessChecked] = useState(false);
 
   useEffect(() => {
     async function checkAccess() {
@@ -30,12 +31,18 @@ export default function NewSurveyPage() {
 
       const response = await fetch("/api/employees?limit=1");
       const data = (await response.json().catch(() => ({ ok: false }))) as { ok?: boolean; total?: number };
-      if (data.ok && data.total === 0) router.replace("/app/people");
+      if (data.ok && data.total === 0) {
+        router.replace("/app/people");
+        return;
+      }
+      setAccessChecked(true);
     }
     startTransition(() => {
       void checkAccess();
     });
   }, [router, startTransition]);
+
+  if (!accessChecked) return null;
 
   return (
     <AppShell title="New survey" subtitle="Template first, then light editing, then launch.">

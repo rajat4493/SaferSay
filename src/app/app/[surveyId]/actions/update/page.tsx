@@ -5,6 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Bold, Check, Copy, Eye, Heading1, Heading2, Italic, Link2, List, ListOrdered, Sparkles } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { useToast } from "@/components/ToastProvider";
+import { canRunSurvey } from "@/lib/permissions";
+import type { UserRole } from "@/lib/server/repositories/types";
 
 type CycleDetail = { cycle: { id: string; name: string } };
 
@@ -24,6 +26,20 @@ export default function DraftUpdatePage() {
   const toast = useToast();
   const surveyId = params.surveyId as string;
   const [cycleName, setCycleName] = useState<string | null>(null);
+  const [accessChecked, setAccessChecked] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/tenants/current")
+      .then((response) => response.json())
+      .then((data: { ok?: boolean; role?: UserRole }) => {
+        if (data.ok && !canRunSurvey(data.role as UserRole)) {
+          router.replace(`/app/${surveyId}/results`);
+          return;
+        }
+        setAccessChecked(true);
+      })
+      .catch(() => undefined);
+  }, [router, surveyId]);
 
   useEffect(() => {
     fetch(`/api/cycles/${surveyId}`)
@@ -33,6 +49,8 @@ export default function DraftUpdatePage() {
       })
       .catch(() => undefined);
   }, [surveyId]);
+
+  if (!accessChecked) return null;
 
   const title = `You spoke, we heard: here's what we're changing about ${cycleName ?? "this survey"}`;
   const body = `Thank you to everyone who shared feedback in ${cycleName ? `"${cycleName}"` : "our recent survey"}. Your input helps us build a more transparent, focused team. Here's what we're doing:`;
