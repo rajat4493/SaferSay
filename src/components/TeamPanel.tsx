@@ -101,6 +101,7 @@ export function TeamPanel() {
           value={inviteEmail}
           onChange={(event) => setInviteEmail(event.target.value)}
           placeholder="teammate@company.com"
+          aria-label="Teammate's email to invite"
           className="admin-input h-9 min-w-0 flex-1"
         />
         <select value={inviteRole} onChange={(event) => setInviteRole(event.target.value as TeamRole)} className="admin-input h-9 w-auto shrink-0">

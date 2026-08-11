@@ -94,14 +94,27 @@ export function EmployeeDirectory({ refreshKey = 0 }: { refreshKey?: number }) {
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search name, email, or team"
+            aria-label="Search name, email, or team"
             className="admin-input h-9 w-full pl-8 sm:w-64"
           />
         </div>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-dashed border-[var(--border)] bg-[var(--bg)] p-3">
-        <input value={newEmail} onChange={(event) => setNewEmail(event.target.value)} placeholder="new.person@company.com" className="admin-input h-9 min-w-0 flex-1" />
-        <input value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="Name (optional)" className="admin-input h-9 min-w-0 flex-1" />
+        <input
+          value={newEmail}
+          onChange={(event) => setNewEmail(event.target.value)}
+          placeholder="new.person@company.com"
+          aria-label="New person's email"
+          className="admin-input h-9 min-w-0 flex-1"
+        />
+        <input
+          value={newName}
+          onChange={(event) => setNewName(event.target.value)}
+          placeholder="Name (optional)"
+          aria-label="New person's name (optional)"
+          className="admin-input h-9 min-w-0 flex-1"
+        />
         <button onClick={addPerson} disabled={adding || !newEmail.trim()} className="btn-primary h-9 shrink-0">
           <Plus size={13} strokeWidth={1.8} />
           {adding ? "Adding..." : "Add person"}

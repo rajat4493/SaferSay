@@ -82,7 +82,13 @@ export function TenantsDirectory() {
         <div className="flex items-center gap-2">
           <div className="relative">
             <Search size={14} strokeWidth={1.8} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--ink-faint)]" />
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search company name" className="admin-input h-9 pl-8 sm:w-64" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search company name"
+              aria-label="Search company name"
+              className="admin-input h-9 pl-8 sm:w-64"
+            />
           </div>
           <button onClick={() => setCreating(true)} className="btn-primary shrink-0">
             <Plus size={13} strokeWidth={1.8} />
@@ -135,7 +141,14 @@ export function TenantsDirectory() {
           <div className="card w-full max-w-sm" onClick={(event) => event.stopPropagation()}>
             <h2 className="section-title">Create tenant</h2>
             <p className="mt-1 secondary-text">Provisions a new, isolated workspace.</p>
-            <input autoFocus value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="Company name" className="admin-input mt-4" />
+            <input
+              autoFocus
+              value={newName}
+              onChange={(event) => setNewName(event.target.value)}
+              placeholder="Company name"
+              aria-label="Company name"
+              className="admin-input mt-4"
+            />
             <div className="mt-5 flex gap-2">
               <button onClick={() => setCreating(false)} disabled={submitting} className="btn-secondary flex-1">
                 Cancel

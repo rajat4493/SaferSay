@@ -248,7 +248,13 @@ export function TenantDetailPanel({ tenantId }: { tenantId: string }) {
         <h2 className="meta-label">Support notes</h2>
         <p className="mt-1 text-xs text-[var(--ink-faint)]">Operational notes only — never a path to this tenant&apos;s data.</p>
         <div className="mt-3 flex gap-2">
-          <input value={noteDraft} onChange={(event) => setNoteDraft(event.target.value)} placeholder="Add a note for this tenant..." className="admin-input h-9 flex-1" />
+          <input
+            value={noteDraft}
+            onChange={(event) => setNoteDraft(event.target.value)}
+            placeholder="Add a note for this tenant..."
+            aria-label="Add a note for this tenant"
+            className="admin-input h-9 flex-1"
+          />
           <button onClick={submitNote} disabled={addingNote || !noteDraft.trim()} className="btn-primary shrink-0">
             Add
           </button>

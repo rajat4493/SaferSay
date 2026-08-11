@@ -6,6 +6,7 @@ import { getTenantPool, withTenantContext, type Queryable } from "@/lib/server/d
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import { seedServerEmployees } from "@/lib/serverStore";
 import { surveyTemplates } from "@/lib/templates";
+import { canImportEmployees } from "@/lib/permissions";
 
 const defaultTemplateId = "00000000-0000-4000-8000-000000000101";
 const defaultQuestionIds = [
@@ -70,6 +71,9 @@ export async function POST() {
   const session = await getSessionContext();
   if (!session) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
+  }
+  if (!canImportEmployees(session.role)) {
+    return NextResponse.json({ ok: false, error: "You don't have permission to seed workspace data." }, { status: 403 });
   }
 
   const { tenant } = session;

@@ -121,6 +121,7 @@ export function OwnerConsoleShell({ children }: { children: React.ReactNode }) {
               onChange={(event) => setSearchDraft(event.target.value)}
               onKeyDown={(event) => event.key === "Enter" && runSearch()}
               placeholder="Search tenants..."
+              aria-label="Search tenants"
               className="admin-input h-9 pl-8"
             />
           </div>

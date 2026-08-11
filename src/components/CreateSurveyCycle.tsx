@@ -109,6 +109,7 @@ export function CreateSurveyCycle({ templateSlug }: { templateSlug: string }) {
             value={cycleName}
             onChange={(event) => setCycleName(event.target.value)}
             placeholder={`${template.name} - July pulse`}
+            aria-label="Survey cycle name"
             className="admin-input"
           />
           <button onClick={createCycle} disabled={submitting} className="btn-primary">
