@@ -23,7 +23,11 @@ export async function POST(request: NextRequest) {
   response.cookies.set(devAuthCookieName, email, {
     httpOnly: true,
     sameSite: "lax",
-    secure: false,
+    // Secure cookies work fine on http://localhost too (browsers special-case
+    // it as a secure context) so this can just always be true -- the previous
+    // `false` meant this cookie wasn't Secure even on HTTPS preview/staging
+    // deployments where dev-login is enabled.
+    secure: true,
     path: "/",
     maxAge: 60 * 60 * 8,
   });
@@ -32,6 +36,6 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE() {
   const response = NextResponse.json({ ok: true });
-  response.cookies.set(devAuthCookieName, "", { path: "/", maxAge: 0 });
+  response.cookies.set(devAuthCookieName, "", { httpOnly: true, sameSite: "lax", secure: true, path: "/", maxAge: 0 });
   return response;
 }

@@ -207,6 +207,7 @@ export function ProtectedReportPanel({ mode = "admin", cycleId }: { mode?: "admi
               value={actionDraft}
               onChange={(event) => setActionDraft(event.target.value)}
               placeholder="e.g. Run a 15-min retro on workload next Friday"
+              aria-label="One change you're committing to"
               className="admin-input flex-1"
             />
             <button onClick={submitAction} disabled={savingAction || !actionDraft.trim()} className="btn-primary shrink-0">

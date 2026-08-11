@@ -56,6 +56,7 @@ export function DevLoginPanel() {
           onChange={(event) => setEmail(event.target.value)}
           onKeyDown={(event) => event.key === "Enter" && submit()}
           placeholder="you@example.com"
+          aria-label="Email to sign in with"
           className="h-10 flex-1 rounded-xl border border-amber-300 bg-white px-3 text-sm outline-none"
         />
         <button
