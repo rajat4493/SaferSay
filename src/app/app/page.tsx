@@ -90,77 +90,94 @@ export default function HomePage() {
   // way and Home goes back to plain status -- the guidance is for getting
   // started, not a permanent fixture.
   const showGuidedStep = !liveSurvey && !everRun && employeeCount !== null;
+  const resultsUnlocked = liveSurvey ? liveSurvey.responseCount >= liveSurvey.minGroupSize : false;
+  // A brand-new, empty workspace shouldn't show "All surveys" / shortcuts
+  // beside the guided card -- there's nothing there yet, and it turns one
+  // clear next action into a dashboard with competing panels.
+  const isEmptyWorkspace = showGuidedStep && !draftSurvey;
+
+  const nextStepCard = (
+    <div className="card">
+      {liveSurvey ? (
+        <>
+          <div className="flex items-center gap-2">
+            <h2 className="section-title text-[15px]">{liveSurvey.name}</h2>
+            <SurveyStatusBadge status={liveSurvey.status} />
+          </div>
+          <p className="mt-2 secondary-text">
+            {liveSurvey.responseCount} of {liveSurvey.minGroupSize} responses
+          </p>
+          <div className="progress-track mt-2.5">
+            <div
+              className="progress-fill"
+              style={{ background: "var(--green)", width: `${Math.min((liveSurvey.responseCount / liveSurvey.minGroupSize) * 100, 100)}%` }}
+            />
+          </div>
+          <p className="mt-2 text-[12px] text-[var(--ink-soft)]">
+            {resultsUnlocked
+              ? "Results unlocked."
+              : `Results unlock after ${liveSurvey.minGroupSize - liveSurvey.responseCount} more response${
+                  liveSurvey.minGroupSize - liveSurvey.responseCount === 1 ? "" : "s"
+                }.`}
+          </p>
+          <Link href={`/app/${liveSurvey.id}/results`} className="btn-primary mt-4 w-full justify-center">
+            {resultsUnlocked ? "Review results" : "View response progress"}
+          </Link>
+        </>
+      ) : showGuidedStep && employeeCount === 0 ? (
+        <>
+          <p className="label-text text-[var(--green)]">Your next step</p>
+          <h2 className="mt-1.5 section-title text-[15px]">Add your people</h2>
+          <p className="mt-2 secondary-text">Add the people who should receive this survey.</p>
+          <Link href="/app/people" className="btn-primary mt-4 w-full justify-center">
+            Add people →
+          </Link>
+        </>
+      ) : showGuidedStep && canCreate ? (
+        <>
+          <p className="label-text text-[var(--green)]">Your next step</p>
+          <h2 className="mt-1.5 section-title text-[15px]">Create your first survey</h2>
+          <p className="mt-2 secondary-text">Pick a template to get started.</p>
+          <Link href="/app/surveys/new" className="btn-primary mt-4 w-full justify-center">
+            Create survey →
+          </Link>
+        </>
+      ) : draftSurvey ? (
+        <>
+          <p className="label-text text-[var(--green)]">Your next step</p>
+          <h2 className="mt-1.5 section-title text-[15px]">{draftSurvey.name}</h2>
+          <p className="mt-2 secondary-text">This survey is drafted but hasn&apos;t been sent yet.</p>
+          <Link href={`/app/${draftSurvey.id}/send`} className="btn-primary mt-4 w-full justify-center">
+            Review and send →
+          </Link>
+        </>
+      ) : (
+        <>
+          <h2 className="section-title text-[15px]">No active survey</h2>
+          <p className="mt-2 secondary-text">Start a new survey to hear from your team.</p>
+          {canCreate ? (
+            <Link href="/app/surveys/new" className="btn-primary mt-4 w-full justify-center">
+              <Plus size={14} strokeWidth={1.8} />
+              New survey
+            </Link>
+          ) : null}
+        </>
+      )}
+    </div>
+  );
+
+  if (isEmptyWorkspace) {
+    return (
+      <AppShell title={`${greeting()}.`} subtitle="Here's what needs your attention.">
+        {nextStepCard}
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell title={`${greeting()}.`} subtitle="Here's what needs your attention.">
       <div className="grid gap-3 md:grid-cols-2">
-        <div className="card">
-          {liveSurvey ? (
-            <>
-              <div className="flex items-center gap-2">
-                <h2 className="section-title text-[15px]">{liveSurvey.name}</h2>
-                <SurveyStatusBadge status={liveSurvey.status} />
-              </div>
-              <p className="mt-2 secondary-text">
-                {liveSurvey.responseCount} of {liveSurvey.minGroupSize} responses
-              </p>
-              <div className="progress-track mt-2.5">
-                <div
-                  className="progress-fill"
-                  style={{ background: "var(--green)", width: `${Math.min((liveSurvey.responseCount / liveSurvey.minGroupSize) * 100, 100)}%` }}
-                />
-              </div>
-              <p className="mt-2 text-[12px] text-[var(--ink-soft)]">
-                {liveSurvey.responseCount >= liveSurvey.minGroupSize
-                  ? "Results unlocked."
-                  : `Results unlock after ${liveSurvey.minGroupSize - liveSurvey.responseCount} more response${
-                      liveSurvey.minGroupSize - liveSurvey.responseCount === 1 ? "" : "s"
-                    }.`}
-              </p>
-              <Link href={`/app/${liveSurvey.id}/results`} className="btn-primary mt-4 w-full justify-center">
-                Open survey
-              </Link>
-            </>
-          ) : showGuidedStep && employeeCount === 0 ? (
-            <>
-              <p className="label-text text-[var(--green)]">Your next step</p>
-              <h2 className="mt-1.5 section-title text-[15px]">Add your people</h2>
-              <p className="mt-2 secondary-text">Add the people who should receive this survey.</p>
-              <Link href="/app/people" className="btn-primary mt-4 w-full justify-center">
-                Add people →
-              </Link>
-            </>
-          ) : showGuidedStep && canCreate ? (
-            <>
-              <p className="label-text text-[var(--green)]">Your next step</p>
-              <h2 className="mt-1.5 section-title text-[15px]">Create your first survey</h2>
-              <p className="mt-2 secondary-text">Pick a template to get started.</p>
-              <Link href="/app/surveys/new" className="btn-primary mt-4 w-full justify-center">
-                Create survey →
-              </Link>
-            </>
-          ) : draftSurvey ? (
-            <>
-              <p className="label-text text-[var(--green)]">Your next step</p>
-              <h2 className="mt-1.5 section-title text-[15px]">{draftSurvey.name}</h2>
-              <p className="mt-2 secondary-text">This survey is drafted but hasn&apos;t been sent yet.</p>
-              <Link href={`/app/${draftSurvey.id}/send`} className="btn-primary mt-4 w-full justify-center">
-                Review and send →
-              </Link>
-            </>
-          ) : (
-            <>
-              <h2 className="section-title text-[15px]">No active survey</h2>
-              <p className="mt-2 secondary-text">Start a new survey to hear from your team.</p>
-              {canCreate ? (
-                <Link href="/app/surveys/new" className="btn-primary mt-4 w-full justify-center">
-                  <Plus size={14} strokeWidth={1.8} />
-                  New survey
-                </Link>
-              ) : null}
-            </>
-          )}
-        </div>
+        {nextStepCard}
 
         <div className="card">
           <h2 className="section-title text-[15px]">All surveys</h2>

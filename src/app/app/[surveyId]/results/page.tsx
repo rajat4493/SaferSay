@@ -139,18 +139,26 @@ export default function SurveyResultsPage() {
       <div className="space-y-[9px]">
         <SurveyStageTabs active="Results" status={status ?? undefined} />
 
-        {resultsState ? <ResultsStateBanner state={resultsState} /> : null}
+        {resultsState ? <ResultsStateBanner state={resultsState} protectedReport={protectedReport} /> : null}
 
         <ProtectedReportPanel cycleId={surveyId} />
 
         {resultsState === "closed" ? (
           <div className="card">
             <h2 className="section-title">This survey is closed</h2>
-            <p className="mt-2 secondary-text">Responses are locked. Close the loop with your team, then start your next survey when you&apos;re ready.</p>
+            <p className="mt-2 secondary-text">
+              {protectedReport
+                ? "Responses are locked, and results stay protected because the anonymity threshold was never reached."
+                : "Responses are locked. Close the loop with your team, then start your next survey when you're ready."}
+            </p>
             <div className="mt-4 space-y-2">
-              <button onClick={() => router.push(`/app/${surveyId}/actions/update`)} className="btn-secondary w-full justify-start">
+              <button
+                onClick={() => router.push(`/app/${surveyId}/actions/update`)}
+                disabled={protectedReport === true}
+                className="btn-secondary w-full justify-start disabled:cursor-not-allowed disabled:opacity-50"
+              >
                 <FileEdit size={14} strokeWidth={1.8} />
-                Draft an update to the team
+                {protectedReport ? "Team update unavailable — results never unlocked" : "Draft an update to the team"}
               </button>
               <button onClick={() => router.push("/app/surveys/new")} className="btn-primary w-full justify-start">
                 Start your next survey
@@ -161,9 +169,14 @@ export default function SurveyResultsPage() {
           <div className="card">
             <h2 className="section-title">Manage survey</h2>
             <div className="mt-4 space-y-2">
-              <button onClick={() => router.push(`/app/${surveyId}/actions/update`)} className="btn-secondary w-full justify-start">
+              <button
+                onClick={() => router.push(`/app/${surveyId}/actions/update`)}
+                disabled={resultsState === "collecting"}
+                title={resultsState === "collecting" ? "Team update becomes available once results unlock." : undefined}
+                className="btn-secondary w-full justify-start disabled:cursor-not-allowed disabled:opacity-50"
+              >
                 <FileEdit size={14} strokeWidth={1.8} />
-                Draft an update to the team
+                {resultsState === "collecting" ? "Team update becomes available once results unlock" : "Draft an update to the team"}
               </button>
               <button onClick={sendReminders} disabled={sendingReminders} className="btn-secondary w-full justify-start">
                 <Send size={14} strokeWidth={1.8} />
@@ -188,26 +201,15 @@ export default function SurveyResultsPage() {
   );
 }
 
-const stateBannerCopy: Record<ResultsState, { title: string; body: string; icon: typeof Send }> = {
-  collecting: {
-    title: "Collecting responses",
-    body: "Results stay hidden until enough people have responded to keep individuals unidentifiable.",
-    icon: Send,
-  },
-  ready: {
-    title: "Results ready",
-    body: "Enough responses are in. The aggregate report below is unlocked.",
-    icon: CheckCircle2,
-  },
-  closed: {
-    title: "Closed",
-    body: "This survey is locked. No further responses can be submitted.",
-    icon: Lock,
-  },
-};
-
-function ResultsStateBanner({ state }: { state: ResultsState }) {
-  const { title, body, icon: Icon } = stateBannerCopy[state];
+function ResultsStateBanner({ state, protectedReport }: { state: ResultsState; protectedReport: boolean | null }) {
+  const { title, body, icon: Icon } =
+    state === "collecting"
+      ? { title: "Collecting responses", body: "Results stay hidden until enough people have responded to keep individuals unidentifiable.", icon: Send }
+      : state === "ready"
+        ? { title: "Results ready", body: "Enough responses are in. The aggregate report below is unlocked.", icon: CheckCircle2 }
+        : protectedReport
+          ? { title: "Closed — results stayed protected", body: "This survey is locked, and the anonymity threshold was never reached, so results remain hidden.", icon: Lock }
+          : { title: "Closed — results available", body: "This survey is locked. No further responses can be submitted, and results are available below.", icon: Lock };
   return (
     <div className="card flex items-start gap-3 py-3.5">
       <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--bg-active)] text-[var(--ink-mid)]">
