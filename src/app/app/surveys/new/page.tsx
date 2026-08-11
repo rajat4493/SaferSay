@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AppShell, Card } from "@/components/AppShell";
 import { CreateSurveyCycle } from "@/components/CreateSurveyCycle";
 import { PageGuide } from "@/components/PageGuide";
@@ -11,7 +11,11 @@ import type { UserRole } from "@/lib/server/repositories/types";
 
 export default function NewSurveyPage() {
   const router = useRouter();
-  const [selected, setSelected] = useState(surveyTemplates[0].slug);
+  const searchParams = useSearchParams();
+  const requestedTemplate = searchParams.get("template");
+  const [selected, setSelected] = useState(
+    (requestedTemplate && surveyTemplates.some((item) => item.slug === requestedTemplate) ? requestedTemplate : surveyTemplates[0].slug),
+  );
   const template = surveyTemplates.find((item) => item.slug === selected) ?? surveyTemplates[0];
   const [, startTransition] = useTransition();
 

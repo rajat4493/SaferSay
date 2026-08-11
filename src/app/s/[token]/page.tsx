@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Check, Download, ShieldCheck, EyeOff } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Download, Heart, Lock, ShieldCheck, EyeOff } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useBrand } from "@/components/BrandProvider";
@@ -27,8 +27,6 @@ type Answer = {
   numberValue?: number;
   textValue?: string;
 };
-
-const SELECT_KEYS = ["A", "B", "C", "D", "E"];
 
 export default function RespondentTokenPage() {
   const params = useParams<{ token: string }>();
@@ -58,9 +56,12 @@ export default function RespondentTokenPage() {
   const questions = session?.questions ?? localQuestions;
   const current = answers.length;
   const question = questions[current];
-  const progressText = step === "survey" ? `${current + 1} / ${questions.length}` : "5 min";
+  const progressPercent = questions.length ? Math.round((current / questions.length) * 100) : 0;
   const scaleOptions = question && question.type !== "open_text" ? scaleValues(question.type) : [];
-  const usesKeyboardSelect = scaleOptions.length > 0 && scaleOptions.length <= SELECT_KEYS.length;
+  // Digit keys 0-9 map directly to a same-valued option (no letter badges
+  // needed since the circle already shows its number). eNPS's 10 has no
+  // single-digit key -- a reasonable trade-off, click/tap still works.
+  const usesKeyboardSelect = scaleOptions.length > 0 && scaleOptions.every((value) => value >= 0 && value <= 9);
 
   useEffect(() => {
     let active = true;
@@ -155,9 +156,8 @@ export default function RespondentTokenPage() {
     URL.revokeObjectURL(url);
   }
 
-  // Keyboard support: letter keys select an option (≤5-option scales
-  // only -- eNPS's 11-point scale doesn't map onto A-E), Enter commits
-  // whichever option is currently selected.
+  // Keyboard support: digit keys select the same-valued option, Enter
+  // commits whichever option is currently selected.
   useEffect(() => {
     if (step !== "survey" || !question || question.type === "open_text") return;
 
@@ -168,10 +168,10 @@ export default function RespondentTokenPage() {
         return;
       }
       if (!usesKeyboardSelect) return;
-      const letterIndex = SELECT_KEYS.indexOf(event.key.toUpperCase());
-      if (letterIndex >= 0 && letterIndex < scaleOptions.length) {
+      const digit = Number(event.key);
+      if (Number.isInteger(digit) && scaleOptions.includes(digit)) {
         event.preventDefault();
-        setSelectedValue(scaleOptions[letterIndex]);
+        setSelectedValue(digit);
       }
     }
 
@@ -181,24 +181,33 @@ export default function RespondentTokenPage() {
   }, [step, question, selectedValue, usesKeyboardSelect, scaleOptions.join(",")]);
 
   return (
-    <main className="taker-surface flex min-h-screen items-center justify-center p-4">
+    <main className="taker-surface flex min-h-screen items-center justify-center p-4 sm:p-8">
       <div className="w-full max-w-xl">
-        <div className="taker-chrome mb-8 flex items-center justify-between">
-          <span className="text-[13.5px] font-medium tracking-[-0.15px] text-[var(--ink)]">{brand.name}</span>
-          <div className="text-[11px] font-medium uppercase tracking-[0.04em] text-[var(--ink-soft)]">{progressText}</div>
+        <div className="taker-chrome mb-6 flex items-center justify-between">
+          <span className="text-[14px] font-semibold tracking-[-0.15px] text-[var(--ink)]">{brand.name}</span>
+          {step === "survey" ? (
+            <div className="text-[11px] font-medium uppercase tracking-[0.04em] text-[var(--ink-soft)]">
+              Question {current + 1} of {questions.length} &nbsp;·&nbsp; {progressPercent}% complete
+            </div>
+          ) : null}
         </div>
+
+        {step === "survey" ? (
+          <div className="taker-progress-track mb-6">
+            <div className="taker-progress-fill" style={{ width: `${(current / questions.length) * 100}%` }} />
+          </div>
+        ) : null}
 
         {step === "loading" ? (
           <Panel title="Checking your link" text="This takes a moment." />
         ) : step === "invalid" ? (
           <Panel title="This link is not active" text={error || "The token is missing, already submitted, or no longer valid."} />
         ) : step === "intro" ? (
-          <div className="rounded-[var(--radius-shell)] border border-[var(--border)] bg-white p-7">
-            <div className="mb-5 inline-flex items-center gap-2 text-[13.5px] font-medium text-[var(--ink-mid)]">
-              <ShieldCheck size={15} strokeWidth={1.8} className="text-[var(--green)]" />
-              Confidential — not even we can trace this to you
+          <div className="rounded-[var(--radius-shell)] border border-[var(--border)] bg-white p-8 shadow-[var(--shadow-elevated)]">
+            <div className="taker-icon-circle mb-5">
+              <ShieldCheck size={20} strokeWidth={1.8} />
             </div>
-            <h2 className="text-[24px] font-medium leading-[1.3] tracking-[-0.35px] text-[var(--ink)]">How your answers stay confidential</h2>
+            <h2 className="font-[family-name:var(--font-display)] text-[30px] font-normal leading-[1.18] tracking-[-0.01em] text-[var(--ink)]">How your answers stay confidential</h2>
 
             <div className="mt-6 space-y-2">
               <ConfidentialityRow
@@ -221,16 +230,23 @@ export default function RespondentTokenPage() {
             <button onClick={() => setStep("survey")} className="btn-primary mt-7 w-full justify-center py-3">
               Start survey
             </button>
+
+            <div className="mt-5 flex justify-center">
+              <span className="taker-footer-badge">
+                <Lock size={12} strokeWidth={1.8} />
+                Anonymous token · Zero tracking
+              </span>
+            </div>
           </div>
         ) : step === "done" ? (
-          <div className="rounded-[var(--radius-shell)] border border-[var(--border)] bg-white p-8 text-center">
+          <div className="rounded-[var(--radius-shell)] border border-[var(--border)] bg-white p-8 text-center shadow-[var(--shadow-elevated)]">
             <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-[var(--green-bg)] text-[var(--green)]">
               <Check size={26} strokeWidth={2} />
             </div>
-            <h2 className="mt-6 text-[24px] font-medium tracking-[-0.35px] text-[var(--ink)]">That&apos;s everything — thank you.</h2>
+            <h2 className="mt-6 font-[family-name:var(--font-display)] text-[30px] font-normal tracking-[-0.01em] text-[var(--ink)]">That&apos;s everything — thank you.</h2>
             <p className="mt-3 text-[13.5px] leading-[1.5] text-[var(--ink-mid)]">Your participation was marked complete separately from your response content.</p>
 
-            <div className="mt-6 rounded-[var(--radius-card)] border border-[var(--border)] bg-white p-4 text-left text-[13.5px] leading-[1.5] text-[var(--ink-mid)]">
+            <div className="mt-6 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--bg)] p-4 text-left text-[13.5px] leading-[1.5] text-[var(--ink-mid)]">
               Your employer will only ever see grouped scores once enough people respond. Nobody -- including us -- can trace this response back to you.
             </div>
 
@@ -240,21 +256,23 @@ export default function RespondentTokenPage() {
             </button>
           </div>
         ) : question ? (
-          <div key={question.id} className="taker-question-enter rounded-[var(--radius-shell)] border border-[var(--border)] bg-white p-7">
-            <div className="taker-progress-track rounded-[var(--radius-pill)]">
-              <div className="taker-progress-fill rounded-[var(--radius-pill)]" style={{ width: `${((current + 1) / questions.length) * 100}%` }} />
+          <div key={question.id} className="taker-question-enter rounded-[var(--radius-shell)] border border-[var(--border)] bg-white p-8 shadow-[var(--shadow-elevated)]">
+            <div className="taker-icon-circle mb-5">
+              <Heart size={19} strokeWidth={1.8} />
             </div>
 
-            <p className="mt-5 text-[11px] font-medium uppercase tracking-[0.04em] text-[var(--ink-soft)]">{question.construct ?? session?.templateName ?? "Survey"}</p>
-            <h2 className="mt-2 text-[24px] font-medium leading-[1.3] tracking-[-0.35px] text-[var(--ink)]">{question.text}</h2>
-            <p className="mt-2 text-[13.5px] leading-[1.5] text-[var(--ink-mid)]">No wrong answers — honest is the only answer that helps.</p>
+            <p className="text-[11px] font-medium uppercase tracking-[0.04em] text-[var(--ink-soft)]">{question.construct ?? session?.templateName ?? "Survey"}</p>
+            <h2 className="mt-2 font-[family-name:var(--font-display)] text-[34px] font-normal leading-[1.18] tracking-[-0.01em] text-[var(--ink)] sm:text-[38px]">{question.text}</h2>
+            <p className="mt-2 text-[13.5px] leading-[1.5] text-[var(--ink-mid)]">
+              {question.type === "open_text" ? "No wrong answers — honest is the only answer that helps." : "How true is this for you?"}
+            </p>
 
             {question.type === "open_text" ? (
               <div className="mt-6 grid gap-3">
                 <textarea
                   value={textValue}
                   onChange={(event) => setTextValue(event.target.value)}
-                  className="min-h-36 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--bg)] p-4 text-[14px] text-[var(--ink)] outline-none focus:border-[var(--ink-soft)]"
+                  className="min-h-36 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--bg)] p-4 text-[14px] text-[var(--ink)] outline-none focus:border-[var(--green)]"
                 />
                 <button onClick={answerText} className="btn-primary justify-center py-3">
                   Continue
@@ -266,37 +284,49 @@ export default function RespondentTokenPage() {
                 ) : null}
               </div>
             ) : (
-              <div className="mt-6 grid gap-2">
-                {scaleOptions.map((value, index) => {
-                  const selected = selectedValue === value;
-                  return (
-                    <button key={value} onClick={() => (selected ? commitSelection(value) : setSelectedValue(value))} className="taker-option" data-selected={selected}>
-                      {usesKeyboardSelect ? <span className="taker-key-badge">{SELECT_KEYS[index]}</span> : null}
-                      <span className="flex-1">
-                        {value} {scaleLabel(question.type, value)}
-                      </span>
-                    </button>
-                  );
-                })}
-                {selectedValue !== null ? (
-                  <button onClick={() => commitSelection(selectedValue)} className="btn-primary mt-1 justify-center py-3">
-                    Continue{usesKeyboardSelect ? " (or press Enter)" : ""}
-                  </button>
-                ) : null}
+              <div className="mt-7 grid gap-2.5">
+                <div className="taker-scale">
+                  {scaleOptions.map((value) => {
+                    const selected = selectedValue === value;
+                    return (
+                      <button key={value} onClick={() => setSelectedValue(value)} className="taker-circle" data-selected={selected} aria-label={`${value} ${scaleLabel(question.type, value)}`}>
+                        {value}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="taker-scale-labels">
+                  <span>{scaleLabel(question.type, scaleOptions[0])}</span>
+                  <span>{scaleLabel(question.type, scaleOptions[scaleOptions.length - 1])}</span>
+                </div>
+                <button
+                  disabled={selectedValue === null}
+                  onClick={() => selectedValue !== null && commitSelection(selectedValue)}
+                  className="btn-primary mt-2 justify-center py-3"
+                >
+                  Next question
+                  <ArrowRight size={14} strokeWidth={1.8} />
+                </button>
               </div>
             )}
 
-            <button
-              disabled={current === 0}
-              onClick={() => {
-                setSelectedValue(null);
-                setAnswers(answers.slice(0, -1));
-              }}
-              className="mt-5 inline-flex items-center gap-2 text-[13px] font-medium text-[var(--ink-mid)] disabled:opacity-30"
-            >
-              <ArrowLeft size={14} strokeWidth={1.8} />
-              Back
-            </button>
+            <div className="mt-6 flex items-center justify-between">
+              <button
+                disabled={current === 0}
+                onClick={() => {
+                  setSelectedValue(null);
+                  setAnswers(answers.slice(0, -1));
+                }}
+                className="inline-flex items-center gap-2 text-[13px] font-medium text-[var(--ink-mid)] disabled:opacity-30"
+              >
+                <ArrowLeft size={14} strokeWidth={1.8} />
+                Back
+              </button>
+              <span className="taker-footer-badge">
+                <Lock size={12} strokeWidth={1.8} />
+                Anonymous token · Zero tracking
+              </span>
+            </div>
           </div>
         ) : null}
       </div>
@@ -340,8 +370,8 @@ function ConfidentialityRow({ tone, heading, description }: { tone: "green" | "r
 
 function Panel({ title, text }: { title: string; text: string }) {
   return (
-    <div className="rounded-[var(--radius-shell)] border border-[var(--border)] bg-white p-7">
-      <h2 className="text-[24px] font-medium tracking-[-0.35px] text-[var(--ink)]">{title}</h2>
+    <div className="rounded-[var(--radius-shell)] border border-[var(--border)] bg-white p-8 shadow-[var(--shadow-elevated)]">
+      <h2 className="font-[family-name:var(--font-display)] text-[28px] font-normal tracking-[-0.01em] text-[var(--ink)]">{title}</h2>
       <p className="mt-3 text-[13.5px] leading-[1.5] text-[var(--ink-mid)]">{text}</p>
     </div>
   );
