@@ -36,7 +36,19 @@ export default function DraftUpdatePage() {
           router.replace(`/app/${surveyId}/results`);
           return;
         }
-        setAccessChecked(true);
+        // A team update implies you know what the survey found -- don't let
+        // this page render (directly by URL or otherwise) while results are
+        // still protected, same rule the disabled button on Results enforces.
+        fetch(`/api/report?cycleId=${encodeURIComponent(surveyId)}`)
+          .then((reportResponse) => reportResponse.json())
+          .then((reportData: { ok?: boolean; report?: { protected: boolean } }) => {
+            if (reportData.ok && reportData.report?.protected) {
+              router.replace(`/app/${surveyId}/results`);
+              return;
+            }
+            setAccessChecked(true);
+          })
+          .catch(() => setAccessChecked(true));
       })
       .catch(() => undefined);
   }, [router, surveyId]);

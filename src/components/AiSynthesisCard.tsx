@@ -58,9 +58,11 @@ export function AiSynthesisCard({
     <div className="card">
       <div className="flex items-center justify-between">
         <h2 className="section-title">AI Synthesis</h2>
-        <span className="badge-beta">Beta</span>
+        <span className="badge-beta">Example</span>
       </div>
-      <p className="mt-1.5 text-[12px] text-[var(--ink-soft)]">Based on feedback so far, here are early themes and suggested actions.</p>
+      <p className="mt-1.5 text-[12px] text-[var(--ink-soft)]">
+        Example themes shown for illustration — not yet generated from your team&apos;s real responses.
+      </p>
 
       <div className="mt-1">
         {themes.map((theme) => (
