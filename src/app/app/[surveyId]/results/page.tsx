@@ -201,22 +201,46 @@ export default function SurveyResultsPage() {
   );
 }
 
+// This banner is meant to be the dominant, unambiguous read on the page --
+// the state score/AI cards below are supporting detail, not competing
+// headlines, so this gets a colored accent and more weight than a plain
+// .card would give it.
 function ResultsStateBanner({ state, protectedReport }: { state: ResultsState; protectedReport: boolean | null }) {
-  const { title, body, icon: Icon } =
+  const { title, body, icon: Icon, accent } =
     state === "collecting"
-      ? { title: "Collecting responses", body: "Results stay hidden until enough people have responded to keep individuals unidentifiable.", icon: Send }
+      ? {
+          title: "Collecting responses",
+          body: "Results stay hidden until enough people have responded to keep individuals unidentifiable.",
+          icon: Send,
+          accent: "var(--ink-mid)",
+        }
       : state === "ready"
-        ? { title: "Results ready", body: "Enough responses are in. The aggregate report below is unlocked.", icon: CheckCircle2 }
+        ? {
+            title: "Results ready",
+            body: "Enough responses are in. The aggregate report below is unlocked.",
+            icon: CheckCircle2,
+            accent: "var(--green)",
+          }
         : protectedReport
-          ? { title: "Closed — results stayed protected", body: "This survey is locked, and the anonymity threshold was never reached, so results remain hidden.", icon: Lock }
-          : { title: "Closed — results available", body: "This survey is locked. No further responses can be submitted, and results are available below.", icon: Lock };
+          ? {
+              title: "Closed — results stayed protected",
+              body: "This survey is locked, and the anonymity threshold was never reached, so results remain hidden.",
+              icon: Lock,
+              accent: "var(--ink-mid)",
+            }
+          : {
+              title: "Closed — results available",
+              body: "This survey is locked. No further responses can be submitted, and results are available below.",
+              icon: Lock,
+              accent: "var(--green)",
+            };
   return (
-    <div className="card flex items-start gap-3 py-3.5">
-      <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--bg-active)] text-[var(--ink-mid)]">
-        <Icon size={14} strokeWidth={1.8} />
+    <div className="card flex items-start gap-3 py-4" style={{ borderLeft: `3px solid ${accent}` }}>
+      <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--bg-active)]" style={{ color: accent }}>
+        <Icon size={15} strokeWidth={1.8} />
       </span>
       <div>
-        <p className="text-[13.5px] font-medium text-[var(--ink)]">{title}</p>
+        <p className="text-[14.5px] font-semibold text-[var(--ink)]">{title}</p>
         <p className="mt-0.5 text-[12.5px] leading-[1.5] text-[var(--ink-soft)]">{body}</p>
       </div>
     </div>
