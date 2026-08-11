@@ -91,10 +91,12 @@ export default function HomePage() {
   // started, not a permanent fixture.
   const showGuidedStep = !liveSurvey && !everRun && employeeCount !== null;
   const resultsUnlocked = liveSurvey ? liveSurvey.responseCount >= liveSurvey.minGroupSize : false;
-  // A brand-new, empty workspace shouldn't show "All surveys" / shortcuts
-  // beside the guided card -- there's nothing there yet, and it turns one
-  // clear next action into a dashboard with competing panels.
-  const isEmptyWorkspace = showGuidedStep && !draftSurvey;
+  // Whenever there's a real next action -- guided first-run, a draft
+  // waiting to send, or a live survey collecting/ready -- the card goes
+  // full width with nothing competing beside it. "All surveys" and
+  // shortcuts only earn a place once there's genuinely nothing pending,
+  // which is the calm baseline state, not the common one.
+  const hasActionableNextStep = showGuidedStep || Boolean(draftSurvey) || Boolean(liveSurvey);
 
   const nextStepCard = (
     <div className="card">
@@ -154,7 +156,9 @@ export default function HomePage() {
       ) : (
         <>
           <h2 className="section-title text-[15px]">No active survey</h2>
-          <p className="mt-2 secondary-text">Start a new survey to hear from your team.</p>
+          <p className="mt-2 secondary-text">
+            {everRun ? "Consider running your next pulse in about six months to track progress." : "Start a new survey to hear from your team."}
+          </p>
           {canCreate ? (
             <Link href="/app/surveys/new" className="btn-primary mt-4 w-full justify-center">
               <Plus size={14} strokeWidth={1.8} />
@@ -166,7 +170,7 @@ export default function HomePage() {
     </div>
   );
 
-  if (isEmptyWorkspace) {
+  if (hasActionableNextStep) {
     return (
       <AppShell title={`${greeting()}.`} subtitle="Here's what needs your attention.">
         {nextStepCard}
