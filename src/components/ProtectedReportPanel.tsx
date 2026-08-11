@@ -3,7 +3,9 @@
 import { useEffect, useState, useTransition } from "react";
 import { Download, EyeOff, RefreshCw, Share2 } from "lucide-react";
 import { Card } from "@/components/AppShell";
+import { AiSynthesisCard } from "@/components/AiSynthesisCard";
 import { ConfidentialitySeal } from "@/components/ConfidentialitySeal";
+import { PsychologicalSafetyCard } from "@/components/PsychologicalSafetyCard";
 import { SkeletonCard, SkeletonText } from "@/components/Skeleton";
 import { useToast } from "@/components/ToastProvider";
 import { ViewerCard } from "@/components/ViewerShell";
@@ -113,12 +115,11 @@ export function ProtectedReportPanel({ mode = "admin", cycleId }: { mode?: "admi
   if (loading && !result) {
     return (
       <>
-        <ConfidentialitySeal />
-        <div className="grid gap-2.5 lg:grid-cols-3">
-          <SkeletonCard />
+        <div className="grid gap-3 md:grid-cols-2">
           <SkeletonCard />
           <SkeletonCard />
         </div>
+        <ConfidentialitySeal />
         <div className="card mt-[9px]">
           <SkeletonText lines={4} />
         </div>
@@ -126,23 +127,17 @@ export function ProtectedReportPanel({ mode = "admin", cycleId }: { mode?: "admi
     );
   }
 
+  const scoredRows = report?.rows.filter((row) => row.average !== null) ?? [];
+  const overallScore = scoredRows.length ? scoredRows.reduce((sum, row) => sum + (row.average ?? 0), 0) / scoredRows.length : null;
+
   return (
     <>
-      <ConfidentialitySeal />
-      <div className="grid gap-2.5 lg:grid-cols-3">
-        <ShellCard>
-          <div className="data-number text-[28px]">{report?.n ?? 0}</div>
-          <p className="mt-1 secondary-text">Responses</p>
-        </ShellCard>
-        <ShellCard>
-          <div className="data-number text-[28px]">{minGroupSize}</div>
-          <p className="mt-1 secondary-text">Minimum group size</p>
-        </ShellCard>
-        <div className={`card ${report?.protected ? "" : "bg-[var(--ink)]"}`}>
-          <div className={`data-number text-[28px] ${report?.protected ? "" : "text-white"}`}>{report?.protected ? "Protected" : "Unlocked"}</div>
-          <p className={`mt-1 secondary-text ${report?.protected ? "" : "text-white/60"}`}>Report state</p>
-        </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        <PsychologicalSafetyCard n={report?.n ?? 0} minGroupSize={minGroupSize} protectedState={report?.protected ?? true} score={overallScore} />
+        <AiSynthesisCard />
       </div>
+
+      <ConfidentialitySeal />
 
       <ShellCard className="mt-[9px]">
         <div className="mb-4 flex items-center justify-between gap-3">

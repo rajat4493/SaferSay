@@ -2,6 +2,7 @@
 
 import {
   ChevronDown,
+  ClipboardList,
   CreditCard,
   Home,
   Lock,
@@ -33,87 +34,61 @@ type NavItemConfig = {
   visible?: (role: UserRole) => boolean;
 };
 
-type NavGroupConfig = {
-  label: string;
-  collapsible?: boolean;
-  hideForPureOwner?: boolean;
-  items: NavItemConfig[];
-};
-
-// Three-zone navigation per CLAUDE_CODE_ADMIN_REFACTOR.md §1
-// All roles use the SAME app -- differences only in what's visible
-const navGroups: NavGroupConfig[] = [
-  {
-    label: "Surveys",
-    hideForPureOwner: true,
-    items: [{ href: "/app", label: "All surveys", icon: Home }],
-  },
-  {
-    label: "People",
-    hideForPureOwner: true,
-    items: [{ href: "/app/people", label: "Employee list", icon: Users }],
-  },
-  {
-    label: "Workspace",
-    collapsible: true,
-    hideForPureOwner: true,
-    items: [
-      { href: "/app/workspace/settings", label: "Settings", icon: Settings, hideForPureOwner: true },
-      { href: "/app/workspace/billing", label: "Billing", icon: CreditCard, hideForPureOwner: true },
-      { href: "/app/workspace/team", label: "Team", icon: UserPlus, hideForPureOwner: true },
-    ],
-  },
-  {
-    // Not gated on Workspace access: auditor (Viewer) has security-proof and
-    // audit-log access per permissions.ts but no Workspace access. Security
-    // is a public page (/security), shown here as an in-app shortcut.
-    label: "Trust",
-    hideForPureOwner: true,
-    items: [
-      { href: "/security", label: "Security", icon: LockKeyhole, hideForPureOwner: true, visible: canAccessSecurityProof },
-      { href: "/app/audit-log", label: "Audit log", icon: ScrollText, hideForPureOwner: true, visible: canAccessAuditLog },
-    ],
-  },
+// Primary nav: flat, three destinations. Everything else (workspace admin,
+// trust/audit pages) lives in the user-card menu instead of taking up
+// primary sidebar space -- same permission checks as before, just folded.
+const primaryNavItems: NavItemConfig[] = [
+  { href: "/app", label: "Home", icon: Home, hideForPureOwner: true },
+  { href: "/app/surveys", label: "Surveys", icon: ClipboardList, hideForPureOwner: true },
+  { href: "/app/people", label: "People", icon: Users, hideForPureOwner: true, visible: canAccessPeople },
 ];
 
-export function AppShell({ children, title, subtitle }: { children: React.ReactNode; title: string; subtitle: string }) {
+const foldedMenuItems: NavItemConfig[] = [
+  { href: "/app/workspace/settings", label: "Settings", icon: Settings, hideForPureOwner: true, visible: canAccessWorkspace },
+  { href: "/app/workspace/billing", label: "Billing", icon: CreditCard, hideForPureOwner: true, visible: canAccessWorkspace },
+  { href: "/app/workspace/team", label: "Team", icon: UserPlus, hideForPureOwner: true, visible: canAccessWorkspace },
+  { href: "/security", label: "Security", icon: LockKeyhole, hideForPureOwner: true, visible: canAccessSecurityProof },
+  { href: "/app/audit-log", label: "Audit log", icon: ScrollText, hideForPureOwner: true, visible: canAccessAuditLog },
+];
+
+export function AppShell({
+  children,
+  title,
+  subtitle,
+  headerActions,
+}: {
+  children: React.ReactNode;
+  title: string;
+  subtitle: string;
+  headerActions?: React.ReactNode;
+}) {
   const pathname = usePathname();
   const { brand } = useBrand();
   const { info } = useTenantSession();
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
 
   // Pure Owner mode: signed in as the platform's super admin, not currently
   // acting inside any customer's workspace. No survey-running nav belongs
   // here -- that only appears once the Owner has explicitly entered a tenant.
   const pureOwnerMode = Boolean(info?.isSuperAdmin && !info.isImpersonating);
 
-  // Apply role-based permission filters (four-role model per CLAUDE_CODE_ADMIN_REFACTOR.md §2)
-  const visibleNavGroups = navGroups
-    .filter((group) => {
-      if (pureOwnerMode && group.hideForPureOwner) return false;
-      // Filter "People" zone for roles without access
-      if (group.label === "People" && info && !canAccessPeople(info.role)) return false;
-      // Filter "Workspace" zone for non-admin roles
-      if (group.label === "Workspace" && info && !canAccessWorkspace(info.role)) return false;
+  const filterItems = (items: NavItemConfig[]) =>
+    items.filter((item) => {
+      if (pureOwnerMode && item.hideForPureOwner) return false;
+      if (item.visible && info && !item.visible(info.role)) return false;
       return true;
-    })
-    .map((group) => ({
-      ...group,
-      items: group.items.filter((item) => {
-        if (pureOwnerMode && item.hideForPureOwner) return false;
-        if (item.visible && info && !item.visible(info.role)) return false;
-        return true;
-      }),
-    }))
-    .filter((group) => group.items.length > 0);
+    });
+
+  const visiblePrimaryItems = filterItems(primaryNavItems);
+  const visibleFoldedItems = filterItems(foldedMenuItems);
 
   const sidebarContent = (
     <>
       <div className="flex items-center justify-between px-4 pt-4 pb-3">
         <Link href="/" className="flex items-center gap-2.5">
           <BrandMark />
-          <span className="truncate text-[14px] font-semibold leading-none text-[var(--ink)]">{brand.name}</span>
+          <span className="truncate text-[16px] font-semibold leading-none text-[var(--ink)]">{brand.name}</span>
         </Link>
         <button onClick={() => setMobileNavOpen(false)} aria-label="Close menu" className="text-[var(--ink-mid)] lg:hidden">
           <X size={18} strokeWidth={1.8} />
@@ -121,47 +96,50 @@ export function AppShell({ children, title, subtitle }: { children: React.ReactN
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2.5 py-2">
-        {visibleNavGroups.map((group, index) => {
-          const hasActiveItem = group.items.some((item) => pathname === item.href);
-          const isOpen = group.collapsible ? (openGroups[group.label] ?? hasActiveItem) : true;
-          return (
-            <div key={group.label} className={index === 0 ? "" : "mt-5"}>
-              {group.collapsible ? (
-                <button
-                  onClick={() => setOpenGroups((current) => ({ ...current, [group.label]: !isOpen }))}
-                  className="meta-label flex w-full items-center justify-between px-2.5 py-1"
-                >
-                  {group.label}
-                  <ChevronDown size={12} strokeWidth={2} className={`transition-transform ${isOpen ? "rotate-180" : ""}`} />
-                </button>
-              ) : (
-                <p className="meta-label px-2.5 py-1">{group.label}</p>
-              )}
-              {isOpen ? (
-                <div className="mt-1 space-y-0.5">
-                  {group.items.map((item) => (
-                    <NavLink key={item.href} item={item} active={pathname === item.href} onNavigate={() => setMobileNavOpen(false)} />
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          );
-        })}
+        <div className="space-y-0.5">
+          {visiblePrimaryItems.map((item) => (
+            <NavLink key={item.href} item={item} active={pathname === item.href} onNavigate={() => setMobileNavOpen(false)} />
+          ))}
+        </div>
       </nav>
 
-      <div className="mt-auto border-t border-[var(--bg-active)] px-4 py-3">
-        <div className="flex items-center gap-2.5">
+      <div className="relative mt-auto border-t border-[var(--bg-active)] px-2.5 py-2.5">
+        {accountMenuOpen && visibleFoldedItems.length > 0 ? (
+          <div className="absolute inset-x-2.5 bottom-[54px] rounded-[12px] border border-[var(--border)] bg-white p-1.5 shadow-[var(--shadow-elevated)]">
+            {visibleFoldedItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => {
+                  setAccountMenuOpen(false);
+                  setMobileNavOpen(false);
+                }}
+                className="flex items-center gap-2 rounded-[8px] px-2.5 py-[7px] text-[12.5px] text-[var(--ink-mid)] transition hover:bg-[var(--bg-hover)] hover:text-[var(--ink)]"
+              >
+                <item.icon size={14} strokeWidth={1.8} />
+                {item.label}
+              </Link>
+            ))}
+            <div className="my-1 border-t border-[var(--border)]" />
+            <div className="px-1">
+              <SignOutButton fullWidth />
+            </div>
+          </div>
+        ) : null}
+
+        <button
+          onClick={() => setAccountMenuOpen((current) => !current)}
+          className="flex w-full items-center gap-2.5 rounded-[10px] px-1.5 py-1.5 text-left transition hover:bg-[var(--bg-hover)]"
+        >
           <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--ink)] text-[11px] font-semibold text-white">
             {(info?.tenantName ?? brand.name).slice(0, 1).toUpperCase()}
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="truncate text-[13px] font-medium text-[var(--ink)]">{info?.tenantName ?? brand.name}</div>
             <RoleTag />
           </div>
-        </div>
-        <div className="mt-2.5">
-          <SignOutButton fullWidth />
-        </div>
+          <ChevronDown size={14} strokeWidth={1.8} className={`shrink-0 text-[var(--ink-faint)] transition-transform ${accountMenuOpen ? "rotate-180" : ""}`} />
+        </button>
       </div>
     </>
   );
@@ -169,39 +147,38 @@ export function AppShell({ children, title, subtitle }: { children: React.ReactN
   return (
     <div className="flex min-h-screen bg-[var(--bg)] text-[var(--ink)]">
       {/* Desktop sidebar -- always visible at lg+ */}
-      <aside className="sticky top-0 hidden h-screen w-[200px] shrink-0 flex-col border-r border-[var(--border)] bg-white lg:flex">{sidebarContent}</aside>
+      <aside className="sticky top-0 hidden h-screen w-[230px] shrink-0 flex-col border-r border-[var(--border-soft)] bg-[var(--bg-sidebar)] lg:flex">{sidebarContent}</aside>
 
       {/* Mobile sidebar -- slide-in drawer, per "sidebar collapses" (design directive) */}
       {mobileNavOpen ? (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div className="absolute inset-0 bg-black/30" onClick={() => setMobileNavOpen(false)} />
-          <aside className="absolute inset-y-0 left-0 flex w-[240px] flex-col border-r border-[var(--border)] bg-white">{sidebarContent}</aside>
+          <aside className="absolute inset-y-0 left-0 flex w-[240px] flex-col border-r border-[var(--border-soft)] bg-[var(--bg-sidebar)]">{sidebarContent}</aside>
         </div>
       ) : null}
 
       <div className="flex min-h-screen flex-1 flex-col">
-        <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-[var(--border)] bg-white px-4 py-[11px] sm:px-6">
-          <div className="flex min-w-0 items-center gap-3">
-            <button onClick={() => setMobileNavOpen(true)} aria-label="Open menu" className="shrink-0 text-[var(--ink-mid)] lg:hidden">
-              <Menu size={18} strokeWidth={1.8} />
-            </button>
-            <div className="hidden items-center gap-1.5 text-[12px] font-medium text-[var(--ink-mid)] sm:flex">
-              <Lock size={13} strokeWidth={1.8} />
-              Confidential — you see numbers, never names
-            </div>
+        <header className="sticky top-0 z-10 grid h-12 shrink-0 grid-cols-[auto_1fr_auto] items-center gap-3 border-b border-[var(--border-soft)] bg-white/55 px-4 backdrop-blur-sm sm:px-6">
+          <button onClick={() => setMobileNavOpen(true)} aria-label="Open menu" className="shrink-0 text-[var(--ink-mid)] lg:hidden">
+            <Menu size={18} strokeWidth={1.8} />
+          </button>
+          <div className="hidden items-center justify-center gap-1.5 text-[13px] text-[#676A66] sm:flex">
+            <Lock size={13} strokeWidth={1.8} />
+            Confidential — you see numbers, never names
           </div>
-          <div className="flex shrink-0 items-center gap-3 sm:gap-4">
-            <Link href="/app/pilot" className="secondary-text font-medium text-[var(--ink-mid)] hover:text-[var(--ink)]">
-              First-run guide
-            </Link>
-          </div>
+          <Link href="/app/pilot" className="col-start-3 justify-self-end whitespace-nowrap text-[13px] font-medium text-[var(--ink-mid)] hover:text-[var(--ink)]">
+            First-run guide
+          </Link>
         </header>
 
-        <section className="flex-1 overflow-y-auto px-4 py-7 sm:px-6">
-          <div className="mx-auto max-w-5xl">
-            <div className="mb-6">
-              <h1 className="page-title">{title}</h1>
-              <p className="mt-1.5 secondary-text">{subtitle}</p>
+        <section className="flex-1 overflow-y-auto px-5 py-10 lg:px-12 lg:py-16">
+          <div className="mx-auto max-w-[1080px]">
+            <div className="mb-8 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h1 className="page-title">{title}</h1>
+                <p className="mt-2 secondary-text">{subtitle}</p>
+              </div>
+              {headerActions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{headerActions}</div> : null}
             </div>
             <ImpersonationBanner />
             {children}
@@ -217,11 +194,11 @@ function NavLink({ item, active, onNavigate }: { item: NavItemConfig; active: bo
     <Link
       href={item.href}
       onClick={onNavigate}
-      className={`flex items-center gap-2.5 rounded-[var(--radius-input)] px-2.5 py-[7px] text-[13px] transition ${
-        active ? "bg-[var(--bg-active)] font-medium text-[var(--ink)]" : "font-normal text-[var(--ink-mid)] hover:bg-[var(--bg-hover)] hover:text-[var(--ink)]"
+      className={`flex h-12 items-center gap-3 rounded-[10px] px-4 text-[15px] font-medium transition ${
+        active ? "bg-[var(--bg-active)] text-[var(--ss-green-700)]" : "text-[#454A46] hover:bg-[var(--bg-hover)] hover:text-[var(--ink)]"
       }`}
     >
-      <item.icon size={15} strokeWidth={1.8} />
+      <item.icon size={18} strokeWidth={1.7} />
       {item.label}
     </Link>
   );

@@ -1,9 +1,8 @@
 <svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
   <title id="title">SaferSay mark</title>
   <desc id="desc">A simple protected speech mark for SaferSay.</desc>
-  <rect width="128" height="128" rx="32" fill="#161616"/>
+  <rect width="128" height="128" rx="64" fill="#2b5d46"/>
   <path d="M30 44C30 32.9543 38.9543 24 50 24H78C89.0457 24 98 32.9543 98 44V68C98 79.0457 89.0457 88 78 88H59L42 103V88H50C38.9543 88 30 79.0457 30 68V44Z" fill="#F4F1EA"/>
-  <path d="M50 56.5H78" stroke="#161616" stroke-width="8" stroke-linecap="round"/>
-  <path d="M50 72.5H68" stroke="#161616" stroke-width="8" stroke-linecap="round"/>
-  <circle cx="87" cy="39" r="11" fill="#C8B6FF"/>
+  <path d="M50 56.5H78" stroke="#2b5d46" stroke-width="8" stroke-linecap="round"/>
+  <path d="M50 72.5H68" stroke="#2b5d46" stroke-width="8" stroke-linecap="round"/>
 </svg>
