@@ -40,7 +40,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     return NextResponse.json({ ok: false, error: "That team member or invite no longer exists." }, { status: 404 });
   }
   if (result.error === "last-admin") {
-    return NextResponse.json({ ok: false, error: "A workspace needs at least one HR Admin — invite another HR Admin before removing this one." }, { status: 400 });
+    return NextResponse.json({ ok: false, error: "A workspace needs at least one Workspace Owner — invite another Workspace Owner before removing this one." }, { status: 400 });
   }
   await logTeamMemberRemoved(session.tenant.id, session.role, session.email, result.removedRole);
   return NextResponse.json({ ok: true, team: result.team });

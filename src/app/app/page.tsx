@@ -34,6 +34,7 @@ export default function HomePage() {
   const [mode, setMode] = useState<ViewMode>("loading");
   const [canCreate, setCanCreate] = useState(false);
   const [cycles, setCycles] = useState<SurveyCycle[] | null>(null);
+  const [employeeCount, setEmployeeCount] = useState<number | null>(null);
 
   useEffect(() => {
     fetch("/api/tenants/current")
@@ -66,6 +67,10 @@ export default function HomePage() {
         }
       })
       .catch(() => setCycles([]));
+    fetch("/api/employees?limit=1")
+      .then((response) => response.json())
+      .then((data: { ok?: boolean; total?: number }) => setEmployeeCount(data.ok ? (data.total ?? 0) : 0))
+      .catch(() => setEmployeeCount(0));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
@@ -78,6 +83,13 @@ export default function HomePage() {
   }
 
   const liveSurvey = cycles?.find((cycle) => cycle.status === "open");
+  const draftSurvey = cycles?.find((cycle) => cycle.status === "draft");
+  const everRun = (cycles?.length ?? 0) > 0;
+  // Guided next-step only applies to a brand-new workspace that's never run
+  // a survey. Once one full cycle has happened, this card gets out of the
+  // way and Home goes back to plain status -- the guidance is for getting
+  // started, not a permanent fixture.
+  const showGuidedStep = !liveSurvey && !everRun && employeeCount !== null;
 
   return (
     <AppShell title={`${greeting()}.`} subtitle="Here's what needs your attention.">
@@ -107,6 +119,33 @@ export default function HomePage() {
               </p>
               <Link href={`/app/${liveSurvey.id}/results`} className="btn-primary mt-4 w-full justify-center">
                 Open survey
+              </Link>
+            </>
+          ) : showGuidedStep && employeeCount === 0 ? (
+            <>
+              <p className="label-text text-[var(--green)]">Your next step</p>
+              <h2 className="mt-1.5 section-title text-[15px]">Add your people</h2>
+              <p className="mt-2 secondary-text">Add the people who should receive this survey.</p>
+              <Link href="/app/people" className="btn-primary mt-4 w-full justify-center">
+                Add people →
+              </Link>
+            </>
+          ) : showGuidedStep && canCreate ? (
+            <>
+              <p className="label-text text-[var(--green)]">Your next step</p>
+              <h2 className="mt-1.5 section-title text-[15px]">Create your first survey</h2>
+              <p className="mt-2 secondary-text">Pick a template to get started.</p>
+              <Link href="/app/surveys/new" className="btn-primary mt-4 w-full justify-center">
+                Create survey →
+              </Link>
+            </>
+          ) : draftSurvey ? (
+            <>
+              <p className="label-text text-[var(--green)]">Your next step</p>
+              <h2 className="mt-1.5 section-title text-[15px]">{draftSurvey.name}</h2>
+              <p className="mt-2 secondary-text">This survey is drafted but hasn&apos;t been sent yet.</p>
+              <Link href={`/app/${draftSurvey.id}/send`} className="btn-primary mt-4 w-full justify-center">
+                Review and send →
               </Link>
             </>
           ) : (

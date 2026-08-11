@@ -83,7 +83,7 @@ export function OwnerConsoleShell({ children }: { children: React.ReactNode }) {
         })}
       </nav>
       <div className="mt-auto border-t border-[var(--bg-active)] px-4 py-3">
-        <p className="text-[11.5px] text-[var(--ink-faint)]">Owner</p>
+        <p className="text-[11.5px] text-[var(--ink-faint)]">Platform Owner</p>
       </div>
     </>
   );
