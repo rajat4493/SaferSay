@@ -81,7 +81,7 @@ describe("Audit Log De-anonymization Guard", () => {
       await expect(
         logAuditEvent({
           ...validEntry,
-          action: "participant_responded", // UNSAFE: respondent action
+          action: "participant_responded" as never, // UNSAFE: respondent action -- deliberately not a real AuditLogAction, testing the runtime guard rejects it
         })
       ).rejects.toThrow(/AUDIT GUARD VIOLATION/);
     });
@@ -90,7 +90,7 @@ describe("Audit Log De-anonymization Guard", () => {
       await expect(
         logAuditEvent({
           ...validEntry,
-          action: "submission_received", // UNSAFE: submission tracking
+          action: "submission_received" as never, // UNSAFE: submission tracking -- deliberately not a real AuditLogAction
         })
       ).rejects.toThrow(/AUDIT GUARD VIOLATION/);
     });
@@ -99,7 +99,7 @@ describe("Audit Log De-anonymization Guard", () => {
       await expect(
         logAuditEvent({
           ...validEntry,
-          action: "who_answered_query", // UNSAFE: respondent identity tracking
+          action: "who_answered_query" as never, // UNSAFE: respondent identity tracking -- deliberately not a real AuditLogAction
         })
       ).rejects.toThrow(/AUDIT GUARD VIOLATION/);
     });
@@ -108,7 +108,7 @@ describe("Audit Log De-anonymization Guard", () => {
       await expect(
         logAuditEvent({
           ...validEntry,
-          action: "respondent_list_exported", // UNSAFE: individual respondent tracking
+          action: "respondent_list_exported" as never, // UNSAFE: individual respondent tracking -- deliberately not a real AuditLogAction
         })
       ).rejects.toThrow(/AUDIT GUARD VIOLATION/);
     });

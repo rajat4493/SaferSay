@@ -52,10 +52,6 @@ export function canModifyBilling(role: UserRole): boolean {
   return role === "customer_admin";
 }
 
-export function canAccessGoLive(role: UserRole): boolean {
-  return role === "customer_admin";
-}
-
 export function canManageTeam(role: UserRole): boolean {
   return role === "customer_admin";
 }
