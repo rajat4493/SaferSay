@@ -9,6 +9,16 @@ describe("first-run pilot guide", () => {
     expect(route).toContain("getPilotState");
   });
 
+  it("gates pilot state on canViewSurveyResults, not just session existence", () => {
+    // Regression test: this route originally checked only that a session
+    // existed, letting any authenticated tenant member (including a
+    // read-only auditor) read report/employee/invite aggregate counts it
+    // shouldn't have access to. Fixed alongside cycles/seed.
+    const route = readFileSync("src/app/api/pilot/state/route.ts", "utf8");
+    expect(route).toContain("canViewSurveyResults");
+    expect(route).toMatch(/canViewSurveyResults\(session\.role\)/);
+  });
+
   it("tracks the core pilot steps", () => {
     const service = readFileSync("src/lib/server/pilotStateService.ts", "utf8");
     expect(service).toContain("Upload employees");
