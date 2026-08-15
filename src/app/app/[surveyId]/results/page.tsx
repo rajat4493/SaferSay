@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Calendar, CheckCircle2, FileEdit, Lock, Send } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { CycleTrendPanel } from "@/components/CycleTrendPanel";
 import { ProtectedReportPanel } from "@/components/ProtectedReportPanel";
 import { SurveyStageTabs } from "@/components/SurveyStageTabs";
 import { useToast } from "@/components/ToastProvider";
@@ -142,6 +143,8 @@ export default function SurveyResultsPage() {
         {resultsState ? <ResultsStateBanner state={resultsState} protectedReport={protectedReport} /> : null}
 
         <ProtectedReportPanel cycleId={surveyId} />
+
+        {cycles.length > 1 ? <CycleTrendPanel /> : null}
 
         {resultsState === "closed" ? (
           <div className="card">

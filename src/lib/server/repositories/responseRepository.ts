@@ -1,6 +1,14 @@
 import { randomUUID } from "crypto";
 import type { Queryable } from "@/lib/server/db/tenantPool";
-import { ResponseAnswerInput, ProtectedReport, ReportScope, RespondentSurveySession } from "./types";
+import { ResponseAnswerInput, ProtectedReport, ReportScope, RespondentSurveySession, CycleTrendQuestion } from "./types";
+
+const MAX_TREND_CYCLES = 6;
+
+/** Trim/lowercase so cosmetic differences (whitespace, casing) don't split
+ * an otherwise-identical question into two trend lines. */
+function normalizeQuestionText(text: string): string {
+  return text.trim().toLowerCase().replace(/\s+/g, " ");
+}
 
 const orgScope: ReportScope = { type: "org" };
 
@@ -259,6 +267,69 @@ export class ResponseRepository {
     const row = result.rows[0];
     if (!row) return null;
     return { ...row, name: stripTenantPrefix(row.name, tenantName) };
+  }
+
+  /**
+   * Per-question average across a tenant's most recent cycles, matched by
+   * normalized question text since edited templates get a fresh question_id
+   * every time a question is reworded (surveyCycleService.ts's
+   * createCycleScopedTemplate) -- id-based matching would fail to connect
+   * most real tenants' cycles. Each point still carries its own cycle's
+   * k-anonymity protection (min_group_size), unchanged from the single-cycle
+   * report -- this is a pivot of the same protected data, not a new
+   * aggregation path around it.
+   */
+  async getCrossCycleTrendForTenant(tenantId: string, tenantName?: string): Promise<CycleTrendQuestion[]> {
+    const cycles = await this.listCyclesForTenant(tenantId, tenantName);
+    const recentCycles = cycles.slice(0, MAX_TREND_CYCLES).reverse(); // oldest first
+    if (recentCycles.length === 0) return [];
+
+    const cycleIds = recentCycles.map((cycle) => cycle.id);
+    const result = await this.db.query<{
+      cycle_id: string;
+      question_id: string;
+      question_text: string;
+      n: number;
+      average: string | null;
+      protected: boolean;
+    }>(
+      `select cycle_id, question_id, question_text, n, average, protected
+       from responses.report_question_trend($1, $2)`,
+      [tenantId, cycleIds],
+    );
+
+    const cycleById = new Map(recentCycles.map((cycle) => [cycle.id, cycle]));
+    const questionsByNormalizedText = new Map<string, CycleTrendQuestion>();
+
+    for (const row of result.rows) {
+      const cycle = cycleById.get(row.cycle_id);
+      if (!cycle) continue; // defensive: row from a cycle outside the requested set
+
+      const normalized = normalizeQuestionText(row.question_text);
+      let question = questionsByNormalizedText.get(normalized);
+      if (!question) {
+        question = { questionText: row.question_text, points: [] };
+        questionsByNormalizedText.set(normalized, question);
+      }
+      question.points.push({
+        cycleId: cycle.id,
+        cycleName: cycle.name,
+        n: row.n,
+        average: row.protected || row.average === null ? null : Number(row.average),
+        protected: row.protected,
+      });
+    }
+
+    // Order each question's points to match cycle recency (oldest first),
+    // and drop questions with fewer than 2 points -- a single-cycle line
+    // isn't a trend and just adds noise to the panel.
+    const cycleOrder = new Map(recentCycles.map((cycle, index) => [cycle.id, index]));
+    return Array.from(questionsByNormalizedText.values())
+      .filter((question) => question.points.length > 1)
+      .map((question) => ({
+        ...question,
+        points: [...question.points].sort((a, b) => (cycleOrder.get(a.cycleId) ?? 0) - (cycleOrder.get(b.cycleId) ?? 0)),
+      }));
   }
 
   async getLatestProtectedReportForTenant(tenantId: string, scope: ReportScope = orgScope, tenantName?: string) {
