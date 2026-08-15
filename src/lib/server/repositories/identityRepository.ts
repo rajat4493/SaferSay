@@ -911,7 +911,35 @@ export class IdentityRepository {
     return result.rows[0]?.id ?? null;
   }
 
+  /**
+   * A `failed` outbox row (e.g. RESEND_API_KEY was missing/misconfigured
+   * at send time) is otherwise permanently stuck: prepareInviteOutbox's
+   * `on conflict (participant_id, delivery_type) do nothing` never touches
+   * an existing row, and nothing else in the app resets one. Called at the
+   * top of both prepare methods below so every "prepare" (real Send button
+   * or the dev/test panel) also gives previously-failed, still-eligible
+   * participants a fresh shot at delivery -- without this, once a send
+   * fails for any reason, that participant can never be retried again.
+   */
+  private async resetFailedOutbox(tenantId: string, cycleId: string, deliveryType: "invite" | "reminder") {
+    const result = await this.db.query(
+      `update identity.invite_outbox o
+       set delivery_status = 'pending', updated_at = now()
+       from identity.survey_participants p
+       where o.participant_id = p.id
+         and o.tenant_id = $1
+         and o.cycle_id = $2
+         and o.delivery_type = $3
+         and o.delivery_status = 'failed'
+         and p.token_status = 'issued'
+         and ($3 <> 'reminder' or p.reminder_count < 3)`,
+      [tenantId, cycleId, deliveryType],
+    );
+    return result.rowCount ?? 0;
+  }
+
   async prepareInviteOutbox(tenantId: string, cycleId: string) {
+    const retried = await this.resetFailedOutbox(tenantId, cycleId, "invite");
     const result = await this.db.query(
       `insert into identity.invite_outbox (id, tenant_id, cycle_id, participant_id, delivery_type)
        select (
@@ -928,10 +956,11 @@ export class IdentityRepository {
        on conflict (participant_id, delivery_type) do nothing`,
       [tenantId, cycleId],
     );
-    return result.rowCount ?? 0;
+    return (result.rowCount ?? 0) + retried;
   }
 
   async prepareReminderOutbox(tenantId: string, cycleId: string) {
+    const retried = await this.resetFailedOutbox(tenantId, cycleId, "reminder");
     const result = await this.db.query(
       `insert into identity.invite_outbox (id, tenant_id, cycle_id, participant_id, delivery_type)
        select (
@@ -949,7 +978,7 @@ export class IdentityRepository {
        on conflict (participant_id, delivery_type) do nothing`,
       [tenantId, cycleId],
     );
-    return result.rowCount ?? 0;
+    return (result.rowCount ?? 0) + retried;
   }
 
   async getInviteOutbox(tenantId: string, cycleId: string): Promise<{ summary: InviteOutboxSummary; rows: InviteOutboxRow[] }> {
