@@ -3,6 +3,7 @@ import { getSessionContext, isPlatformOwnerImpersonating } from "@/lib/server/au
 import { getDatabasePool } from "@/lib/server/db/pool";
 import { getTenantPool, withTenantContext } from "@/lib/server/db/tenantPool";
 import { ResponseRepository } from "@/lib/server/repositories/responseRepository";
+import type { ReportScope } from "@/lib/server/repositories/types";
 import { getProtectedServerReport } from "@/lib/serverStore";
 import { canViewSurveyResults } from "@/lib/permissions";
 
@@ -12,15 +13,25 @@ import { canViewSurveyResults } from "@/lib/permissions";
  * tenant's latest cycle -- same optional-cycleId convention as
  * /api/invites/outbox and /api/invites/queue.
  */
-async function loadReportForCycle(repo: ResponseRepository, tenantId: string, cycleId: string | null, tenantName?: string) {
-  if (!cycleId) return repo.getLatestProtectedReportForTenant(tenantId, undefined, tenantName);
+async function loadReportForCycle(
+  repo: ResponseRepository,
+  tenantId: string,
+  cycleId: string | null,
+  tenantName?: string,
+  department?: string | null,
+) {
+  // department scope only applies when a specific cycle is requested --
+  // the no-cycleId "latest cycle" convenience path stays org-scoped.
+  const scope: ReportScope | undefined = cycleId && department ? { type: "department", department } : undefined;
+
+  if (!cycleId) return repo.getLatestProtectedReportForTenant(tenantId, scope, tenantName);
 
   const cycle = await repo.getCycleForTenant(tenantId, cycleId, tenantName);
   if (!cycle) return { cycle: null, report: { protected: true as const, n: 0, rows: [] } };
 
   return {
     cycle: { id: cycle.id, name: cycle.name, minGroupSize: cycle.minGroupSize },
-    report: await repo.getProtectedReportForTenant(tenantId, cycle.id, cycle.minGroupSize),
+    report: await repo.getProtectedReportForTenant(tenantId, cycle.id, cycle.minGroupSize, scope),
   };
 }
 
@@ -45,11 +56,12 @@ export async function GET(request: NextRequest) {
   }
 
   const cycleId = request.nextUrl.searchParams.get("cycleId");
+  const department = request.nextUrl.searchParams.get("department");
   const tenantPool = getTenantPool();
   const { tenant } = session;
   if (tenantPool) {
     const result = await withTenantContext(tenantPool, tenant.id, (client) =>
-      loadReportForCycle(new ResponseRepository(client), tenant.id, cycleId, tenant.name),
+      loadReportForCycle(new ResponseRepository(client), tenant.id, cycleId, tenant.name, department),
     );
     return NextResponse.json({ ok: true, tenant, ...result });
   }
@@ -58,7 +70,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       ok: true,
       tenant,
-      ...(await loadReportForCycle(new ResponseRepository(adminPool), tenant.id, cycleId, tenant.name)),
+      ...(await loadReportForCycle(new ResponseRepository(adminPool), tenant.id, cycleId, tenant.name, department)),
     });
   }
   return NextResponse.json({ ok: true, cycle: null, report: await getProtectedServerReport() });

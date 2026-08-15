@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getSessionContext } from "@/lib/server/authSession";
 import { withTenantScopedDb } from "@/lib/server/db/tenantPool";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
+import { ResponseRepository } from "@/lib/server/repositories/responseRepository";
 import { sendQueuedInviteDeliveries } from "@/lib/server/resendDelivery";
 import { logInvitesSent, logRemindersSent } from "@/lib/server/auditLog";
 import { canRunSurvey } from "@/lib/permissions";
@@ -54,6 +55,10 @@ export async function POST(request: NextRequest) {
 
     if (deliveryType === "invite" && delivery.sent > 0) {
       await repo.markFirstRunCompleted(tenant.id);
+      // Real founder-facing "the survey is live" transition -- see
+      // ResponseRepository.openCycle. A reminder implies the cycle is
+      // already open, so this only fires for the initial invite send.
+      await new ResponseRepository(db).openCycle(tenant.id, cycleId);
     }
 
     return {

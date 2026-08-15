@@ -28,6 +28,20 @@ import {
   UserRole,
 } from "./types";
 
+/**
+ * Canonicalizes a free-text team value so "Engineering", "engineering ",
+ * and "Engineering  " land in the same anonymity group instead of
+ * fragmenting it three ways. This is the stored/grouped form; callers
+ * needing a display string should title-case it themselves (see
+ * titleCaseTeam in src/lib/textFormat.ts) -- grouping must stay on this
+ * canonical form everywhere it's compared (import, token issuance,
+ * submission segment, department picker).
+ */
+export function normalizeTeamLabel(value: string | null | undefined): string | null {
+  const collapsed = value?.trim().replace(/\s+/g, " ").toLowerCase();
+  return collapsed ? collapsed : null;
+}
+
 export class IdentityRepository {
   constructor(private readonly db: Queryable) {}
 
@@ -685,7 +699,7 @@ export class IdentityRepository {
          on conflict (tenant_id, email)
          do update set name = excluded.name, team = excluded.team, location = excluded.location, manager_email = excluded.manager_email
          returning id, email, name, team, location, manager_email`,
-        [id, tenantId, employee.email, employee.name ?? null, employee.team ?? null, employee.location ?? null, employee.managerEmail ?? null],
+        [id, tenantId, employee.email, employee.name ?? null, normalizeTeamLabel(employee.team), employee.location ?? null, employee.managerEmail ?? null],
       );
       imported.push(employee);
     }
@@ -758,20 +772,25 @@ export class IdentityRepository {
       id: string;
       email: string;
       name: string | null;
-    }>("select id, email, name from identity.employees where tenant_id = $1 and employment_status = 'active'", [
+      team: string | null;
+    }>("select id, email, name, team from identity.employees where tenant_id = $1 and employment_status = 'active'", [
       tenantId,
     ]);
 
     const issued: IssuedParticipantToken[] = [];
     for (const employee of employees.rows) {
       const rawToken = randomBytes(32).toString("base64url");
+      // team is already canonicalized by normalizeTeamLabel at import time
+      // -- snapshot it here so a later employee-record change (a re-import,
+      // a department rename) can't retroactively reshuffle this cycle's
+      // anonymity groups after invites already went out.
       const result = await this.db.query<{ id: string }>(
         `insert into identity.survey_participants
-          (id, tenant_id, cycle_id, employee_id, token_hash, token_status, issued_at)
-         values ($1, $2, $3, $4, $5, 'issued', now())
+          (id, tenant_id, cycle_id, employee_id, token_hash, token_status, issued_at, team)
+         values ($1, $2, $3, $4, $5, 'issued', now(), $6)
          on conflict (cycle_id, employee_id) do nothing
          returning id`,
-        [randomUUID(), tenantId, cycleId, employee.id, hashServerToken(rawToken)],
+        [randomUUID(), tenantId, cycleId, employee.id, hashServerToken(rawToken), employee.team],
       );
       if (result.rowCount === 1) {
         issued.push({ employeeId: employee.id, email: employee.email, name: employee.name ?? undefined, rawToken });
@@ -811,8 +830,9 @@ export class IdentityRepository {
       tenant_id: string;
       cycle_id: string;
       token_status: "issued" | "spent" | "revoked";
+      team: string | null;
     }>(
-      `select tenant_id, cycle_id, token_status
+      `select tenant_id, cycle_id, token_status, team
        from identity.survey_participants
        where token_hash = $1`,
       [tokenHash],

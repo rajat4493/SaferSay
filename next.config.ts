@@ -4,6 +4,14 @@ import type { NextConfig } from "next";
 // app, so script-src/style-src keep 'unsafe-inline' rather than breaking
 // Next.js hydration; connect-src is scoped to the services this app
 // actually calls (Supabase, Sentry) instead of left wide open.
+//
+// script-src additionally needs 'unsafe-eval' under `next dev` only --
+// webpack's dev-mode module wrapping (Fast Refresh/HMR) uses eval() for
+// better stack traces, and a strict CSP with no unsafe-eval silently
+// breaks client-side state updates across the app in local dev (this is
+// what made the dev-login panel, and other client fetches, appear to hang
+// -- not a bug in those components). The production build doesn't need
+// or get this relaxation.
 const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
@@ -14,7 +22,7 @@ const securityHeaders = [
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
+      `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV !== "production" ? " 'unsafe-eval'" : ""}`,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https:",
       "font-src 'self' data:",

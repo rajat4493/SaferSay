@@ -47,13 +47,17 @@ export class ResponseRepository {
     cycleId: string;
     spentTokenHash: string;
     answers: ResponseAnswerInput[];
+    // Already-canonicalized (see normalizeTeamLabel) and already-snapshotted
+    // at invite-issuance time -- this method just stores the string, it
+    // does not look anything up or normalize it further.
+    segmentTeam?: string | null;
   }) {
     const submissionId = randomUUID();
     await this.db.query(
       `insert into responses.submissions
-        (id, tenant_id, cycle_id, spent_token_hash, submitted_at_bucket)
-       values ($1, $2, $3, $4, current_date)`,
-      [submissionId, params.tenantId, params.cycleId, params.spentTokenHash],
+        (id, tenant_id, cycle_id, spent_token_hash, submitted_at_bucket, segment_team)
+       values ($1, $2, $3, $4, current_date, $5)`,
+      [submissionId, params.tenantId, params.cycleId, params.spentTokenHash, params.segmentTeam ?? null],
     );
 
     for (const answer of params.answers) {
@@ -146,11 +150,17 @@ export class ResponseRepository {
     minGroupSize = 5,
     scope: ReportScope = orgScope,
   ): Promise<ProtectedReport> {
-    if (scope.type !== "org") {
-      // Department/Team scoping isn't implemented yet (v1.1+) -- fail loudly
-      // rather than silently returning org-wide data under a narrower
-      // scope's name, which would be a confidentiality-adjacent bug.
-      throw new Error(`Report scope "${scope.type}" is not implemented yet.`);
+    if (scope.type === "team") {
+      // manager_email is unverified free text with no hierarchy table --
+      // building a k-anonymity-gated view on top of it risks the same
+      // "team" being sliced differently across cycles as values drift.
+      // Fails loudly rather than silently degrading; ship department scope
+      // (backed by the validated, snapshotted segment_team) first.
+      throw new Error(`Report scope "team" is not implemented -- see department scope.`);
+    }
+
+    if (scope.type === "department") {
+      return this.getDepartmentProtectedReport(tenantId, cycleId, minGroupSize, scope.department);
     }
 
     const countResult = await this.db.query<{ n: string }>(
@@ -179,6 +189,107 @@ export class ResponseRepository {
         average: row.average === null ? null : Number(row.average),
       })),
     };
+  }
+
+  /**
+   * Complementary suppression against differencing attacks: a viewer who
+   * can see the org total plus every department's report except one could
+   * back-calculate the suppressed department's exact average by
+   * subtraction. If exactly one department in this cycle would be the
+   * lone suppressed remainder, an additional (smallest-n) releasable
+   * department is bundled into suppression too, so at least two
+   * departments' worth of data stay ambiguous together. Computed fresh per
+   * request against the cycle's current department membership, not cached
+   * -- membership can change as team values get imported.
+   */
+  private async getDepartmentReleasability(
+    tenantId: string,
+    cycleId: string,
+    minGroupSize: number,
+  ): Promise<Map<string, { n: number; releasable: boolean }>> {
+    const countsResult = await this.db.query<{ segment_team: string; n: string }>(
+      `select segment_team, count(*)::text as n
+       from responses.submissions
+       where tenant_id = $1 and cycle_id = $2 and segment_team is not null
+       group by segment_team`,
+      [tenantId, cycleId],
+    );
+
+    const counts = countsResult.rows.map((row) => ({ department: row.segment_team, n: Number(row.n) }));
+    const belowThreshold = counts.filter((row) => row.n < minGroupSize);
+    const releasable = counts.filter((row) => row.n >= minGroupSize);
+
+    const additionallySuppressed = new Set<string>();
+    if (belowThreshold.length === 1 && releasable.length >= 1) {
+      const smallest = releasable.reduce((min, row) => (row.n < min.n ? row : min));
+      additionallySuppressed.add(smallest.department);
+    }
+
+    const result = new Map<string, { n: number; releasable: boolean }>();
+    for (const row of counts) {
+      const naturallyBelow = row.n < minGroupSize;
+      result.set(row.department, { n: row.n, releasable: !naturallyBelow && !additionallySuppressed.has(row.department) });
+    }
+    return result;
+  }
+
+  private async getDepartmentProtectedReport(
+    tenantId: string,
+    cycleId: string,
+    minGroupSize: number,
+    department: string,
+  ): Promise<ProtectedReport> {
+    const releasability = await this.getDepartmentReleasability(tenantId, cycleId, minGroupSize);
+    const entry = releasability.get(department);
+
+    // Deliberately never returns the real n here, even though the
+    // org-level protected report does (see getProtectedReport's comment) --
+    // for a *department*, the exact count is itself part of what a
+    // differencing attack could use, so a suppressed department's response
+    // always looks identical whether it's naturally below threshold,
+    // additionally suppressed to protect another department, or simply
+    // has zero responses at all.
+    if (!entry || !entry.releasable) return { protected: true, n: 0, rows: [] };
+
+    const result = await this.db.query<{ question_id: string; question_text: string; n: number; average: string | null }>(
+      `select r.question_id, q.question_text, r.n, r.average
+       from responses.report_question_scores_by_department($1, $2, $3) r
+       join responses.survey_cycles c on c.id = $1
+       join responses.template_questions q on q.id = r.question_id
+       where c.tenant_id = $4
+         and r.protected = false`,
+      [cycleId, department, minGroupSize, tenantId],
+    );
+    return {
+      protected: false,
+      n: entry.n,
+      rows: result.rows.map((row) => ({
+        questionId: row.question_id,
+        label: row.question_text,
+        n: row.n,
+        average: row.average === null ? null : Number(row.average),
+      })),
+    };
+  }
+
+  /**
+   * Distinct department (segment_team) labels present in a cycle's
+   * submissions -- names only, alphabetical, never counts or any
+   * size-implying order, so listing departments doesn't itself leak which
+   * ones are small. Reads only from this repository's own responses.*
+   * tables (submissions already has a direct grant for the restricted
+   * role, see 0011) -- this repository never reaches into the identity
+   * schema, same severance guarantee as every other method here.
+   */
+  async listDepartmentsForCycle(tenantId: string, cycleId: string): Promise<string[]> {
+    const result = await this.db.query<{ segment_team: string }>(
+      `select distinct segment_team
+       from responses.submissions
+       where tenant_id = $1 and cycle_id = $2 and segment_team is not null
+       order by segment_team asc`,
+      [tenantId, cycleId],
+    );
+    return result.rows.map((row) => row.segment_team);
   }
 
   /**
@@ -243,6 +354,22 @@ export class ResponseRepository {
       minGroupSize: row.min_group_size,
       createdAt: row.created_at,
     };
+  }
+
+  /**
+   * draft -> open only -- guarded so this can never resurrect a closed
+   * survey, and is a harmless no-op if called again (e.g. a reminder send
+   * after the cycle is already open). See /api/invites/send, which is the
+   * only real founder-facing action that should trigger this.
+   */
+  async openCycle(tenantId: string, cycleId: string) {
+    const result = await this.db.query(
+      `update responses.survey_cycles
+       set status = 'open'
+       where tenant_id = $1 and id = $2 and status = 'draft'`,
+      [tenantId, cycleId],
+    );
+    return (result.rowCount ?? 0) > 0;
   }
 
   async closeCycle(tenantId: string, cycleId: string) {

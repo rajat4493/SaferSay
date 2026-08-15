@@ -8,6 +8,7 @@ import { CycleTrendPanel } from "@/components/CycleTrendPanel";
 import { ProtectedReportPanel } from "@/components/ProtectedReportPanel";
 import { SurveyStageTabs } from "@/components/SurveyStageTabs";
 import { useToast } from "@/components/ToastProvider";
+import { titleCaseTeam } from "@/lib/textFormat";
 
 type CycleSummary = { id: string; name: string };
 
@@ -27,6 +28,16 @@ export default function SurveyResultsPage() {
   const [sendingReminders, setSendingReminders] = useState(false);
   const [cycles, setCycles] = useState<CycleSummary[]>([]);
   const [protectedReport, setProtectedReport] = useState<boolean | null>(null);
+  const [departments, setDepartments] = useState<string[]>([]);
+  const [selectedDepartment, setSelectedDepartment] = useState<string>("");
+  // Reset the department picker to "All teams" when the cycle changes,
+  // without setState-in-effect -- adjusting state during render in
+  // response to a changed prop is the pattern React recommends for this.
+  const [departmentResetKey, setDepartmentResetKey] = useState(surveyId);
+  if (surveyId !== departmentResetKey) {
+    setDepartmentResetKey(surveyId);
+    setSelectedDepartment("");
+  }
 
   useEffect(() => {
     fetch(`/api/cycles/${surveyId}`)
@@ -57,6 +68,15 @@ export default function SurveyResultsPage() {
       })
       .catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    fetch(`/api/report/departments?cycleId=${encodeURIComponent(surveyId)}`)
+      .then((response) => response.json())
+      .then((data: { ok?: boolean; departments?: string[] }) => {
+        if (data.ok) setDepartments(data.departments ?? []);
+      })
+      .catch(() => undefined);
+  }, [surveyId]);
 
   async function sendReminders() {
     setSendingReminders(true);
@@ -128,9 +148,19 @@ export default function SurveyResultsPage() {
               </option>
             ))}
           </select>
-          <span className="pill-select" title="Per-team breakdown isn't available yet -- smaller groups also cut against the anonymity threshold">
-            All teams
-          </span>
+          <select
+            value={selectedDepartment}
+            onChange={(event) => setSelectedDepartment(event.target.value)}
+            className="pill-select"
+            title="Team-level results still respect the anonymity threshold -- some views may not be available yet."
+          >
+            <option value="">All teams</option>
+            {departments.map((department) => (
+              <option key={department} value={department}>
+                {titleCaseTeam(department)}
+              </option>
+            ))}
+          </select>
           <span className="icon-btn">
             <Calendar size={15} strokeWidth={1.8} />
           </span>
@@ -142,7 +172,7 @@ export default function SurveyResultsPage() {
 
         {resultsState ? <ResultsStateBanner state={resultsState} protectedReport={protectedReport} /> : null}
 
-        <ProtectedReportPanel cycleId={surveyId} />
+        <ProtectedReportPanel cycleId={surveyId} department={selectedDepartment || undefined} />
 
         {cycles.length > 1 ? <CycleTrendPanel /> : null}
 

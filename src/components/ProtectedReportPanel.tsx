@@ -32,7 +32,15 @@ type ReportResponse = {
 // cutoff is scaled proportionally: 6.5/10 -> 3.25/5.
 const ATTENTION_THRESHOLD = 3.25;
 
-export function ProtectedReportPanel({ mode = "admin", cycleId }: { mode?: "admin" | "viewer"; cycleId?: string }) {
+export function ProtectedReportPanel({
+  mode = "admin",
+  cycleId,
+  department,
+}: {
+  mode?: "admin" | "viewer";
+  cycleId?: string;
+  department?: string;
+}) {
   const [result, setResult] = useState<ReportResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [, startTransition] = useTransition();
@@ -45,7 +53,11 @@ export function ProtectedReportPanel({ mode = "admin", cycleId }: { mode?: "admi
 
   async function loadReport() {
     setLoading(true);
-    const reportUrl = cycleId ? `/api/report?cycleId=${encodeURIComponent(cycleId)}` : "/api/report";
+    const params = new URLSearchParams();
+    if (cycleId) params.set("cycleId", cycleId);
+    if (department) params.set("department", department);
+    const query = params.toString();
+    const reportUrl = query ? `/api/report?${query}` : "/api/report";
     const response = await fetch(reportUrl);
     const data = (await response.json().catch(() => ({ ok: false, error: "Report could not be loaded." }))) as ReportResponse;
     setResult(data);
@@ -63,7 +75,7 @@ export function ProtectedReportPanel({ mode = "admin", cycleId }: { mode?: "admi
       loadReport();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cycleId]);
+  }, [cycleId, department]);
 
   const report = result?.report;
   const minGroupSize = result?.cycle?.minGroupSize ?? 5;
@@ -133,7 +145,13 @@ export function ProtectedReportPanel({ mode = "admin", cycleId }: { mode?: "admi
   return (
     <>
       <div className="grid gap-3 md:grid-cols-2">
-        <PsychologicalSafetyCard n={report?.n ?? 0} minGroupSize={minGroupSize} protectedState={report?.protected ?? true} score={overallScore} />
+        <PsychologicalSafetyCard
+          n={report?.n ?? 0}
+          minGroupSize={minGroupSize}
+          protectedState={report?.protected ?? true}
+          score={overallScore}
+          genericUnavailable={Boolean(department) && (!report || report.protected)}
+        />
         <AiSynthesisCard locked={!report || report.protected} />
       </div>
 
@@ -172,9 +190,18 @@ export function ProtectedReportPanel({ mode = "admin", cycleId }: { mode?: "admi
         ) : !report || report.protected ? (
           <div>
             <div className="flex items-center gap-2 text-[14px] font-medium text-[var(--ink)]">
-              <EyeOff size={16} strokeWidth={1.8} /> Results hidden
+              <EyeOff size={16} strokeWidth={1.8} /> {department ? "Not available" : "Results hidden"}
             </div>
-            <p className="mt-2 secondary-text">The report will unlock only after at least {minGroupSize} submissions exist.</p>
+            {/* Department-scoped copy is deliberately generic -- it must not
+                confirm whether this team is below threshold on its own, or
+                suppressed to protect a different team from a differencing
+                attack (see responseRepository.ts's getDepartmentReleasability).
+                No counts, no "N more needed" framing, same wording every time. */}
+            <p className="mt-2 secondary-text">
+              {department
+                ? "This view isn't available yet."
+                : `The report will unlock only after at least ${minGroupSize} submissions exist.`}
+            </p>
           </div>
         ) : (
           <div className="space-y-4">

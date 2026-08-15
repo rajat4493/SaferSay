@@ -28,6 +28,9 @@ export async function submitWithSeveredRepositories(params: {
     cycleId: participant.cycle_id,
     spentTokenHash: tokenHash,
     answers: params.answers,
+    // Snapshotted at invite-issuance time (identityRepository.issueTokens),
+    // not looked up live here -- see 0020_participant_team_snapshot.sql.
+    segmentTeam: participant.team,
   });
   await identityRepository.markTokenSpent(tokenHash);
   return submission;
