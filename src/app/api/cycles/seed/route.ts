@@ -8,25 +8,24 @@ import { seedServerEmployees } from "@/lib/serverStore";
 import { surveyTemplates } from "@/lib/templates";
 import { canImportEmployees } from "@/lib/permissions";
 
-const defaultTemplateId = "00000000-0000-4000-8000-000000000101";
-const defaultQuestionIds = [
-  "00000000-0000-4000-8000-000000000201",
-  "00000000-0000-4000-8000-000000000202",
-  "00000000-0000-4000-8000-000000000203",
-];
-
 async function seedIntoDatabase(db: Queryable, tenant: { id: string; name: string; slug: string }) {
   const template = surveyTemplates[0];
-  await db.query(
+  // `on conflict (slug) do update` never touches `id` -- a fixed id here
+  // would only be correct on the very first seed ever run against a given
+  // database. Read back the real id (new or pre-existing) with RETURNING
+  // instead of assuming one, so this stays correct on every subsequent run.
+  const templateResult = await db.query<{ id: string }>(
     `insert into responses.survey_templates (id, slug, name, description, category, estimated_minutes)
      values ($1, $2, $3, $4, $5, $6)
      on conflict (slug) do update
      set name = excluded.name,
          description = excluded.description,
          category = excluded.category,
-         estimated_minutes = excluded.estimated_minutes`,
-    [defaultTemplateId, template.slug, template.name, template.description, template.category, 5],
+         estimated_minutes = excluded.estimated_minutes
+     returning id`,
+    [randomUUID(), template.slug, template.name, template.description, template.category, 5],
   );
+  const templateId = templateResult.rows[0].id;
 
   for (const [index, question] of template.questions.slice(0, 3).entries()) {
     await db.query(
@@ -36,7 +35,7 @@ async function seedIntoDatabase(db: Queryable, tenant: { id: string; name: strin
        on conflict (template_id, position) do update
        set question_text = excluded.question_text,
            construct = excluded.construct`,
-      [defaultQuestionIds[index], defaultTemplateId, index + 1, question.text, question.construct],
+      [randomUUID(), templateId, index + 1, question.text, question.construct],
     );
   }
 
@@ -45,7 +44,7 @@ async function seedIntoDatabase(db: Queryable, tenant: { id: string; name: strin
     `insert into responses.survey_cycles
       (id, tenant_id, template_id, name, status, payment_status)
      values ($1, $2, $3, $4, 'draft', 'free_preview')`,
-    [cycleId, tenant.id, defaultTemplateId, `${tenant.name} Engagement Check`],
+    [cycleId, tenant.id, templateId, `${tenant.name} Engagement Check`],
   );
 
   const employees = Array.from({ length: 31 }, (_, index) => ({

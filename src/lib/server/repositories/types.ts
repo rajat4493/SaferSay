@@ -259,3 +259,24 @@ export type ProtectedReport =
       n: number;
       rows: Array<{ questionId: string; label?: string; n: number; average: number | null }>;
     };
+
+/**
+ * One question's average across a set of cycles, oldest first. Cycles are
+ * matched by normalized question text (see surveyCycleService.ts -- edited
+ * templates get a fresh question_id per cycle, so text is the only stable
+ * join key across cycles). A point with `protected: true` means that
+ * cycle's own min_group_size wasn't met for this question; `average` is
+ * null and must not be rendered as a real score.
+ */
+export type CycleTrendPoint = {
+  cycleId: string;
+  cycleName: string;
+  n: number;
+  average: number | null;
+  protected: boolean;
+};
+
+export type CycleTrendQuestion = {
+  questionText: string;
+  points: CycleTrendPoint[];
+};
