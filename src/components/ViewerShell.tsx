@@ -75,7 +75,7 @@ export function ViewerShell({ children, title, subtitle }: { children: React.Rea
         <div className="mx-auto max-w-5xl">
           <div className="mb-6 flex items-start justify-between gap-3 border-b border-[var(--border)] pb-5">
             <div>
-              <p className="meta-label">Threshold-safe viewer access</p>
+              <p className="meta-label">Protected view</p>
               <h1 className="page-title mt-2">{title}</h1>
               <p className="mt-1.5 secondary-text">{subtitle}</p>
             </div>

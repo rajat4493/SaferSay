@@ -7,7 +7,7 @@ import { CopyLinkButton } from "@/components/CopyLinkButton";
 const controls = [
   ["Identity store", "Sign-in, eligibility, reminder status, token issue state. No answers."],
   ["Response store", "Answers, cycle id, safe tags only. No name, email, employee id, IP, or user agent."],
-  ["Minimum group size", "Reports and exports suppress groups below the threshold set in Settings."],
+  ["Minimum group size", "Reports and exports suppress groups below the threshold Settings sets for new surveys -- a survey already collecting responses keeps the threshold it launched with."],
   ["Reminder isolation", "Reminders target unspent participation tokens only; they never read answers."],
   ["Payment isolation", "Stripe receives billing metadata only, never employee answers or survey tokens."],
   ["No emotion inference", "No psychological or emotional state classification, now or later."],

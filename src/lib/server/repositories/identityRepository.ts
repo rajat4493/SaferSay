@@ -932,7 +932,11 @@ export class IdentityRepository {
          and o.delivery_type = $3
          and o.delivery_status = 'failed'
          and p.token_status = 'issued'
-         and ($3 <> 'reminder' or p.reminder_count < 3)`,
+         and ($3 <> 'reminder' or p.reminder_count < 3)
+         and ($3 <> 'reminder' or exists (
+           select 1 from identity.invite_outbox sent
+           where sent.participant_id = p.id and sent.delivery_type = 'invite' and sent.delivery_status = 'sent'
+         ))`,
       [tenantId, cycleId, deliveryType],
     );
     return result.rowCount ?? 0;
@@ -975,6 +979,16 @@ export class IdentityRepository {
          and p.cycle_id = $2
          and p.token_status = 'issued'
          and p.reminder_count < 3
+         -- A "reminder" email is only truthful for someone who actually got
+         -- the original invite. Without this, a participant whose invite
+         -- send failed (bad address, quota, whatever) would get an email
+         -- titled "SaferSay survey reminder" as their first-ever contact --
+         -- see resendDelivery.ts's buildInviteMessage, which doesn't know
+         -- the difference between "reminding" and "never sent".
+         and exists (
+           select 1 from identity.invite_outbox sent
+           where sent.participant_id = p.id and sent.delivery_type = 'invite' and sent.delivery_status = 'sent'
+         )
        on conflict (participant_id, delivery_type) do nothing`,
       [tenantId, cycleId],
     );

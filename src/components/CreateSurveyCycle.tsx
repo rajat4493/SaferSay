@@ -52,7 +52,9 @@ export function CreateSurveyCycle({ templateSlug }: { templateSlug: string }) {
 
   async function createCycle() {
     if (includedCount === 0) {
-      setStatus("Include at least one question before creating the cycle.");
+      const message = "Include at least one question before creating the cycle.";
+      setStatus(message);
+      toast.show({ variant: "error", message });
       return;
     }
 
@@ -98,7 +100,7 @@ export function CreateSurveyCycle({ templateSlug }: { templateSlug: string }) {
     <div className="card mt-[9px]">
       <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
         <div className="max-w-2xl">
-          <p className="meta-label">Server-side launch prep</p>
+          <p className="meta-label">Launch</p>
           <h2 className="section-title mt-2">Create draft cycle</h2>
           <p className="mt-1.5 secondary-text">
             Creates a survey cycle from {template.name} and issues one secure token per active employee.

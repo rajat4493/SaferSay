@@ -53,8 +53,11 @@ export default function Home() {
             confidentiality, protected reporting, and one-place client rebranding.
           </p>
           <div className="flex flex-col gap-3 sm:flex-row">
-            <Link href="/app" className="inline-flex h-12 items-center justify-center gap-2 rounded-[var(--radius-pill)] bg-[var(--brand-accent)] px-6 text-sm font-semibold text-white transition hover:-translate-y-0.5">
-              Open app
+            <Link
+              href={signedIn ? "/app" : "/login"}
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-[var(--radius-pill)] bg-[var(--brand-accent)] px-6 text-sm font-semibold text-white transition hover:-translate-y-0.5"
+            >
+              {signedIn ? "Open app" : "Get started"}
               <ArrowRight size={17} />
             </Link>
             <Link href="/app/brand" className="inline-flex h-12 items-center justify-center rounded-[var(--radius-pill)] border border-white/20 bg-white/5 px-6 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/10">
@@ -64,7 +67,10 @@ export default function Home() {
         </div>
       </section>
 
-      <div className="overflow-hidden border-y border-white/10 bg-white/5 py-4">
+      {/* Decorative and fully duplicative of the three value cards below --
+          aria-hidden so a screen reader doesn't read the same four phrases
+          twice back to back with no indication it's just a scroll loop. */}
+      <div className="overflow-hidden border-y border-white/10 bg-white/5 py-4" aria-hidden="true">
         <div className="flex w-max animate-marquee gap-16 whitespace-nowrap text-sm font-semibold uppercase tracking-[0.2em] text-white/50">
           {[...tickerItems, ...tickerItems].map((item, index) => (
             <span key={`${item}-${index}`}>{item}</span>

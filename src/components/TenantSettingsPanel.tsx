@@ -22,6 +22,13 @@ const featureLabels: Record<string, string> = {
 export function TenantSettingsPanel() {
   const [settings, setSettings] = useState<Settings | null | undefined>(undefined);
   const [saving, setSaving] = useState(false);
+  // Tracks the slider's own visual position while dragging, separate from
+  // the last-saved `settings.minGroupSize` -- React binds a range input's
+  // onChange to the native `input` event, which fires on every step of a
+  // drag, not just on release. Committing the PATCH (and its audit-log
+  // write) on every one of those would spam the server; this only sends
+  // the request once, when the drag/keypress actually ends.
+  const [sliderValue, setSliderValue] = useState<number | null>(null);
   const toast = useToast();
 
   function load() {
@@ -33,7 +40,9 @@ export function TenantSettingsPanel() {
 
   useEffect(load, []);
 
-  async function updateMinGroupSize(value: number) {
+  async function commitMinGroupSize() {
+    if (sliderValue === null || !settings || sliderValue === settings.minGroupSize) return;
+    const value = sliderValue;
     setSaving(true);
     const response = await fetch("/api/tenants/settings", {
       method: "PATCH",
@@ -42,6 +51,7 @@ export function TenantSettingsPanel() {
     });
     const data = await response.json().catch(() => ({ ok: false }));
     setSaving(false);
+    setSliderValue(null);
     if (data.ok) {
       setSettings(data.settings);
       toast.show({ variant: "success", message: `Minimum group size set to ${data.settings.minGroupSize}.` });
@@ -95,8 +105,19 @@ export function TenantSettingsPanel() {
           can never go below 3 — that&apos;s the point at which &quot;confidential&quot; stops meaning anything.
         </p>
         <div className="mt-4 flex items-center gap-3">
-          <input type="range" min={3} max={10} value={settings.minGroupSize} disabled={saving} onChange={(event) => updateMinGroupSize(Number(event.target.value))} className="flex-1" />
-          <span className="data-number w-10 text-[16px]">{settings.minGroupSize}</span>
+          <input
+            type="range"
+            min={3}
+            max={10}
+            value={sliderValue ?? settings.minGroupSize}
+            disabled={saving}
+            onChange={(event) => setSliderValue(Number(event.target.value))}
+            onMouseUp={commitMinGroupSize}
+            onTouchEnd={commitMinGroupSize}
+            onKeyUp={commitMinGroupSize}
+            className="flex-1"
+          />
+          <span className="data-number w-10 text-[16px]">{sliderValue ?? settings.minGroupSize}</span>
         </div>
       </Card>
 
