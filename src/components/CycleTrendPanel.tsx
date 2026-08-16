@@ -85,11 +85,18 @@ export function CycleTrendPanel({ mode = "admin" }: { mode?: "admin" | "viewer" 
                 const attention = point.average < ATTENTION_THRESHOLD;
                 const height = `${Math.max(6, Math.min(100, (point.average / 5) * 100))}%`;
                 return (
-                  <div key={point.cycleId} className="flex flex-col items-center gap-1" title={`${point.cycleName}: ${point.average.toFixed(2)}`}>
+                  <div
+                    key={point.cycleId}
+                    className="flex flex-col items-center gap-1"
+                    title={`${point.cycleName}: ${point.average.toFixed(2)} (n=${point.n})`}
+                  >
                     <div className="flex h-[52px] w-[22px] items-end rounded-[var(--radius-input)] bg-[var(--bg-active)]">
                       <div className="w-full rounded-[var(--radius-input)]" style={{ height, background: attention ? "var(--red)" : "var(--ink)" }} />
                     </div>
+                    {/* Sample size alongside the average -- without this, a
+                        cycle with n=1 looked exactly as confident as n=8. */}
                     <span className="text-[10px] font-medium text-[var(--ink)]">{point.average.toFixed(1)}</span>
+                    <span className="text-[9px] text-[var(--ink-faint)]">n={point.n}</span>
                   </div>
                 );
               })}

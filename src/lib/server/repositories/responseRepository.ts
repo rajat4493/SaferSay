@@ -449,10 +449,13 @@ export class ResponseRepository {
 
     // Order each question's points to match cycle recency (oldest first),
     // and drop questions with fewer than 2 points -- a single-cycle line
-    // isn't a trend and just adds noise to the panel.
+    // isn't a trend and just adds noise to the panel. Also drop questions
+    // where every point is still protected -- a wall of locked icons with
+    // zero real data isn't a trend either, just noise; same "silent until
+    // there's something to compare" philosophy as the <2-point case.
     const cycleOrder = new Map(recentCycles.map((cycle, index) => [cycle.id, index]));
     return Array.from(questionsByNormalizedText.values())
-      .filter((question) => question.points.length > 1)
+      .filter((question) => question.points.length > 1 && question.points.some((point) => !point.protected && point.average !== null))
       .map((question) => ({
         ...question,
         points: [...question.points].sort((a, b) => (cycleOrder.get(a.cycleId) ?? 0) - (cycleOrder.get(b.cycleId) ?? 0)),

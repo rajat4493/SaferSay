@@ -85,4 +85,38 @@ describe("getCrossCycleTrendForTenant", () => {
     const result = await new ResponseRepository(db).getCrossCycleTrendForTenant(tenantId);
     expect(result).toEqual([]);
   });
+
+  it("drops a question where every cycle is still below threshold -- a wall of locked icons isn't a trend", async () => {
+    const db = fakeDb({
+      cycles: [
+        { id: "cycle-b", name: "Q2 Pulse", status: "closed", min_group_size: 5, created_at: "2026-04-01", response_count: 2 },
+        { id: "cycle-a", name: "Q1 Pulse", status: "closed", min_group_size: 5, created_at: "2026-01-01", response_count: 1 },
+      ],
+      trend: [
+        { cycle_id: "cycle-a", question_id: "q-a1", question_text: "Team trust", n: 1, average: null, protected: true },
+        { cycle_id: "cycle-b", question_id: "q-b1", question_text: "Team trust", n: 2, average: null, protected: true },
+      ],
+    });
+
+    const result = await new ResponseRepository(db).getCrossCycleTrendForTenant(tenantId);
+
+    expect(result).toHaveLength(0);
+  });
+
+  it("keeps a question with a genuine mix of one protected and one real point", async () => {
+    const db = fakeDb({
+      cycles: [
+        { id: "cycle-b", name: "Q2 Pulse", status: "closed", min_group_size: 5, created_at: "2026-04-01", response_count: 8 },
+        { id: "cycle-a", name: "Q1 Pulse", status: "closed", min_group_size: 5, created_at: "2026-01-01", response_count: 2 },
+      ],
+      trend: [
+        { cycle_id: "cycle-a", question_id: "q-a1", question_text: "Team trust", n: 2, average: null, protected: true },
+        { cycle_id: "cycle-b", question_id: "q-b1", question_text: "Team trust", n: 8, average: "4.2", protected: false },
+      ],
+    });
+
+    const result = await new ResponseRepository(db).getCrossCycleTrendForTenant(tenantId);
+
+    expect(result).toHaveLength(1);
+  });
 });

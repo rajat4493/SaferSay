@@ -75,7 +75,14 @@ export default function SurveysHome() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
-  const liveSurvey = cycles?.find((cycle) => cycle.status === "open");
+  // Bucket by real status, not by "is/isn't the featured card" -- a
+  // second simultaneously-open cycle (or a draft) must never land under
+  // "Past surveys" just because it wasn't the one `.find()` picked first.
+  const openCycles = cycles?.filter((cycle) => cycle.status === "open") ?? [];
+  const liveSurvey = openCycles[0];
+  const additionalLiveCycles = openCycles.slice(1);
+  const draftCycles = cycles?.filter((cycle) => cycle.status === "draft" || cycle.status === "scheduled") ?? [];
+  const pastSurveys = cycles?.filter((cycle) => cycle.status === "closed") ?? [];
 
   // Response-rate stat is scoped to the live survey's real issued/spent
   // token counts (identity.survey_participants) -- not a guess against
@@ -103,8 +110,7 @@ export default function SurveysHome() {
     );
   }
 
-  const otherSurveys = cycles?.filter((cycle) => cycle.id !== liveSurvey?.id) ?? [];
-  const activeSurveyCount = cycles?.filter((cycle) => cycle.status === "open").length ?? 0;
+  const activeSurveyCount = openCycles.length;
   const responseRate = liveParticipation && liveParticipation.issued > 0 ? Math.round((liveParticipation.spent / liveParticipation.issued) * 100) : null;
   const threshold = liveSurvey?.minGroupSize ?? null;
   const featuredTemplates = surveyTemplates.slice(0, 3);
@@ -174,14 +180,32 @@ export default function SurveysHome() {
             <div className="mt-6">
               <h2 className="section-title">Live survey</h2>
               <SurveyCard cycle={liveSurvey} participation={liveParticipation} featured className="mt-2.5" />
+              {additionalLiveCycles.length > 0 ? (
+                <div className="mt-2.5 space-y-2">
+                  {additionalLiveCycles.map((cycle) => (
+                    <SurveyCard key={cycle.id} cycle={cycle} />
+                  ))}
+                </div>
+              ) : null}
             </div>
           ) : null}
 
-          {otherSurveys.length > 0 ? (
+          {draftCycles.length > 0 ? (
             <div className="mt-6">
-              <h2 className="section-title">{liveSurvey ? "Past surveys" : "Your surveys"}</h2>
+              <h2 className="section-title">Drafts</h2>
               <div className="mt-2.5 space-y-2">
-                {otherSurveys.map((cycle) => (
+                {draftCycles.map((cycle) => (
+                  <SurveyCard key={cycle.id} cycle={cycle} />
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {pastSurveys.length > 0 ? (
+            <div className="mt-6">
+              <h2 className="section-title">Past surveys</h2>
+              <div className="mt-2.5 space-y-2">
+                {pastSurveys.map((cycle) => (
                   <SurveyCard key={cycle.id} cycle={cycle} />
                 ))}
               </div>
