@@ -441,6 +441,7 @@ export class ResponseRepository {
       question.points.push({
         cycleId: cycle.id,
         cycleName: cycle.name,
+        cycleCreatedAt: cycle.createdAt,
         n: row.n,
         average: row.protected || row.average === null ? null : Number(row.average),
         protected: row.protected,

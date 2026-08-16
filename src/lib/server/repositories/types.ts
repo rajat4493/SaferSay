@@ -271,6 +271,11 @@ export type ProtectedReport =
 export type CycleTrendPoint = {
   cycleId: string;
   cycleName: string;
+  // Repeat cycles of the same template often share an identical cycleName
+  // (e.g. two "Engagement Check" runs) -- the date is what actually
+  // disambiguates them in a shared legend, so it travels with the point
+  // rather than being looked up separately.
+  cycleCreatedAt: string;
   n: number;
   average: number | null;
   protected: boolean;
