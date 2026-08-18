@@ -23,7 +23,11 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "You don't have permission to change workspace settings." }, { status: 403 });
   }
 
-  const body = (await request.json().catch(() => ({}))) as { minGroupSize?: number };
+  const body = (await request.json().catch(() => ({}))) as { minGroupSize?: number; safetyContactEmail?: string };
+
+  if (typeof body.safetyContactEmail === "string" && body.safetyContactEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.safetyContactEmail.trim())) {
+    return NextResponse.json({ ok: false, error: "Safety contact must be a valid email address." }, { status: 400 });
+  }
 
   const settings = await withTenantScopedDb(session.tenant.id, async (db) => {
     const repo = new IdentityRepository(db);
@@ -32,6 +36,12 @@ export async function PATCH(request: NextRequest) {
       // can tune it, but can never disable the wall (see
       // docs/strategy/CLIENT_TENANT_ADMIN_SPEC.md §7).
       await repo.setMinGroupSize(session.tenant.id, body.minGroupSize);
+    }
+    if (typeof body.safetyContactEmail === "string") {
+      // Empty string explicitly clears it (SOS button stops rendering) --
+      // no fallback to any other contact, ever. See 0023_sos_reports.sql.
+      const trimmed = body.safetyContactEmail.trim();
+      await repo.setSafetyContactEmail(session.tenant.id, trimmed ? trimmed : null);
     }
     return repo.getTenantSelfSettings(session.tenant.id);
   });

@@ -435,6 +435,74 @@ export class IdentityRepository {
     return clamped;
   }
 
+  /**
+   * Lean, dedicated lookup for the respondent-facing (unauthenticated,
+   * token-only) SOS availability check -- deliberately not routed through
+   * getTenantSelfSettings, which is the admin-session settings page's
+   * broader read. Null means the SOS button must not render at all; there
+   * is no fallback contact.
+   */
+  async getSafetyContactEmail(tenantId: string): Promise<string | null> {
+    const result = await this.db.query<{ safety_contact_email: string | null }>(
+      `select safety_contact_email from identity.tenant_settings where tenant_id = $1`,
+      [tenantId],
+    );
+    return result.rows[0]?.safety_contact_email ?? null;
+  }
+
+  async setSafetyContactEmail(tenantId: string, email: string | null) {
+    await this.db.query(
+      `insert into identity.tenant_settings (tenant_id, safety_contact_email)
+       values ($1, $2)
+       on conflict (tenant_id) do update set safety_contact_email = excluded.safety_contact_email, updated_at = now()`,
+      [tenantId, email],
+    );
+  }
+
+  /**
+   * The one deliberate, auditable, grep-able place identity is read for a
+   * survey token outside the normal severed flow -- do NOT widen
+   * findIssuedToken/findIssuedTokenForRespondentSession for this; those
+   * must stay identity-blind for the anonymous-submission path. Used only
+   * by the SOS route, only after consent has been explicitly given.
+   */
+  async findParticipantIdentityForSos(tokenHash: string) {
+    const result = await this.db.query<{
+      tenant_id: string;
+      cycle_id: string;
+      employee_id: string;
+      employee_email: string;
+      employee_name: string | null;
+    }>(
+      `select p.tenant_id, p.cycle_id, p.employee_id, e.email as employee_email, e.name as employee_name
+       from identity.survey_participants p
+       join identity.employees e on e.id = p.employee_id
+       where p.token_hash = $1`,
+      [tokenHash],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  async createSosReport(params: {
+    tenantId: string;
+    cycleId: string | null;
+    employeeId: string;
+    message: string;
+    routedToEmail: string;
+  }) {
+    const id = randomUUID();
+    await this.db.query(
+      `insert into identity.sos_reports (id, tenant_id, cycle_id, employee_id, message, consent_ack, routed_to_email)
+       values ($1, $2, $3, $4, $5, true, $6)`,
+      [id, params.tenantId, params.cycleId, params.employeeId, params.message, params.routedToEmail],
+    );
+    return { id };
+  }
+
+  async markSosReportEmailStatus(id: string, status: "sent" | "failed") {
+    await this.db.query(`update identity.sos_reports set email_status = $2 where id = $1`, [id, status]);
+  }
+
   async addSupportNote(tenantId: string, authorEmail: string, note: string) {
     await this.db.query(
       `insert into identity.tenant_support_notes (id, tenant_id, author_email, note)
@@ -571,12 +639,14 @@ export class IdentityRepository {
       data_residency_region: string;
       plan_tier: TenantPlanTier;
       features: Record<string, boolean>;
+      safety_contact_email: string | null;
     }>(
       `select
          coalesce(default_min_group_size, 5) as default_min_group_size,
          coalesce(data_residency_region, 'EU') as data_residency_region,
          coalesce(plan_tier, 'standard') as plan_tier,
-         coalesce(features, '{}'::jsonb) as features
+         coalesce(features, '{}'::jsonb) as features,
+         safety_contact_email
        from identity.tenant_settings where tenant_id = $1`,
       [tenantId],
     );
@@ -586,6 +656,7 @@ export class IdentityRepository {
       dataResidencyRegion: row?.data_residency_region ?? "EU",
       planTier: row?.plan_tier ?? "standard",
       features: row?.features ?? {},
+      safetyContactEmail: row?.safety_contact_email ?? null,
     };
   }
 

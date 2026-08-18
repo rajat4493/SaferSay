@@ -146,6 +146,9 @@ export type TenantSelfSettings = {
   dataResidencyRegion: string;
   planTier: TenantPlanTier;
   features: Record<string, boolean>;
+  // null = SOS button does not render for respondents. No default/fallback
+  // (e.g. to the customer_admin contact) -- see 0023_sos_reports.sql.
+  safetyContactEmail: string | null;
 };
 
 export type CycleAction = {

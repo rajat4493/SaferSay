@@ -11,6 +11,7 @@ type Settings = {
   dataResidencyRegion: string;
   planTier: string;
   features: Record<string, boolean>;
+  safetyContactEmail: string | null;
 };
 
 const featureLabels: Record<string, string> = {
@@ -29,6 +30,11 @@ export function TenantSettingsPanel() {
   // write) on every one of those would spam the server; this only sends
   // the request once, when the drag/keypress actually ends.
   const [sliderValue, setSliderValue] = useState<number | null>(null);
+  // Same "draft until saved, then fall back to fresh settings" pattern as
+  // sliderValue -- this is a plain text field though, so it commits on an
+  // explicit Save click, not a drag-release.
+  const [safetyContactDraft, setSafetyContactDraft] = useState<string | null>(null);
+  const [savingSafetyContact, setSavingSafetyContact] = useState(false);
   const toast = useToast();
 
   function load() {
@@ -57,6 +63,28 @@ export function TenantSettingsPanel() {
       toast.show({ variant: "success", message: `Minimum group size set to ${data.settings.minGroupSize}.` });
     } else {
       toast.show({ variant: "error", message: "Couldn't save that setting. Try again." });
+    }
+  }
+
+  async function saveSafetyContact() {
+    if (safetyContactDraft === null) return;
+    setSavingSafetyContact(true);
+    const response = await fetch("/api/tenants/settings", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ safetyContactEmail: safetyContactDraft }),
+    });
+    const data = await response.json().catch(() => ({ ok: false }));
+    setSavingSafetyContact(false);
+    if (data.ok) {
+      setSettings(data.settings);
+      setSafetyContactDraft(null);
+      toast.show({
+        variant: "success",
+        message: data.settings.safetyContactEmail ? "Safety contact saved." : "Safety contact removed -- the SOS button is now hidden for respondents.",
+      });
+    } else {
+      toast.show({ variant: "error", message: data.error ?? "Couldn't save that setting. Try again." });
     }
   }
 
@@ -118,6 +146,33 @@ export function TenantSettingsPanel() {
             className="flex-1"
           />
           <span className="data-number w-10 text-[16px]">{sliderValue ?? settings.minGroupSize}</span>
+        </div>
+      </Card>
+
+      <Card>
+        <h2 className="section-title">Safety contact</h2>
+        <p className="mt-1.5 secondary-text">
+          Where a survey-taker&apos;s &quot;I need help&quot; message goes if they choose to identify themselves for a safety concern
+          (e.g. harassment) -- separate from the anonymous survey, never included in aggregate reports.{" "}
+          <strong className="text-[var(--ink)]">
+            Don&apos;t use your own address, or anyone who might be the subject of a report -- pick someone a survey-taker could
+            safely report about anyone else to.
+          </strong>{" "}
+          The &quot;I need help&quot; button won&apos;t appear for respondents until this is set.
+        </p>
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+          <input
+            type="email"
+            value={safetyContactDraft ?? settings.safetyContactEmail ?? ""}
+            onChange={(event) => setSafetyContactDraft(event.target.value)}
+            placeholder="hr@yourcompany.com"
+            aria-label="Safety contact email"
+            disabled={savingSafetyContact}
+            className="admin-input flex-1"
+          />
+          <button onClick={saveSafetyContact} disabled={savingSafetyContact || safetyContactDraft === null} className="btn-primary shrink-0">
+            {savingSafetyContact ? "Saving..." : "Save"}
+          </button>
         </div>
       </Card>
 

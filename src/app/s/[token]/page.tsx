@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useBrand } from "@/components/BrandProvider";
 import { useSurveyData } from "@/components/DataProvider";
+import { SosButton } from "@/components/SosButton";
 import { questionBank, submitTokenResponse } from "@/lib/localData";
 
 type SurveyQuestion = {
@@ -191,6 +192,16 @@ export default function RespondentTokenPage() {
             </div>
           ) : null}
         </div>
+
+        {/* Persistent across every step (not just mid-survey) -- a
+            respondent may need this before starting, mid-survey, or
+            without ever completing it at all. Self-hides entirely when
+            the tenant hasn't configured a safety contact. */}
+        {step !== "loading" && step !== "invalid" ? (
+          <div className="mb-4 flex justify-center">
+            <SosButton token={token} />
+          </div>
+        ) : null}
 
         {step === "survey" ? (
           <div className="taker-progress-track mb-6">
