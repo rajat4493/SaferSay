@@ -21,6 +21,11 @@ type ReportResponse = {
     n: number;
     rows: Array<{ questionId: string; label?: string; n: number; average: number | null }>;
   };
+  textAnswers?: {
+    protected: boolean;
+    n: number;
+    rows: Array<{ questionId: string; label?: string; n: number; answers: string[] }>;
+  };
 };
 
 // Score bars are black by default, red only for scores needing attention
@@ -142,6 +147,13 @@ export function ProtectedReportPanel({
   const scoredRows = report?.rows.filter((row) => row.average !== null) ?? [];
   const overallScore = scoredRows.length ? scoredRows.reduce((sum, row) => sum + (row.average ?? 0), 0) / scoredRows.length : null;
 
+  const textReport = result?.textAnswers;
+  // Only show the section at all if there's something to say about it --
+  // either it's genuinely protected, or there are real answers. A survey
+  // with zero open-text questions returns unprotected+empty, and that
+  // shouldn't render an empty "What people said" card.
+  const showTextSection = Boolean(textReport && (textReport.protected || textReport.rows.length > 0));
+
   return (
     <>
       <div className="grid gap-3 md:grid-cols-2">
@@ -224,6 +236,41 @@ export function ProtectedReportPanel({
           </div>
         )}
       </ShellCard>
+
+      {showTextSection && textReport ? (
+        <ShellCard className="mt-[9px]">
+          <h2 className="section-title">What people said</h2>
+          {textReport.protected ? (
+            <div className="mt-2">
+              <div className="flex items-center gap-2 text-[14px] font-medium text-[var(--ink)]">
+                <EyeOff size={16} strokeWidth={1.8} /> Comments hidden
+              </div>
+              <p className="mt-2 secondary-text">Not enough responses yet to show comments without risking identifying someone.</p>
+            </div>
+          ) : (
+            <>
+              {/* Shown once for the whole section, not per-answer -- this is
+                  a deliberate product decision (not algorithmic filtering):
+                  responses are shown exactly as submitted. */}
+              <p className="mt-1 secondary-text">Shown as submitted, unedited. This survey doesn&apos;t filter or moderate open responses.</p>
+              <div className="mt-4 space-y-5">
+                {textReport.rows.map((row) => (
+                  <div key={row.questionId}>
+                    <p className="text-[13px] font-medium text-[var(--ink-mid)]">{row.label ?? row.questionId}</p>
+                    <div className="mt-2 space-y-2">
+                      {row.answers.map((answer, index) => (
+                        <p key={index} className="rounded-[var(--radius-input)] border border-[var(--border)] bg-white p-3 text-[13px] leading-[1.5] text-[var(--ink)]">
+                          {answer}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </ShellCard>
+      ) : null}
 
       {report && !report.protected ? (
         <ShellCard className="mt-[9px]">

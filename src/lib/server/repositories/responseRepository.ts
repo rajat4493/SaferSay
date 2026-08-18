@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import type { Queryable } from "@/lib/server/db/tenantPool";
-import { ResponseAnswerInput, ProtectedReport, ReportScope, RespondentSurveySession, CycleTrendQuestion } from "./types";
+import { ResponseAnswerInput, ProtectedReport, ProtectedTextReport, ReportScope, RespondentSurveySession, CycleTrendQuestion } from "./types";
 
 const MAX_TREND_CYCLES = 6;
 
@@ -187,6 +187,62 @@ export class ResponseRepository {
         label: row.question_text,
         n: row.n,
         average: row.average === null ? null : Number(row.average),
+      })),
+    };
+  }
+
+  /**
+   * Open-text answers, gated at a stricter threshold than numeric scores
+   * (minGroupSize + 3, never the bare numeric threshold) since a sentence
+   * of free text is more identifying than a number -- see
+   * ProtectedTextReport's doc comment. Deliberately no filtering or
+   * redaction of the returned strings; that's a product decision made in
+   * the UI layer (a persistent content-note banner), not something this
+   * repository should silently do to what someone actually wrote.
+   *
+   * v1 scope: org-only, no department-scoped text -- text is more
+   * identifying than numbers, so department-slicing it would compound the
+   * differencing-attack risk getDepartmentReleasability exists to guard
+   * against. Deliberate non-goal, not an oversight.
+   */
+  async getProtectedOpenTextReport(tenantId: string, cycleId: string, minGroupSize = 5): Promise<ProtectedTextReport> {
+    const minTextGroupSize = minGroupSize + 3;
+
+    const countResult = await this.db.query<{ n: string }>(
+      "select count(*)::text as n from responses.submissions where tenant_id = $1 and cycle_id = $2",
+      [tenantId, cycleId],
+    );
+    const n = Number(countResult.rows[0]?.n ?? 0);
+    if (n < minTextGroupSize) return { protected: true, n, rows: [] };
+
+    const result = await this.db.query<{ question_id: string; question_text: string; n: number; text_value: string | null }>(
+      `select r.question_id, q.question_text, r.n, r.text_value
+       from responses.report_open_text_answers($1, $2) r
+       join responses.survey_cycles c on c.id = $1
+       join responses.template_questions q on q.id = r.question_id
+       where c.tenant_id = $3
+         and r.protected = false`,
+      [cycleId, minTextGroupSize, tenantId],
+    );
+
+    const byQuestion = new Map<string, { label: string; n: number; answers: string[] }>();
+    for (const row of result.rows) {
+      let entry = byQuestion.get(row.question_id);
+      if (!entry) {
+        entry = { label: row.question_text, n: row.n, answers: [] };
+        byQuestion.set(row.question_id, entry);
+      }
+      if (row.text_value) entry.answers.push(row.text_value);
+    }
+
+    return {
+      protected: false,
+      n,
+      rows: Array.from(byQuestion.entries()).map(([questionId, entry]) => ({
+        questionId,
+        label: entry.label,
+        n: entry.n,
+        answers: entry.answers,
       })),
     };
   }

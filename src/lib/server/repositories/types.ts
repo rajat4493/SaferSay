@@ -261,6 +261,22 @@ export type ProtectedReport =
     };
 
 /**
+ * Open-text answers, gated at a stricter threshold than numeric scores
+ * (see getProtectedOpenTextReport -- always minGroupSize + 3, never the
+ * bare numeric threshold) since a sentence of free text is more
+ * identifying than a number. `answers` are the raw, unedited strings --
+ * this app deliberately does not filter or redact them (see
+ * ProtectedReportPanel's content-note banner).
+ */
+export type ProtectedTextReport =
+  | { protected: true; n: number; rows: [] }
+  | {
+      protected: false;
+      n: number;
+      rows: Array<{ questionId: string; label?: string; n: number; answers: string[] }>;
+    };
+
+/**
  * One question's average across a set of cycles, oldest first. Cycles are
  * matched by normalized question text (see surveyCycleService.ts -- edited
  * templates get a fresh question_id per cycle, so text is the only stable

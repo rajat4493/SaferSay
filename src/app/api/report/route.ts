@@ -24,15 +24,25 @@ async function loadReportForCycle(
   // the no-cycleId "latest cycle" convenience path stays org-scoped.
   const scope: ReportScope | undefined = cycleId && department ? { type: "department", department } : undefined;
 
-  if (!cycleId) return repo.getLatestProtectedReportForTenant(tenantId, scope, tenantName);
+  const result = !cycleId
+    ? await repo.getLatestProtectedReportForTenant(tenantId, scope, tenantName)
+    : await (async () => {
+        const cycle = await repo.getCycleForTenant(tenantId, cycleId, tenantName);
+        if (!cycle) return { cycle: null, report: { protected: true as const, n: 0, rows: [] } };
+        return {
+          cycle: { id: cycle.id, name: cycle.name, minGroupSize: cycle.minGroupSize },
+          report: await repo.getProtectedReportForTenant(tenantId, cycle.id, cycle.minGroupSize, scope),
+        };
+      })();
 
-  const cycle = await repo.getCycleForTenant(tenantId, cycleId, tenantName);
-  if (!cycle) return { cycle: null, report: { protected: true as const, n: 0, rows: [] } };
+  // Open text stays org-wide in v1 regardless of the department picker --
+  // see getProtectedOpenTextReport's doc comment on why department-scoped
+  // text is a deliberate non-goal, not an oversight.
+  const textAnswers = result.cycle
+    ? await repo.getProtectedOpenTextReport(tenantId, result.cycle.id, result.cycle.minGroupSize)
+    : { protected: true as const, n: 0, rows: [] };
 
-  return {
-    cycle: { id: cycle.id, name: cycle.name, minGroupSize: cycle.minGroupSize },
-    report: await repo.getProtectedReportForTenant(tenantId, cycle.id, cycle.minGroupSize, scope),
-  };
+  return { ...result, textAnswers };
 }
 
 export async function GET(request: NextRequest) {
