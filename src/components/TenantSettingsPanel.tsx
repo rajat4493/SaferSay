@@ -12,7 +12,11 @@ type Settings = {
   planTier: string;
   features: Record<string, boolean>;
   safetyContactEmail: string | null;
+  smtpConfigured: boolean;
+  smtpFromEmail: string | null;
 };
+
+type ApiKey = { id: string; label: string | null; createdAt: string; revokedAt: string | null };
 
 const featureLabels: Record<string, string> = {
   customQuestions: "Custom question editing",
@@ -35,6 +39,16 @@ export function TenantSettingsPanel() {
   // explicit Save click, not a drag-release.
   const [safetyContactDraft, setSafetyContactDraft] = useState<string | null>(null);
   const [savingSafetyContact, setSavingSafetyContact] = useState(false);
+  const [smtpHost, setSmtpHost] = useState("");
+  const [smtpPort, setSmtpPort] = useState("");
+  const [smtpUsername, setSmtpUsername] = useState("");
+  const [smtpPassword, setSmtpPassword] = useState("");
+  const [smtpFromEmail, setSmtpFromEmail] = useState("");
+  const [savingSmtp, setSavingSmtp] = useState(false);
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+  const [newApiKeyLabel, setNewApiKeyLabel] = useState("");
+  const [createdApiKey, setCreatedApiKey] = useState("");
+  const [creatingApiKey, setCreatingApiKey] = useState(false);
   const toast = useToast();
 
   function load() {
@@ -44,7 +58,80 @@ export function TenantSettingsPanel() {
       .catch(() => setSettings(null));
   }
 
+  function loadApiKeys() {
+    fetch("/api/tenants/api-keys")
+      .then((response) => response.json())
+      .then((data: { ok?: boolean; keys?: ApiKey[] }) => setApiKeys(data.ok ? (data.keys ?? []) : []))
+      .catch(() => setApiKeys([]));
+  }
+
   useEffect(load, []);
+  useEffect(loadApiKeys, []);
+
+  async function saveSmtp() {
+    setSavingSmtp(true);
+    const response = await fetch("/api/tenants/settings", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        smtpHost,
+        smtpPort: Number(smtpPort),
+        smtpUsername,
+        smtpPassword,
+        smtpFromEmail,
+      }),
+    });
+    const data = await response.json().catch(() => ({ ok: false }));
+    setSavingSmtp(false);
+    if (data.ok) {
+      setSettings(data.settings);
+      setSmtpHost("");
+      setSmtpPort("");
+      setSmtpUsername("");
+      setSmtpPassword("");
+      setSmtpFromEmail("");
+      toast.show({ variant: "success", message: "Your mail server is now used for invite and reminder emails." });
+    } else {
+      toast.show({ variant: "error", message: data.error ?? "Couldn't save SMTP settings." });
+    }
+  }
+
+  async function clearSmtp() {
+    setSavingSmtp(true);
+    const response = await fetch("/api/tenants/settings", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ smtpClear: true }),
+    });
+    const data = await response.json().catch(() => ({ ok: false }));
+    setSavingSmtp(false);
+    if (data.ok) {
+      setSettings(data.settings);
+      toast.show({ variant: "success", message: "Removed. Invite and reminder emails will send from SaferSay again." });
+    }
+  }
+
+  async function createApiKey() {
+    setCreatingApiKey(true);
+    setCreatedApiKey("");
+    const response = await fetch("/api/tenants/api-keys", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ label: newApiKeyLabel.trim() || undefined }),
+    });
+    const data = (await response.json().catch(() => ({}))) as { ok?: boolean; key?: string };
+    setCreatingApiKey(false);
+    if (data.ok && data.key) {
+      setCreatedApiKey(data.key);
+      setNewApiKeyLabel("");
+      loadApiKeys();
+    }
+  }
+
+  async function revokeApiKey(id: string) {
+    await fetch(`/api/tenants/api-keys?id=${id}`, { method: "DELETE" });
+    loadApiKeys();
+  }
 
   async function commitMinGroupSize() {
     if (sliderValue === null || !settings || sliderValue === settings.minGroupSize) return;
@@ -174,6 +261,79 @@ export function TenantSettingsPanel() {
             {savingSafetyContact ? "Saving..." : "Save"}
           </button>
         </div>
+      </Card>
+
+      <Card>
+        <h2 className="section-title">Outbound mail server</h2>
+        <p className="mt-1.5 secondary-text">
+          {settings.smtpConfigured
+            ? `Invite and reminder emails currently send from your own server (${settings.smtpFromEmail}).`
+            : "Invite and reminder emails currently send from SaferSay's shared address. Add your own SMTP server to send from your own domain instead."}
+        </p>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          <input value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} placeholder="smtp.yourcompany.com" aria-label="SMTP host" className="admin-input" />
+          <input value={smtpPort} onChange={(e) => setSmtpPort(e.target.value)} placeholder="587" aria-label="SMTP port" className="admin-input" />
+          <input value={smtpUsername} onChange={(e) => setSmtpUsername(e.target.value)} placeholder="Username" aria-label="SMTP username" className="admin-input" />
+          <input type="password" value={smtpPassword} onChange={(e) => setSmtpPassword(e.target.value)} placeholder="Password" aria-label="SMTP password" className="admin-input" />
+          <input
+            type="email"
+            value={smtpFromEmail}
+            onChange={(e) => setSmtpFromEmail(e.target.value)}
+            placeholder="surveys@yourcompany.com"
+            aria-label="SMTP from address"
+            className="admin-input sm:col-span-2"
+          />
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button onClick={saveSmtp} disabled={savingSmtp || !smtpHost.trim()} className="btn-primary">
+            {savingSmtp ? "Saving..." : "Save mail server"}
+          </button>
+          {settings.smtpConfigured ? (
+            <button onClick={clearSmtp} disabled={savingSmtp} className="btn-secondary">
+              Use SaferSay&apos;s address instead
+            </button>
+          ) : null}
+        </div>
+      </Card>
+
+      <Card>
+        <h2 className="section-title">API keys</h2>
+        <p className="mt-1.5 secondary-text">
+          For pulling report data into PowerBI, Tableau, or a ChatGPT connector. Same k-anonymity protection as the app -- a key can
+          never see anything below your confidentiality threshold.
+        </p>
+        {createdApiKey ? (
+          <div className="mt-3 rounded-[var(--radius-input)] border border-[var(--green-border)] bg-[var(--green-bg)] p-3 text-[13px]">
+            <p className="font-medium text-[var(--ink)]">Copy this now -- it won&apos;t be shown again:</p>
+            <code className="mt-1 block break-all">{createdApiKey}</code>
+          </div>
+        ) : null}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <input
+            value={newApiKeyLabel}
+            onChange={(e) => setNewApiKeyLabel(e.target.value)}
+            placeholder="Label (optional, e.g. PowerBI)"
+            aria-label="API key label"
+            className="admin-input flex-1"
+          />
+          <button onClick={createApiKey} disabled={creatingApiKey} className="btn-primary shrink-0">
+            {creatingApiKey ? "Creating..." : "Create key"}
+          </button>
+        </div>
+        {apiKeys.filter((key) => !key.revokedAt).length > 0 ? (
+          <div className="mt-3 space-y-1.5">
+            {apiKeys
+              .filter((key) => !key.revokedAt)
+              .map((key) => (
+                <div key={key.id} className="flex items-center justify-between rounded-[var(--radius-input)] border border-[var(--border)] px-3 py-2 text-[13px]">
+                  <span className="text-[var(--ink)]">{key.label || "Unlabeled key"}</span>
+                  <button onClick={() => revokeApiKey(key.id)} className="text-xs font-medium text-[var(--red)] hover:underline">
+                    Revoke
+                  </button>
+                </div>
+              ))}
+          </div>
+        ) : null}
       </Card>
 
       <Card>

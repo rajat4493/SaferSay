@@ -149,6 +149,11 @@ export type TenantSelfSettings = {
   // null = SOS button does not render for respondents. No default/fallback
   // (e.g. to the customer_admin contact) -- see 0023_sos_reports.sql.
   safetyContactEmail: string | null;
+  // Never the password -- just enough for the settings UI to show
+  // "configured" vs "not configured". null smtpConfigured means invite/
+  // reminder email falls back to the global Resend sender.
+  smtpConfigured: boolean;
+  smtpFromEmail: string | null;
 };
 
 export type CycleAction = {
@@ -250,6 +255,13 @@ export type RespondentSurveySession = {
  * §4). The parameter exists now so adding those scopes later is a query
  * change, not a reporting-layer rewrite.
  */
+export type QuestionBankItem = {
+  id: string;
+  construct: string | null;
+  text: string;
+  questionType: "scale" | "open_text";
+};
+
 export type ReportScope =
   | { type: "org" }
   | { type: "department"; department: string }
@@ -260,7 +272,7 @@ export type ProtectedReport =
   | {
       protected: false;
       n: number;
-      rows: Array<{ questionId: string; label?: string; n: number; average: number | null }>;
+      rows: Array<{ questionId: string; label?: string; construct?: string | null; n: number; average: number | null }>;
     };
 
 /**

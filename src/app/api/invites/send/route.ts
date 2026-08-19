@@ -46,7 +46,8 @@ export async function POST(request: NextRequest) {
     }
 
     const deliveries = await repo.getQueuedOutboxDeliveries(tenant.id, cycleId, deliveryType);
-    const delivery = await sendQueuedInviteDeliveries({ tenant, deliveries });
+    const smtpConfig = await repo.getSmtpConfig(tenant.id);
+    const delivery = await sendQueuedInviteDeliveries({ tenant, deliveries, smtpConfig });
     // Sequential, not Promise.all: db is a single shared client under
     // withTenantScopedDb (tenant-scoped connection), and pg clients can't
     // run concurrent queries on one connection.

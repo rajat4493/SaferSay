@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from "crypto";
 import type { Queryable } from "@/lib/server/db/tenantPool";
 import { hashServerToken } from "@/lib/server/tokenHashing";
+import { decryptSecret, encryptSecret } from "@/lib/server/secretCrypto";
 import {
   AuditLogRecord,
   CycleAction,
@@ -460,6 +461,68 @@ export class IdentityRepository {
   }
 
   /**
+   * Tenant-configured outbound SMTP, or null if the tenant hasn't set one
+   * (meaning: use the global Resend config, exactly today's behavior --
+   * see resendDelivery.ts). smtp_password is decrypted here so the caller
+   * gets a ready-to-use config; it is never returned by any API route,
+   * only used server-side to actually send mail.
+   */
+  async getSmtpConfig(tenantId: string): Promise<{
+    host: string;
+    port: number;
+    username: string;
+    password: string;
+    fromEmail: string;
+  } | null> {
+    const result = await this.db.query<{
+      smtp_host: string | null;
+      smtp_port: number | null;
+      smtp_username: string | null;
+      smtp_password_encrypted: string | null;
+      smtp_from_email: string | null;
+    }>(
+      `select smtp_host, smtp_port, smtp_username, smtp_password_encrypted, smtp_from_email
+       from identity.tenant_settings where tenant_id = $1`,
+      [tenantId],
+    );
+    const row = result.rows[0];
+    if (!row?.smtp_host || !row.smtp_port || !row.smtp_username || !row.smtp_password_encrypted || !row.smtp_from_email) return null;
+    return {
+      host: row.smtp_host,
+      port: row.smtp_port,
+      username: row.smtp_username,
+      password: decryptSecret(row.smtp_password_encrypted),
+      fromEmail: row.smtp_from_email,
+    };
+  }
+
+  /** Pass null to clear the tenant's SMTP config and fall back to the global Resend sender. */
+  async setSmtpConfig(
+    tenantId: string,
+    config: { host: string; port: number; username: string; password: string; fromEmail: string } | null,
+  ) {
+    await this.db.query(
+      `insert into identity.tenant_settings (tenant_id, smtp_host, smtp_port, smtp_username, smtp_password_encrypted, smtp_from_email)
+       values ($1, $2, $3, $4, $5, $6)
+       on conflict (tenant_id) do update set
+         smtp_host = excluded.smtp_host,
+         smtp_port = excluded.smtp_port,
+         smtp_username = excluded.smtp_username,
+         smtp_password_encrypted = excluded.smtp_password_encrypted,
+         smtp_from_email = excluded.smtp_from_email,
+         updated_at = now()`,
+      [
+        tenantId,
+        config?.host ?? null,
+        config?.port ?? null,
+        config?.username ?? null,
+        config ? encryptSecret(config.password) : null,
+        config?.fromEmail ?? null,
+      ],
+    );
+  }
+
+  /**
    * The one deliberate, auditable, grep-able place identity is read for a
    * survey token outside the normal severed flow -- do NOT widen
    * findIssuedToken/findIssuedTokenForRespondentSession for this; those
@@ -640,13 +703,17 @@ export class IdentityRepository {
       plan_tier: TenantPlanTier;
       features: Record<string, boolean>;
       safety_contact_email: string | null;
+      smtp_host: string | null;
+      smtp_from_email: string | null;
     }>(
       `select
          coalesce(default_min_group_size, 5) as default_min_group_size,
          coalesce(data_residency_region, 'EU') as data_residency_region,
          coalesce(plan_tier, 'standard') as plan_tier,
          coalesce(features, '{}'::jsonb) as features,
-         safety_contact_email
+         safety_contact_email,
+         smtp_host,
+         smtp_from_email
        from identity.tenant_settings where tenant_id = $1`,
       [tenantId],
     );
@@ -657,6 +724,10 @@ export class IdentityRepository {
       planTier: row?.plan_tier ?? "standard",
       features: row?.features ?? {},
       safetyContactEmail: row?.safety_contact_email ?? null,
+      // Never the password -- just enough for the settings UI to show
+      // "configured" vs "not configured" without ever round-tripping the secret.
+      smtpConfigured: Boolean(row?.smtp_host),
+      smtpFromEmail: row?.smtp_from_email ?? null,
     };
   }
 
@@ -717,6 +788,22 @@ export class IdentityRepository {
        values ($1, $2, $3, $4)`,
       [randomUUID(), superAdminUserId, superAdminEmail, tenantId],
     );
+  }
+
+  /**
+   * Points a tenant at their own dedicated database (or, passing null,
+   * moves them back onto the shared one). The caller is responsible for
+   * having already run scripts/run-migrations.mjs against `connectionString`
+   * -- this method only records where to find it, on the privileged
+   * control-plane pool (identity.tenants must stay reachable regardless
+   * of which database a given tenant's own data lives in). See
+   * 0027_tenant_dedicated_db.sql and getPoolForTenant (tenantPool.ts).
+   */
+  async setDedicatedDatabaseUrl(tenantId: string, connectionString: string | null) {
+    await this.db.query(`update identity.tenants set database_url_encrypted = $2 where id = $1`, [
+      tenantId,
+      connectionString ? encryptSecret(connectionString) : null,
+    ]);
   }
 
   async createTenant(name: string, slug = toTenantSlug(name)): Promise<TenantRecord> {
@@ -820,6 +907,95 @@ export class IdentityRepository {
       })),
       total: Number(countResult.rows[0]?.count ?? 0),
     };
+  }
+
+  /**
+   * Distinct normalized team labels for a tenant, with active-employee
+   * counts. This is the authoring-side counterpart to
+   * ResponseRepository.listDepartmentsForCycle -- that lists departments
+   * observed in submitted responses for a cycle; this lists teams as
+   * currently assigned on identity.employees, for admin management.
+   */
+  async listTeams(tenantId: string): Promise<Array<{ team: string; memberCount: number }>> {
+    const result = await this.db.query<{ team: string; member_count: string }>(
+      `select team, count(*)::text as member_count
+       from identity.employees
+       where tenant_id = $1 and team is not null and employment_status = 'active'
+       group by team
+       order by team`,
+      [tenantId],
+    );
+    return result.rows.map((row) => ({ team: row.team, memberCount: Number(row.member_count) }));
+  }
+
+  async renameTeam(tenantId: string, fromTeam: string, toTeam: string): Promise<number> {
+    const normalizedFrom = normalizeTeamLabel(fromTeam);
+    const normalizedTo = normalizeTeamLabel(toTeam);
+    if (!normalizedFrom || !normalizedTo) throw new Error("Team names cannot be empty.");
+    const result = await this.db.query(
+      `update identity.employees set team = $3 where tenant_id = $1 and team = $2`,
+      [tenantId, normalizedFrom, normalizedTo],
+    );
+    return result.rowCount ?? 0;
+  }
+
+  /** Merges several team labels into one target label -- same underlying update as renameTeam, applied to each source. */
+  async mergeTeams(tenantId: string, fromTeams: string[], intoTeam: string): Promise<number> {
+    const normalizedInto = normalizeTeamLabel(intoTeam);
+    if (!normalizedInto) throw new Error("Target team name cannot be empty.");
+    let total = 0;
+    for (const fromTeam of fromTeams) {
+      const normalizedFrom = normalizeTeamLabel(fromTeam);
+      if (!normalizedFrom || normalizedFrom === normalizedInto) continue;
+      total += await this.renameTeam(tenantId, normalizedFrom, normalizedInto);
+    }
+    return total;
+  }
+
+  /**
+   * Creates a tenant API key and returns the raw value exactly once -- only
+   * key_hash is ever persisted (same convention as respondent tokens, see
+   * hashServerToken). Callers must show `rawKey` to the admin immediately
+   * and never log or re-derive it afterward.
+   */
+  async createApiKey(tenantId: string, label: string | null): Promise<{ id: string; rawKey: string }> {
+    const id = randomUUID();
+    const rawKey = `ssk_${randomBytes(24).toString("base64url")}`;
+    await this.db.query(
+      `insert into identity.tenant_api_keys (id, tenant_id, key_hash, label) values ($1, $2, $3, $4)`,
+      [id, tenantId, hashServerToken(rawKey), label],
+    );
+    return { id, rawKey };
+  }
+
+  async listApiKeys(tenantId: string): Promise<Array<{ id: string; label: string | null; createdAt: string; revokedAt: string | null }>> {
+    const result = await this.db.query<{ id: string; label: string | null; created_at: string; revoked_at: string | null }>(
+      `select id, label, created_at, revoked_at from identity.tenant_api_keys where tenant_id = $1 order by created_at desc`,
+      [tenantId],
+    );
+    return result.rows.map((row) => ({ id: row.id, label: row.label, createdAt: row.created_at, revokedAt: row.revoked_at }));
+  }
+
+  async revokeApiKey(tenantId: string, keyId: string): Promise<void> {
+    const result = await this.db.query(
+      `update identity.tenant_api_keys set revoked_at = now() where tenant_id = $1 and id = $2 and revoked_at is null`,
+      [tenantId, keyId],
+    );
+    if (result.rowCount !== 1) throw new Error("API key not found.");
+  }
+
+  /**
+   * Resolves a raw API key to its tenant, on the privileged pool -- this is
+   * what *establishes* the tenant context for an external integration
+   * request, so it necessarily runs before app.current_tenant_id is set,
+   * same reasoning as findIssuedToken for respondent tokens.
+   */
+  async findTenantForApiKey(rawKey: string): Promise<{ tenantId: string } | null> {
+    const result = await this.db.query<{ tenant_id: string }>(
+      `select tenant_id from identity.tenant_api_keys where key_hash = $1 and revoked_at is null`,
+      [hashServerToken(rawKey)],
+    );
+    return result.rows[0] ? { tenantId: result.rows[0].tenant_id } : null;
   }
 
   async setEmployeeStatus(tenantId: string, employeeId: string, status: "active" | "inactive") {

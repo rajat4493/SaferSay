@@ -1,0 +1,17 @@
+-- Opt-in dedicated Postgres database per tenant, for the "our data isn't
+-- co-mingled with anyone else's" compliance story -- still SaferSay-
+-- managed (same RLS/k-anonymity/SECURITY DEFINER architecture gets
+-- applied to it via the migration runner, see scripts/run-migrations.ts),
+-- not literal customer-hosted infrastructure.
+--
+-- Nullable, no default: absent means the tenant stays on the shared
+-- database exactly as today -- fully backward compatible, zero behavior
+-- change for every existing tenant. Encrypted at rest (see
+-- secretCrypto.ts) since it's a full connection string with credentials.
+--
+-- Lives on identity.tenants (the control-plane table, always reachable
+-- via the privileged DATABASE_URL pool) rather than tenant_settings,
+-- because resolving it is what decides *which* database to even connect
+-- to for everything else -- it has to be readable before any
+-- tenant-scoped pool exists.
+alter table identity.tenants add column if not exists database_url_encrypted text;

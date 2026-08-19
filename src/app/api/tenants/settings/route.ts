@@ -23,10 +23,28 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "You don't have permission to change workspace settings." }, { status: 403 });
   }
 
-  const body = (await request.json().catch(() => ({}))) as { minGroupSize?: number; safetyContactEmail?: string };
+  const body = (await request.json().catch(() => ({}))) as {
+    minGroupSize?: number;
+    safetyContactEmail?: string;
+    smtpHost?: string;
+    smtpPort?: number;
+    smtpUsername?: string;
+    smtpPassword?: string;
+    smtpFromEmail?: string;
+    smtpClear?: boolean;
+  };
 
   if (typeof body.safetyContactEmail === "string" && body.safetyContactEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.safetyContactEmail.trim())) {
     return NextResponse.json({ ok: false, error: "Safety contact must be a valid email address." }, { status: 400 });
+  }
+
+  // SMTP is set-together, not field-by-field: the admin resends the full
+  // config (including password) every time they change any part of it.
+  // No partial-update path exists, so there's no ambiguity about whether
+  // an omitted password means "keep the old one" or "clear it."
+  const wantsSmtpUpdate = typeof body.smtpHost === "string" && body.smtpHost.trim();
+  if (wantsSmtpUpdate && (!body.smtpPort || !body.smtpUsername?.trim() || !body.smtpPassword?.trim() || !body.smtpFromEmail?.trim())) {
+    return NextResponse.json({ ok: false, error: "SMTP host, port, username, password, and from-address are all required together." }, { status: 400 });
   }
 
   const settings = await withTenantScopedDb(session.tenant.id, async (db) => {
@@ -42,6 +60,17 @@ export async function PATCH(request: NextRequest) {
       // no fallback to any other contact, ever. See 0023_sos_reports.sql.
       const trimmed = body.safetyContactEmail.trim();
       await repo.setSafetyContactEmail(session.tenant.id, trimmed ? trimmed : null);
+    }
+    if (body.smtpClear) {
+      await repo.setSmtpConfig(session.tenant.id, null);
+    } else if (wantsSmtpUpdate) {
+      await repo.setSmtpConfig(session.tenant.id, {
+        host: body.smtpHost!.trim(),
+        port: body.smtpPort!,
+        username: body.smtpUsername!.trim(),
+        password: body.smtpPassword!,
+        fromEmail: body.smtpFromEmail!.trim(),
+      });
     }
     return repo.getTenantSelfSettings(session.tenant.id);
   });

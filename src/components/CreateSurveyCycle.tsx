@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDown, ArrowUp } from "lucide-react";
+import { ArrowDown, ArrowUp, Plus } from "lucide-react";
 import { surveyTemplates, type SurveyTemplate } from "@/lib/templates";
 import { useToast } from "@/components/ToastProvider";
 
 type EditableQuestion = SurveyTemplate["questions"][number] & { included: boolean };
+
+type BankQuestion = { id: string; construct: string | null; text: string; questionType: "scale" | "open_text" };
 
 function toEditable(template: SurveyTemplate): EditableQuestion[] {
   return template.questions.map((question) => ({ ...question, included: true }));
@@ -27,8 +29,52 @@ export function CreateSurveyCycle({ templateSlug }: { templateSlug: string }) {
   const [cycleName, setCycleName] = useState("");
   const [status, setStatus] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [bankQuestions, setBankQuestions] = useState<BankQuestion[]>([]);
+  const [newBankText, setNewBankText] = useState("");
+  const [newBankConstruct, setNewBankConstruct] = useState("");
+  const [addingToBank, setAddingToBank] = useState(false);
   const router = useRouter();
   const toast = useToast();
+
+  useEffect(() => {
+    fetch("/api/question-bank")
+      .then((response) => response.json())
+      .then((result: { ok?: boolean; questions?: BankQuestion[] }) => {
+        if (result.ok) setBankQuestions(result.questions ?? []);
+      })
+      .catch(() => {});
+  }, []);
+
+  function addFromBank(bankQuestion: BankQuestion) {
+    setQuestions((current) => [
+      ...current,
+      {
+        id: bankQuestion.id,
+        construct: bankQuestion.construct ?? "",
+        type: bankQuestion.questionType === "open_text" ? "open_text" : "likert_5",
+        text: bankQuestion.text,
+        included: true,
+      },
+    ]);
+  }
+
+  async function addNewQuestionToBank() {
+    const text = newBankText.trim();
+    if (!text) return;
+    setAddingToBank(true);
+    const response = await fetch("/api/question-bank", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text, construct: newBankConstruct.trim() || undefined, questionType: "scale" }),
+    });
+    const result = (await response.json().catch(() => ({}))) as { ok?: boolean; question?: BankQuestion };
+    setAddingToBank(false);
+    if (result.ok && result.question) {
+      setBankQuestions((current) => [result.question!, ...current]);
+      setNewBankText("");
+      setNewBankConstruct("");
+    }
+  }
 
   function toggleIncluded(index: number) {
     setQuestions((current) => current.map((question, i) => (i === index ? { ...question, included: !question.included } : question)));
@@ -167,6 +213,48 @@ export function CreateSurveyCycle({ templateSlug }: { templateSlug: string }) {
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="mt-5 border-t border-[var(--border)] pt-5">
+        <h3 className="text-[14px] font-medium text-[var(--ink)]">Your question bank</h3>
+        <p className="mt-1 secondary-text">Add a saved question to this cycle, or save a new one for reuse next time.</p>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <input
+            value={newBankConstruct}
+            onChange={(event) => setNewBankConstruct(event.target.value)}
+            placeholder="Theme (optional)"
+            aria-label="New question theme"
+            className="admin-input h-9 w-40"
+          />
+          <input
+            value={newBankText}
+            onChange={(event) => setNewBankText(event.target.value)}
+            placeholder="New question text"
+            aria-label="New question text"
+            className="admin-input h-9 min-w-0 flex-1"
+          />
+          <button onClick={addNewQuestionToBank} disabled={addingToBank || !newBankText.trim()} className="btn-secondary h-9 shrink-0">
+            <Plus size={13} strokeWidth={1.8} />
+            {addingToBank ? "Saving..." : "Save to bank"}
+          </button>
+        </div>
+
+        {bankQuestions.length > 0 ? (
+          <div className="mt-3 space-y-2">
+            {bankQuestions.map((bankQuestion) => (
+              <div key={bankQuestion.id} className="flex items-start justify-between gap-3 rounded-[var(--radius-input)] border border-[var(--border)] bg-white p-3 text-sm">
+                <div>
+                  {bankQuestion.construct ? <div className="label-text">{bankQuestion.construct}</div> : null}
+                  <div className="text-[var(--ink)]">{bankQuestion.text}</div>
+                </div>
+                <button onClick={() => addFromBank(bankQuestion)} className="btn-secondary shrink-0 px-3 py-1.5 text-xs">
+                  Add to cycle
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {status ? <p className="mt-4 rounded-[var(--radius-input)] bg-[var(--bg)] p-3 secondary-text font-medium">{status}</p> : null}

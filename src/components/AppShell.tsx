@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  BarChart3,
   ChevronDown,
   ClipboardList,
   CreditCard,
@@ -23,7 +24,7 @@ import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import { RoleTag } from "@/components/RoleTag";
 import { SignOutButton } from "@/components/SignOutButton";
 import { useTenantSession } from "@/lib/useTenantSession";
-import { canAccessAuditLog, canAccessPeople, canAccessSecurityProof, canAccessWorkspace } from "@/lib/permissions";
+import { canAccessAuditLog, canAccessPeople, canAccessSecurityProof, canAccessWorkspace, canViewSurveyResults } from "@/lib/permissions";
 import type { UserRole } from "@/lib/server/repositories/types";
 
 type NavItemConfig = {
@@ -39,6 +40,7 @@ type NavItemConfig = {
 // primary sidebar space -- same permission checks as before, just folded.
 const primaryNavItems: NavItemConfig[] = [
   { href: "/app", label: "Home", icon: Home, hideForPureOwner: true },
+  { href: "/app/overview", label: "Overview", icon: BarChart3, hideForPureOwner: true, visible: canViewSurveyResults },
   { href: "/app/surveys", label: "Surveys", icon: ClipboardList, hideForPureOwner: true },
   { href: "/app/people", label: "People", icon: Users, hideForPureOwner: true, visible: canAccessPeople },
 ];

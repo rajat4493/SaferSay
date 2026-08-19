@@ -1,10 +1,12 @@
 import { Pool, type PoolClient } from "pg";
 import { getDatabasePool } from "@/lib/server/db/pool";
+import { decryptSecret } from "@/lib/server/secretCrypto";
 
 /** What both Pool and PoolClient expose that repositories actually use. */
 export type Queryable = Pick<Pool, "query">;
 
 let pool: Pool | null = null;
+const dedicatedPools = new Map<string, Pool>();
 
 /**
  * The restricted, non-superuser `safersay_app` role's connection pool --
@@ -53,15 +55,49 @@ export async function withTenantContext<T>(
 }
 
 /**
- * The single call site pattern for tenant-scoped database access: uses the
- * RLS-enforced restricted role when DATABASE_URL_APP is configured, falling
- * back to the privileged pool (today's behavior, application-code
- * filtering only) when it isn't -- so this is safe to roll out
- * incrementally without breaking environments that haven't set the new
- * role up yet.
+ * Resolves the pool a given tenant should actually use: their own
+ * dedicated database if `identity.tenants.database_url_encrypted` is set
+ * (see 0027_tenant_dedicated_db.sql), otherwise the shared restricted
+ * pool from getTenantPool(). One extra control-plane query per call --
+ * deliberately not cached across requests in v1, so a dedicated-DB
+ * provisioning change takes effect immediately rather than waiting out a
+ * stale cache. The resulting Pool *is* cached (keyed by connection
+ * string), so this never opens a fresh TCP connection per request.
+ */
+async function getPoolForTenant(tenantId: string): Promise<Pool | null> {
+  const controlPlane = getDatabasePool();
+  if (controlPlane) {
+    const result = await controlPlane.query<{ database_url_encrypted: string | null }>(
+      "select database_url_encrypted from identity.tenants where id = $1",
+      [tenantId],
+    );
+    const encrypted = result.rows[0]?.database_url_encrypted;
+    if (encrypted) {
+      const connectionString = decryptSecret(encrypted);
+      let dedicated = dedicatedPools.get(connectionString);
+      if (!dedicated) {
+        dedicated = new Pool({
+          connectionString,
+          ssl: connectionString.includes("supabase.com") ? { rejectUnauthorized: false } : undefined,
+        });
+        dedicatedPools.set(connectionString, dedicated);
+      }
+      return dedicated;
+    }
+  }
+  return getTenantPool();
+}
+
+/**
+ * The single call site pattern for tenant-scoped database access: routes
+ * to the tenant's dedicated database if they have one, otherwise the
+ * RLS-enforced shared restricted role, otherwise the privileged pool
+ * (today's behavior, application-code filtering only) -- so this is safe
+ * to roll out incrementally without breaking environments that haven't
+ * set DATABASE_URL_APP or any dedicated databases up yet.
  */
 export async function withTenantScopedDb<T>(tenantId: string, run: (db: Queryable) => Promise<T>): Promise<T> {
-  const tenantPool = getTenantPool();
+  const tenantPool = await getPoolForTenant(tenantId);
   if (tenantPool) {
     return withTenantContext(tenantPool, tenantId, run);
   }

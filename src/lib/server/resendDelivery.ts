@@ -1,8 +1,11 @@
 import "server-only";
 
 import { Resend } from "resend";
+import nodemailer from "nodemailer";
 import { getRuntimeMode } from "@/lib/runtimeConfig";
 import type { QueuedInviteDelivery, TenantRecord } from "@/lib/server/repositories/types";
+
+export type TenantSmtpConfig = { host: string; port: number; username: string; password: string; fromEmail: string };
 
 export type DeliveryResult = {
   sent: number;
@@ -18,13 +21,26 @@ export function getResendConfig() {
   };
 }
 
+/**
+ * Sends via the tenant's own SMTP server when configured (see
+ * IdentityRepository.getSmtpConfig), otherwise falls back to the global
+ * Resend config -- exactly today's behavior for every tenant that hasn't
+ * set one up. This is the only branch point; message content and the
+ * outbox sent/failed bookkeeping are identical either way.
+ */
 export async function sendQueuedInviteDeliveries({
   tenant,
   deliveries,
+  smtpConfig,
 }: {
   tenant: TenantRecord;
   deliveries: QueuedInviteDelivery[];
+  smtpConfig?: TenantSmtpConfig | null;
 }): Promise<DeliveryResult & { sentIds: string[]; failedIds: string[] }> {
+  if (smtpConfig) {
+    return sendViaTenantSmtp({ tenant, deliveries, smtpConfig });
+  }
+
   const config = getResendConfig();
   if (!config.apiKey) {
     return { sent: 0, failed: deliveries.length, errors: ["RESEND_API_KEY is not configured."], sentIds: [], failedIds: deliveries.map((item) => item.outboxId) };
@@ -62,6 +78,47 @@ export async function sendQueuedInviteDeliveries({
     }
 
     sentIds.push(delivery.outboxId);
+  }
+
+  return { sent: sentIds.length, failed: failedIds.length, errors, sentIds, failedIds };
+}
+
+async function sendViaTenantSmtp({
+  tenant,
+  deliveries,
+  smtpConfig,
+}: {
+  tenant: TenantRecord;
+  deliveries: QueuedInviteDelivery[];
+  smtpConfig: TenantSmtpConfig;
+}): Promise<DeliveryResult & { sentIds: string[]; failedIds: string[] }> {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://safer-say.vercel.app";
+  const transporter = nodemailer.createTransport({
+    host: smtpConfig.host,
+    port: smtpConfig.port,
+    secure: smtpConfig.port === 465,
+    auth: { user: smtpConfig.username, pass: smtpConfig.password },
+  });
+
+  const sentIds: string[] = [];
+  const failedIds: string[] = [];
+  const errors: string[] = [];
+
+  for (const delivery of deliveries) {
+    const message = buildInviteMessage({ tenant, delivery, appUrl });
+    try {
+      await transporter.sendMail({
+        from: smtpConfig.fromEmail,
+        to: delivery.email,
+        subject: message.subject,
+        html: message.html,
+        text: message.text,
+      });
+      sentIds.push(delivery.outboxId);
+    } catch (error) {
+      failedIds.push(delivery.outboxId);
+      errors.push(`${delivery.email}: ${error instanceof Error ? error.message : "SMTP send failed."}`);
+    }
   }
 
   return { sent: sentIds.length, failed: failedIds.length, errors, sentIds, failedIds };

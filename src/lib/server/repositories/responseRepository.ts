@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import type { Queryable } from "@/lib/server/db/tenantPool";
-import { ResponseAnswerInput, ProtectedReport, ProtectedTextReport, ReportScope, RespondentSurveySession, CycleTrendQuestion } from "./types";
+import { ResponseAnswerInput, ProtectedReport, ProtectedTextReport, QuestionBankItem, ReportScope, RespondentSurveySession, CycleTrendQuestion } from "./types";
 
 const MAX_TREND_CYCLES = 6;
 
@@ -170,8 +170,8 @@ export class ResponseRepository {
     const n = Number(countResult.rows[0]?.n ?? 0);
     if (n < minGroupSize) return { protected: true, n, rows: [] };
 
-    const result = await this.db.query<{ question_id: string; question_text: string; n: number; average: string | null }>(
-      `select r.question_id, q.question_text, r.n, r.average
+    const result = await this.db.query<{ question_id: string; question_text: string; construct: string | null; n: number; average: string | null }>(
+      `select r.question_id, q.question_text, q.construct, r.n, r.average
        from responses.report_question_scores($1, $2) r
        join responses.survey_cycles c on c.id = $1
        join responses.template_questions q on q.id = r.question_id
@@ -185,6 +185,7 @@ export class ResponseRepository {
       rows: result.rows.map((row) => ({
         questionId: row.question_id,
         label: row.question_text,
+        construct: row.construct,
         n: row.n,
         average: row.average === null ? null : Number(row.average),
       })),
@@ -307,8 +308,8 @@ export class ResponseRepository {
     // has zero responses at all.
     if (!entry || !entry.releasable) return { protected: true, n: 0, rows: [] };
 
-    const result = await this.db.query<{ question_id: string; question_text: string; n: number; average: string | null }>(
-      `select r.question_id, q.question_text, r.n, r.average
+    const result = await this.db.query<{ question_id: string; question_text: string; construct: string | null; n: number; average: string | null }>(
+      `select r.question_id, q.question_text, q.construct, r.n, r.average
        from responses.report_question_scores_by_department($1, $2, $3) r
        join responses.survey_cycles c on c.id = $1
        join responses.template_questions q on q.id = r.question_id
@@ -322,10 +323,46 @@ export class ResponseRepository {
       rows: result.rows.map((row) => ({
         questionId: row.question_id,
         label: row.question_text,
+        construct: row.construct,
         n: row.n,
         average: row.average === null ? null : Number(row.average),
       })),
     };
+  }
+
+  /** Reusable, tenant-private survey questions -- see 0024_question_bank.sql. Archived items are excluded, not deleted, so past cycles that used them keep their own snapshot untouched. */
+  async listQuestionBank(tenantId: string): Promise<QuestionBankItem[]> {
+    const result = await this.db.query<{ id: string; construct: string | null; text: string; question_type: "scale" | "open_text" }>(
+      `select id, construct, text, question_type
+       from responses.question_bank
+       where tenant_id = $1 and archived_at is null
+       order by created_at desc`,
+      [tenantId],
+    );
+    return result.rows.map((row) => ({ id: row.id, construct: row.construct, text: row.text, questionType: row.question_type }));
+  }
+
+  async addQuestionToBank(
+    tenantId: string,
+    input: { construct?: string | null; text: string; questionType: "scale" | "open_text" },
+  ): Promise<QuestionBankItem> {
+    const id = randomUUID();
+    const result = await this.db.query<{ id: string; construct: string | null; text: string; question_type: "scale" | "open_text" }>(
+      `insert into responses.question_bank (id, tenant_id, construct, text, question_type)
+       values ($1, $2, $3, $4, $5)
+       returning id, construct, text, question_type`,
+      [id, tenantId, input.construct ?? null, input.text, input.questionType],
+    );
+    const row = result.rows[0];
+    return { id: row.id, construct: row.construct, text: row.text, questionType: row.question_type };
+  }
+
+  async archiveQuestionFromBank(tenantId: string, questionId: string): Promise<void> {
+    const result = await this.db.query(
+      `update responses.question_bank set archived_at = now() where tenant_id = $1 and id = $2 and archived_at is null`,
+      [tenantId, questionId],
+    );
+    if (result.rowCount !== 1) throw new Error("Question not found.");
   }
 
   /**
