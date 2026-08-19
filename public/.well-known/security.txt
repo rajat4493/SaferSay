@@ -1,0 +1,11 @@
+Contact: mailto:security@safersay.com
+Contact: https://safer-say.vercel.app/security
+Expires: 2027-08-19T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://safer-say.vercel.app/.well-known/security.txt
+Policy: https://safer-say.vercel.app/security
+
+# We welcome reports of security vulnerabilities. Please include steps to
+# reproduce and, where possible, avoid accessing or modifying data that
+# isn't your own during testing. We aim to acknowledge reports within
+# 3 business days.

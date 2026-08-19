@@ -5,6 +5,7 @@ import { submitWithSeveredRepositories } from "@/lib/server/confidentialSubmissi
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import { submitServerResponse } from "@/lib/serverStore";
 import { hashServerToken } from "@/lib/server/tokenHashing";
+import { checkRateLimit, getClientIp } from "@/lib/server/rateLimit";
 
 export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as {
@@ -13,6 +14,14 @@ export async function POST(request: NextRequest) {
   };
   if (!body.token || !Array.isArray(body.answers)) {
     return NextResponse.json({ ok: false, error: "Survey token and answers are required." }, { status: 400 });
+  }
+
+  // Guards against token-guessing, not against a single legitimate
+  // respondent -- a real submission is a one-time action per person, so a
+  // generous per-IP ceiling here only ever bites automated attempts.
+  const { allowed } = await checkRateLimit(`submit:${getClientIp(request)}`, 30, 60);
+  if (!allowed) {
+    return NextResponse.json({ ok: false, error: "Too many attempts. Try again in a minute." }, { status: 429 });
   }
 
   const adminPool = getDatabasePool();

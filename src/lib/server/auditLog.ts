@@ -41,7 +41,8 @@ export type AuditLogAction =
   | "threshold_changed"
   | "settings_updated"
   | "team_invite_sent"
-  | "team_member_removed";
+  | "team_member_removed"
+  | "deletion_requested";
 
 export type AuditLogTargetType = "survey" | "workspace" | "people_list" | null;
 
@@ -231,6 +232,23 @@ export async function logEmployeeImport(
 /**
  * Helper: Log threshold change
  */
+/**
+ * Helper: Log an account-deletion request. This only records that a
+ * request was made (for the audit trail an RFP reviewer expects) --
+ * actual deletion stays a manual, super-admin-reviewed action, since
+ * deleting a tenant's data is irreversible and shouldn't be one API call
+ * away from an admin's own account.
+ */
+export async function logDeletionRequested(tenantId: string, actorRole: UserRole, actorId: string): Promise<void> {
+  await logAuditEvent({
+    tenantId,
+    actorRole,
+    actorId,
+    action: "deletion_requested",
+    targetType: "workspace",
+  });
+}
+
 export async function logThresholdChanged(
   tenantId: string,
   actorRole: UserRole,

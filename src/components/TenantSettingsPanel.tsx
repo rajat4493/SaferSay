@@ -49,6 +49,8 @@ export function TenantSettingsPanel() {
   const [newApiKeyLabel, setNewApiKeyLabel] = useState("");
   const [createdApiKey, setCreatedApiKey] = useState("");
   const [creatingApiKey, setCreatingApiKey] = useState(false);
+  const [requestingDeletion, setRequestingDeletion] = useState(false);
+  const [deletionRequested, setDeletionRequested] = useState(false);
   const toast = useToast();
 
   function load() {
@@ -199,6 +201,34 @@ export function TenantSettingsPanel() {
         link.click();
         URL.revokeObjectURL(url);
       });
+  }
+
+  function exportWorkspaceJson() {
+    fetch("/api/tenants/export")
+      .then((response) => response.json())
+      .then((data) => {
+        if (!data.ok) return;
+        const blob = new Blob([JSON.stringify(data.export, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "safersay-workspace-export.json";
+        link.click();
+        URL.revokeObjectURL(url);
+      });
+  }
+
+  async function requestDeletion() {
+    setRequestingDeletion(true);
+    const response = await fetch("/api/tenants/deletion-request", { method: "POST" });
+    const data = await response.json().catch(() => ({ ok: false }));
+    setRequestingDeletion(false);
+    if (data.ok) {
+      setDeletionRequested(true);
+      toast.show({ variant: "success", message: "Deletion request logged. We'll follow up by email." });
+    } else {
+      toast.show({ variant: "error", message: "Couldn't log that request. Try again." });
+    }
   }
 
   if (settings === undefined) {
@@ -369,10 +399,22 @@ export function TenantSettingsPanel() {
           <button onClick={exportEmployeesCsv} className="btn-secondary btn-pill">
             Export employee list (CSV)
           </button>
-          <a href="mailto:privacy@safersay.com?subject=Account%20deletion%20request" className="btn-secondary btn-pill">
-            Request account deletion
-          </a>
+          <button onClick={exportWorkspaceJson} className="btn-secondary btn-pill">
+            Export full workspace data (JSON)
+          </button>
+          {deletionRequested ? (
+            <span className="btn-secondary btn-pill cursor-default opacity-70">Deletion requested -- we&apos;ll follow up by email</span>
+          ) : (
+            <button onClick={requestDeletion} disabled={requestingDeletion} className="btn-secondary btn-pill">
+              {requestingDeletion ? "Logging request..." : "Request account deletion"}
+            </button>
+          )}
         </div>
+        <p className="mt-2 text-xs text-[var(--ink-faint)]">
+          Requesting deletion logs it to your workspace&apos;s audit trail immediately -- actual deletion is a
+          manual step we confirm with you by email first, since it can&apos;t be undone. You can also reach us
+          directly at <a href="mailto:privacy@safersay.com" className="underline">privacy@safersay.com</a>.
+        </p>
       </Card>
     </div>
   );

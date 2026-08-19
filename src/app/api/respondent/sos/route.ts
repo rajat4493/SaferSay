@@ -4,6 +4,7 @@ import { getTenantPool, withTenantContext, type Queryable } from "@/lib/server/d
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import { sendSosAlert } from "@/lib/server/sosDelivery";
 import { hashServerToken } from "@/lib/server/tokenHashing";
+import { checkRateLimit, getClientIp } from "@/lib/server/rateLimit";
 
 /**
  * Respondent-facing (token-gated, not staff-role-gated), same as
@@ -27,6 +28,16 @@ export async function POST(request: NextRequest) {
     // Defense in depth -- the UI requires the checkbox before this can be
     // submitted at all, but never trust the client to have enforced it.
     return NextResponse.json({ ok: false, error: "You must acknowledge before sending." }, { status: 400 });
+  }
+
+  // Every successful send emails a real person -- keep this tight. Keyed
+  // by IP (guards a script hammering the endpoint) and separately by the
+  // token itself (guards one compromised/shared link from spamming the
+  // safety contact repeatedly).
+  const ipCheck = await checkRateLimit(`sos-ip:${getClientIp(request)}`, 5, 300);
+  const tokenCheck = await checkRateLimit(`sos-token:${hashServerToken(body.token)}`, 3, 3600);
+  if (!ipCheck.allowed || !tokenCheck.allowed) {
+    return NextResponse.json({ ok: false, error: "Too many attempts. Try again later." }, { status: 429 });
   }
 
   const adminPool = getDatabasePool();
