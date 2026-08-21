@@ -92,6 +92,13 @@ export function runtimeChecks(): RuntimeCheck[] {
       requiredForProduction: false,
       purpose: "Server and browser crash reporting, so you find out before a client does.",
     },
+    {
+      key: "RETENTION_PURGE_SECRET",
+      label: "Data retention purge",
+      configured: Boolean(process.env.RETENTION_PURGE_SECRET || process.env.CRON_SECRET),
+      requiredForProduction: true,
+      purpose: "Authenticates the scheduled job (vercel.json cron) that deletes survey data past each tenant's retention window -- the route refuses to run without it, so retention silently never happens otherwise.",
+    },
   ];
 }
 
