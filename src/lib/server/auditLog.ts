@@ -42,7 +42,8 @@ export type AuditLogAction =
   | "threshold_changed"
   | "settings_updated"
   | "team_invite_sent"
-  | "team_member_removed";
+  | "team_member_removed"
+  | "data_retention_purged";
 
 export type AuditLogTargetType = "survey" | "workspace" | "people_list" | null;
 
@@ -230,6 +231,29 @@ export async function logReportExported(
     targetType: "survey",
     targetId: surveyId ?? undefined,
     details: `format: ${format}`,
+  });
+}
+
+/**
+ * Helper: Log an automatic data-retention purge run for a tenant (aggregate
+ * counts only -- which cycles/submissions were deleted, never which
+ * respondent's data specifically, matching the audit guard's rules for
+ * every other aggregate-only action).
+ */
+export async function logDataRetentionPurged(
+  tenantId: string,
+  retentionMonths: number,
+  cyclesPurged: number,
+  submissionsDeleted: number
+): Promise<void> {
+  await logAuditEvent({
+    tenantId,
+    actorRole: "customer_admin",
+    actorId: "system-retention-job",
+    action: "data_retention_purged",
+    targetType: "workspace",
+    safeCounts: { cycles_purged: cyclesPurged, submissions_deleted: submissionsDeleted },
+    details: `retention window: ${retentionMonths} months`,
   });
 }
 

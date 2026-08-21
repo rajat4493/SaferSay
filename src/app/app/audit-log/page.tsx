@@ -30,6 +30,7 @@ const actionLabels: Record<string, string> = {
   settings_updated: "Updated workspace settings",
   team_invite_sent: "Invited a teammate",
   team_member_removed: "Removed a teammate",
+  data_retention_purged: "Automatic data retention purge ran",
 };
 
 const roleLabels: Record<string, string> = {

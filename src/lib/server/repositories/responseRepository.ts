@@ -507,7 +507,7 @@ export class ResponseRepository {
   async closeCycle(tenantId: string, cycleId: string) {
     const result = await this.db.query(
       `update responses.survey_cycles
-       set status = 'closed'
+       set status = 'closed', actual_closed_at = now()
        where tenant_id = $1 and id = $2 and status <> 'closed'`,
       [tenantId, cycleId],
     );
