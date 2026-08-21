@@ -35,7 +35,13 @@ export async function POST(request: NextRequest) {
   response.cookies.set(superAdminTenantCookieName, target.id, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    // Always true, not gated on NODE_ENV -- secure cookies work fine on
+    // http://localhost too (browsers special-case it), and NODE_ENV can
+    // be something other than exactly "production" on an HTTPS
+    // staging/preview deploy, which would otherwise leave a cookie that
+    // controls which tenant's data a super admin views without Secure.
+    // Same fix already applied to the dev-auth cookie (dev/login/route.ts).
+    secure: true,
     path: "/",
     maxAge: 60 * 60 * 8,
   });

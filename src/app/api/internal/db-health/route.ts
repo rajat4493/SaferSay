@@ -1,9 +1,20 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getDatabasePool } from "@/lib/server/db/pool";
 import { runSeveranceHealthCheck } from "@/lib/server/severanceHealth";
+import { getRuntimeMode } from "@/lib/runtimeConfig";
 
 export async function GET(request: NextRequest) {
   const healthcheckSecret = process.env.HEALTHCHECK_SECRET;
+
+  // In production, HEALTHCHECK_SECRET is required, not optional -- this
+  // endpoint returns internal schema/RLS metadata (which tables have row
+  // security enabled, cross-schema FK checks), which is reconnaissance an
+  // attacker could use. Failing open here would mean forgetting to set
+  // the secret silently exposes it. In local/dev mode it stays optional,
+  // for the same convenience healthchecks elsewhere in the app allow.
+  if (getRuntimeMode() === "production" && !healthcheckSecret) {
+    return NextResponse.json({ ok: false, error: "Health check is not configured." }, { status: 503 });
+  }
 
   if (healthcheckSecret) {
     const suppliedSecret = request.headers.get("x-safersay-healthcheck-secret");
