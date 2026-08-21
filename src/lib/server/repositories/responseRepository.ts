@@ -574,7 +574,15 @@ export class ResponseRepository {
         cycleId: cycle.id,
         cycleName: cycle.name,
         cycleCreatedAt: cycle.createdAt,
-        n: row.n,
+        // report_question_trend() always computes the real count(*) as n,
+        // same as it always computes the real average -- protected only
+        // says whether n cleared min_group_size. average is correctly
+        // nulled below threshold; n must be too, or a below-threshold
+        // point's exact respondent count ships to the client just not
+        // rendered, which is not the same as not being exposed (same
+        // "never reveal exact n" rule getDepartmentProtectedReport
+        // enforces for department-scoped reports).
+        n: row.protected ? 0 : row.n,
         average: row.protected || row.average === null ? null : Number(row.average),
         protected: row.protected,
       });
