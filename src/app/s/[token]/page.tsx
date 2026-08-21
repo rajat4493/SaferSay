@@ -204,10 +204,21 @@ export default function RespondentTokenPage() {
         ) : null}
 
         {step === "survey" ? (
-          <div className="taker-progress-track mb-6">
+          <div
+            className="taker-progress-track mb-6"
+            role="progressbar"
+            aria-label="Survey progress"
+            aria-valuemin={0}
+            aria-valuemax={questions.length}
+            aria-valuenow={current}
+            aria-valuetext={`Question ${current + 1} of ${questions.length}`}
+          >
             <div className="taker-progress-fill" style={{ width: `${(current / questions.length) * 100}%` }} />
           </div>
         ) : null}
+        <div aria-live="polite" className="sr-only">
+          {step === "survey" && question ? `Question ${current + 1} of ${questions.length}` : step === "done" ? "Survey complete" : ""}
+        </div>
 
         {step === "loading" ? (
           <Panel title="Checking your link" text="This takes a moment." />
@@ -296,11 +307,19 @@ export default function RespondentTokenPage() {
               </div>
             ) : (
               <div className="mt-7 grid gap-2.5">
-                <div className="taker-scale">
+                <div className="taker-scale" role="radiogroup" aria-label={question.text}>
                   {scaleOptions.map((value) => {
                     const selected = selectedValue === value;
                     return (
-                      <button key={value} onClick={() => setSelectedValue(value)} className="taker-circle" data-selected={selected} aria-label={`${value} ${scaleLabel(question.type, value)}`}>
+                      <button
+                        key={value}
+                        onClick={() => setSelectedValue(value)}
+                        className="taker-circle"
+                        data-selected={selected}
+                        role="radio"
+                        aria-checked={selected}
+                        aria-label={`${value} ${scaleLabel(question.type, value)}`}
+                      >
                         {value}
                       </button>
                     );

@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BrandMark } from "@/components/BrandMark";
 import { useBrand } from "@/components/BrandProvider";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
@@ -70,6 +70,17 @@ export function AppShell({
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
 
+  // Escape closes the mobile drawer from anywhere, matching native dialog
+  // behavior -- required since the drawer is role="dialog" aria-modal.
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setMobileNavOpen(false);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [mobileNavOpen]);
+
   // Pure Owner mode: signed in as the platform's super admin, not currently
   // acting inside any customer's workspace. No survey-running nav belongs
   // here -- that only appears once the Owner has explicitly entered a tenant.
@@ -97,7 +108,7 @@ export function AppShell({
         </button>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-2.5 py-2">
+      <nav aria-label="Primary" className="flex-1 overflow-y-auto px-2.5 py-2">
         <div className="space-y-0.5">
           {visiblePrimaryItems.map((item) => (
             <NavLink key={item.href} item={item} active={pathname === item.href} onNavigate={() => setMobileNavOpen(false)} />
@@ -148,6 +159,13 @@ export function AppShell({
 
   return (
     <div className="flex min-h-screen bg-[var(--bg)] text-[var(--ink)]">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-[var(--radius-button)] focus:bg-[var(--ink)] focus:px-4 focus:py-2 focus:text-[13px] focus:font-semibold focus:text-white"
+      >
+        Skip to main content
+      </a>
+
       {/* Desktop sidebar -- always visible at lg+ */}
       <aside className="sticky top-0 hidden h-screen w-[230px] shrink-0 flex-col border-r border-[var(--border-soft)] bg-[var(--bg-sidebar)] lg:flex">{sidebarContent}</aside>
 
@@ -155,7 +173,14 @@ export function AppShell({
       {mobileNavOpen ? (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div className="absolute inset-0 bg-black/30" onClick={() => setMobileNavOpen(false)} />
-          <aside className="absolute inset-y-0 left-0 flex w-[240px] flex-col border-r border-[var(--border-soft)] bg-[var(--bg-sidebar)]">{sidebarContent}</aside>
+          <aside
+            role="dialog"
+            aria-modal="true"
+            aria-label="Navigation"
+            className="absolute inset-y-0 left-0 flex w-[240px] flex-col border-r border-[var(--border-soft)] bg-[var(--bg-sidebar)]"
+          >
+            {sidebarContent}
+          </aside>
         </div>
       ) : null}
 
@@ -173,7 +198,7 @@ export function AppShell({
           </Link>
         </header>
 
-        <section className="flex-1 overflow-y-auto px-5 py-10 lg:px-12 lg:py-16">
+        <main id="main-content" className="flex-1 overflow-y-auto px-5 py-10 lg:px-12 lg:py-16">
           <div className="mx-auto max-w-[1080px]">
             <div className="mb-8 flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -185,7 +210,7 @@ export function AppShell({
             <ImpersonationBanner />
             {children}
           </div>
-        </section>
+        </main>
       </div>
     </div>
   );
@@ -196,6 +221,7 @@ function NavLink({ item, active, onNavigate }: { item: NavItemConfig; active: bo
     <Link
       href={item.href}
       onClick={onNavigate}
+      aria-current={active ? "page" : undefined}
       className={`flex h-12 items-center gap-3 rounded-[10px] px-4 text-[15px] font-medium transition ${
         active ? "bg-[var(--bg-active)] text-[var(--ss-green-700)]" : "text-[#454A46] hover:bg-[var(--bg-hover)] hover:text-[var(--ink)]"
       }`}
