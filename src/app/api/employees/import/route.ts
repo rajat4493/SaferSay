@@ -22,12 +22,33 @@ export async function POST(request: NextRequest) {
   }
 
   const { tenant, userId } = session;
-  const imported = await withTenantScopedDb(tenant.id, async (db) => {
+  const batchEmails = new Set(preview.employees.map((employee) => employee.email));
+
+  const result = await withTenantScopedDb(tenant.id, async (db) => {
     const repo = new IdentityRepository(db);
+
+    // manager_email is only trustworthy enough to eventually build
+    // hierarchy-scoped reporting on if it's verified to reference a real
+    // employee -- either already on file, or in this same batch (so a
+    // whole org chart can be imported in one CSV without ordering rows by
+    // seniority first).
+    const existingEmails = await repo.listAllEmployeeEmails(tenant.id);
+    const managerErrors = preview.employees
+      .filter((employee) => employee.managerEmail && !batchEmails.has(employee.managerEmail) && !existingEmails.has(employee.managerEmail))
+      .map((employee) => `${employee.email}: manager_email "${employee.managerEmail}" does not match any known employee.`);
+    if (managerErrors.length > 0) {
+      return { errors: managerErrors };
+    }
+
     const count = await repo.importEmployees(tenant.id, preview.employees);
     if (count > 0) await repo.emitOnboardingEvent(tenant.id, userId, "employees");
-    return count;
+    return { imported: count };
   });
+
+  if (result.errors) {
+    return NextResponse.json({ ok: false, errors: result.errors }, { status: 400 });
+  }
+  const imported = result.imported ?? 0;
 
   // Log audit event: employee list imported
   if (imported > 0) {

@@ -864,6 +864,18 @@ export class IdentityRepository {
     return imported.length;
   }
 
+  /**
+   * All employee emails for a tenant, unpaginated -- used only to validate
+   * that a CSV import's manager_email column references a real employee
+   * (see /api/employees/import) before treating it as verified enough to
+   * report on. Not for display: EmployeeRecord's fuller shape and
+   * pagination live in listEmployees below.
+   */
+  async listAllEmployeeEmails(tenantId: string): Promise<Set<string>> {
+    const result = await this.db.query<{ email: string }>(`select email from identity.employees where tenant_id = $1`, [tenantId]);
+    return new Set(result.rows.map((row) => row.email));
+  }
+
   async listEmployees(
     tenantId: string,
     options: { search?: string; limit?: number; offset?: number } = {},
