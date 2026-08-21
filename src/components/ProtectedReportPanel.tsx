@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Download, EyeOff, RefreshCw, Share2 } from "lucide-react";
+import { Download, EyeOff, FileText, RefreshCw, Share2 } from "lucide-react";
 import { Card } from "@/components/AppShell";
 import { AiSynthesisCard } from "@/components/AiSynthesisCard";
 import { ConfidentialitySeal } from "@/components/ConfidentialitySeal";
@@ -53,6 +53,7 @@ export function ProtectedReportPanel({
   const [actionDraft, setActionDraft] = useState("");
   const [savingAction, setSavingAction] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const toast = useToast();
   const ShellCard = mode === "viewer" ? ViewerCard : Card;
 
@@ -96,6 +97,31 @@ export function ProtectedReportPanel({
     link.download = `${result?.cycle?.name ?? "safersay-report"}.csv`;
     link.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function exportPdf() {
+    if (!report || report.protected) return;
+    setDownloadingPdf(true);
+    try {
+      const params = new URLSearchParams({ format: "pdf" });
+      if (result?.cycle?.id) params.set("cycleId", result.cycle.id);
+      const response = await fetch(`/api/report/export?${params.toString()}`);
+      if (!response.ok) {
+        toast.show({ variant: "error", message: "Couldn't generate the PDF. Try again." });
+        return;
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${result?.cycle?.name ?? "safersay-report"}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.show({ variant: "error", message: "Couldn't generate the PDF. Try again." });
+    } finally {
+      setDownloadingPdf(false);
+    }
   }
 
   async function submitAction() {
@@ -185,6 +211,10 @@ export function ProtectedReportPanel({
                 <button onClick={exportCsv} className="btn-secondary">
                   <Download size={13} strokeWidth={1.8} />
                   Export CSV
+                </button>
+                <button onClick={exportPdf} disabled={downloadingPdf} className="btn-secondary">
+                  <FileText size={13} strokeWidth={1.8} />
+                  {downloadingPdf ? "Generating..." : "Export PDF"}
                 </button>
                 <button onClick={shareScore} className="btn-primary">
                   <Share2 size={13} strokeWidth={1.8} />

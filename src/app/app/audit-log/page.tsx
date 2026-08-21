@@ -25,7 +25,7 @@ const actionLabels: Record<string, string> = {
   employee_list_imported: "Imported employee list",
   employee_added: "Added an employee",
   employee_removed: "Removed an employee",
-  report_exported: "Exported a report",
+  report_exported: "Exported a report (CSV/JSON/PDF)",
   threshold_changed: "Changed the minimum group size",
   settings_updated: "Updated workspace settings",
   team_invite_sent: "Invited a teammate",

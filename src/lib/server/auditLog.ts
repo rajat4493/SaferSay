@@ -211,6 +211,29 @@ export async function logSurveyQuestionsUpdated(
 }
 
 /**
+ * Helper: Log a report export (CSV/JSON/PDF pull of aggregate results).
+ * surveyId is null for a tenant-wide "latest cycle" export with no
+ * specific cycleId query param.
+ */
+export async function logReportExported(
+  tenantId: string,
+  actorRole: UserRole,
+  actorId: string,
+  surveyId: string | null,
+  format: "csv" | "json" | "pdf"
+): Promise<void> {
+  await logAuditEvent({
+    tenantId,
+    actorRole,
+    actorId,
+    action: "report_exported",
+    targetType: "survey",
+    targetId: surveyId ?? undefined,
+    details: `format: ${format}`,
+  });
+}
+
+/**
  * Helper: Log invites sent (aggregate count only, never individual emails)
  */
 export async function logInvitesSent(
