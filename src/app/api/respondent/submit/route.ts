@@ -5,8 +5,17 @@ import { submitWithSeveredRepositories } from "@/lib/server/confidentialSubmissi
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import { submitServerResponse } from "@/lib/serverStore";
 import { hashServerToken } from "@/lib/server/tokenHashing";
+import { checkRateLimit } from "@/lib/server/rateLimit";
 
 export async function POST(request: NextRequest) {
+  const rateLimit = await checkRateLimit({ request, routeKey: "respondent-submit", limit: 10, windowSeconds: 60 });
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { ok: false, error: "Too many attempts. Please wait a moment and try again." },
+      { status: 429, headers: { "retry-after": String(rateLimit.retryAfterSeconds) } },
+    );
+  }
+
   const body = (await request.json().catch(() => ({}))) as {
     token: string;
     answers: Array<{ questionId: string; numberValue?: number; textValue?: string }>;

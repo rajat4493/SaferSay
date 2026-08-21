@@ -4,6 +4,7 @@ import { getTenantPool, withTenantContext, type Queryable } from "@/lib/server/d
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import { sendSosAlert } from "@/lib/server/sosDelivery";
 import { hashServerToken } from "@/lib/server/tokenHashing";
+import { checkRateLimit } from "@/lib/server/rateLimit";
 
 /**
  * Respondent-facing (token-gated, not staff-role-gated), same as
@@ -27,6 +28,16 @@ export async function POST(request: NextRequest) {
     // Defense in depth -- the UI requires the checkbox before this can be
     // submitted at all, but never trust the client to have enforced it.
     return NextResponse.json({ ok: false, error: "You must acknowledge before sending." }, { status: 400 });
+  }
+
+  // Tighter than the other respondent routes -- this sends a real alert
+  // to a human safety contact, so it must not be spammable.
+  const rateLimit = await checkRateLimit({ request, routeKey: "respondent-sos", limit: 5, windowSeconds: 300 });
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { ok: false, error: "Too many attempts. Please wait a few minutes and try again." },
+      { status: 429, headers: { "retry-after": String(rateLimit.retryAfterSeconds) } },
+    );
   }
 
   const adminPool = getDatabasePool();
