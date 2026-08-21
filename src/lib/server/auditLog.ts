@@ -30,6 +30,7 @@ import type { UserRole } from "@/lib/server/repositories/types";
 
 export type AuditLogAction =
   | "survey_created"
+  | "survey_questions_updated"
   | "survey_closed"
   | "survey_deleted"
   | "invites_sent"
@@ -185,6 +186,27 @@ export async function logSurveyCreated(
     targetType: "survey",
     targetId: surveyId,
     details: templateName ? `from ${templateName} template` : undefined,
+  });
+}
+
+/**
+ * Helper: Log a draft survey's questions being edited/reordered.
+ */
+export async function logSurveyQuestionsUpdated(
+  tenantId: string,
+  actorRole: UserRole,
+  actorId: string,
+  surveyId: string,
+  questionCount: number
+): Promise<void> {
+  await logAuditEvent({
+    tenantId,
+    actorRole,
+    actorId,
+    action: "survey_questions_updated",
+    targetType: "survey",
+    targetId: surveyId,
+    safeCounts: { question_count: questionCount },
   });
 }
 

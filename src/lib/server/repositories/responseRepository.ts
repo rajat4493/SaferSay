@@ -465,6 +465,45 @@ export class ResponseRepository {
     return (result.rowCount ?? 0) > 0;
   }
 
+  /**
+   * Replaces a draft cycle's questions wholesale. Only ever called for
+   * status = 'draft' cycles (enforced by the caller before this runs) --
+   * once a cycle opens, tokens may already be usable and answers.question_id
+   * FKs into these rows, so rewriting them post-open would risk orphaning
+   * submitted answers or breaking cross-question comparability.
+   */
+  async updateTemplateQuestions(
+    tenantId: string,
+    cycleId: string,
+    questions: Array<{
+      text: string;
+      type: "likert_5" | "enps_0_10" | "open_text";
+      construct: string | null;
+      optional: boolean;
+    }>,
+  ): Promise<{ ok: true } | { ok: false; error: "not_found" | "not_draft" | "empty" }> {
+    if (questions.length === 0) return { ok: false, error: "empty" };
+
+    const cycleResult = await this.db.query<{ template_id: string; status: string }>(
+      `select template_id, status from responses.survey_cycles where tenant_id = $1 and id = $2 limit 1`,
+      [tenantId, cycleId],
+    );
+    const cycle = cycleResult.rows[0];
+    if (!cycle) return { ok: false, error: "not_found" };
+    if (cycle.status !== "draft") return { ok: false, error: "not_draft" };
+
+    await this.db.query(`delete from responses.template_questions where template_id = $1`, [cycle.template_id]);
+    for (let index = 0; index < questions.length; index += 1) {
+      const question = questions[index];
+      await this.db.query(
+        `insert into responses.template_questions (id, template_id, position, question_text, question_type, construct, is_optional)
+         values ($1, $2, $3, $4, $5, $6, $7)`,
+        [randomUUID(), cycle.template_id, index + 1, question.text, question.type, question.construct, question.optional],
+      );
+    }
+    return { ok: true };
+  }
+
   async closeCycle(tenantId: string, cycleId: string) {
     const result = await this.db.query(
       `update responses.survey_cycles

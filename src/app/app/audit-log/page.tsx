@@ -17,6 +17,7 @@ type AuditLogRow = {
 
 const actionLabels: Record<string, string> = {
   survey_created: "Created a survey",
+  survey_questions_updated: "Edited a survey's questions",
   survey_closed: "Closed a survey",
   survey_deleted: "Deleted a survey",
   invites_sent: "Sent invites",
