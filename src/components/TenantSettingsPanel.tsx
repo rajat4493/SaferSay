@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Card } from "@/components/AppShell";
+import { Avatar } from "@/components/Avatar";
 import { SkeletonCard } from "@/components/Skeleton";
 import { useToast } from "@/components/ToastProvider";
+import { useTenantSession } from "@/lib/useTenantSession";
 
 type Settings = {
   minGroupSize: number;
@@ -51,7 +53,10 @@ export function TenantSettingsPanel() {
   const [creatingApiKey, setCreatingApiKey] = useState(false);
   const [requestingDeletion, setRequestingDeletion] = useState(false);
   const [deletionRequested, setDeletionRequested] = useState(false);
+  const [nameDraft, setNameDraft] = useState<string | null>(null);
+  const [savingName, setSavingName] = useState(false);
   const toast = useToast();
+  const { info: sessionInfo } = useTenantSession();
 
   function load() {
     fetch("/api/tenants/settings")
@@ -69,6 +74,29 @@ export function TenantSettingsPanel() {
 
   useEffect(load, []);
   useEffect(loadApiKeys, []);
+
+  async function saveName() {
+    const name = (nameDraft ?? "").trim();
+    if (!name) return;
+    setSavingName(true);
+    const response = await fetch("/api/account", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    const data = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+    setSavingName(false);
+    if (data.ok) {
+      toast.show({ variant: "success", message: "Name updated." });
+      setNameDraft(null);
+      // Full reload keeps this in sync with every other place the signed-in
+      // user's name is shown (AppShell's account card) without threading a
+      // refetch callback through useTenantSession.
+      window.location.reload();
+    } else {
+      toast.show({ variant: "error", message: data.error ?? "Couldn't update your name." });
+    }
+  }
 
   async function saveSmtp() {
     setSavingSmtp(true);
@@ -243,6 +271,28 @@ export function TenantSettingsPanel() {
 
   return (
     <div className="space-y-[9px]">
+      <Card>
+        <h2 className="section-title">Your account</h2>
+        <p className="mt-1.5 secondary-text">The display name shown to your teammates in this workspace.</p>
+        <div className="mt-4 flex items-center gap-3">
+          <Avatar label={nameDraft ?? sessionInfo?.userName ?? sessionInfo?.userEmail ?? "?"} />
+          <input
+            value={nameDraft ?? sessionInfo?.userName ?? ""}
+            onChange={(event) => setNameDraft(event.target.value)}
+            placeholder={sessionInfo?.userEmail ?? "Your name"}
+            aria-label="Display name"
+            className="admin-input max-w-xs"
+          />
+          <button
+            onClick={saveName}
+            disabled={savingName || nameDraft === null || nameDraft.trim() === (sessionInfo?.userName ?? "")}
+            className="btn-secondary"
+          >
+            {savingName ? "Saving..." : "Save"}
+          </button>
+        </div>
+      </Card>
+
       <Card>
         <h2 className="section-title">Confidentiality threshold</h2>
         <p className="mt-1.5 secondary-text">

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getSessionContext } from "@/lib/server/authSession";
 import { withTenantScopedDb } from "@/lib/server/db/tenantPool";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
+import { ResponseRepository } from "@/lib/server/repositories/responseRepository";
 import { sendQueuedInviteDeliveries } from "@/lib/server/resendDelivery";
 import { logInvitesSent, logRemindersSent } from "@/lib/server/auditLog";
 import { canRunSurvey } from "@/lib/permissions";
@@ -27,6 +28,12 @@ export async function POST(request: NextRequest) {
     const repo = new IdentityRepository(db);
     const cycleId = body.cycleId ?? (await repo.getLatestCycleIdForTenant(tenant.id));
     if (!cycleId) return null;
+
+    // A closed cycle should never queue or send further invites/reminders --
+    // it's no longer collecting responses. Same guard applied on the
+    // outbox-prepare route; this is the point actual sending happens.
+    const cycle = await new ResponseRepository(db).getCycleForTenant(tenant.id, cycleId);
+    if (cycle?.status === "closed") return "closed" as const;
 
     const queued = await repo.markOutboxQueued(tenant.id, cycleId, deliveryType);
     if (queued > 0 && deliveryType === "invite") {
@@ -61,6 +68,9 @@ export async function POST(request: NextRequest) {
   });
 
   if (!result) return NextResponse.json({ ok: false, error: "No survey cycle was found." }, { status: 400 });
+  if (result === "closed") {
+    return NextResponse.json({ ok: false, error: "This survey is closed. No further invites or reminders can be sent." }, { status: 400 });
+  }
 
   if ("delivery" in result && result.delivery.sent > 0) {
     if (deliveryType === "invite") {

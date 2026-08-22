@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Plus, Search } from "lucide-react";
 import { Card } from "@/components/AppShell";
+import { Avatar } from "@/components/Avatar";
 import { SkeletonRow } from "@/components/Skeleton";
 
 type Employee = {
@@ -134,12 +135,15 @@ export function EmployeeDirectory({ refreshKey = 0 }: { refreshKey?: number }) {
         ) : (
           employees.map((employee) => (
             <div key={employee.id} className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-[var(--border)] p-3 text-[13px] last:border-b-0">
-              <div>
-                <div className="font-medium text-[var(--ink)]">{employee.name || employee.email}</div>
-                <div className="text-[var(--ink-mid)]">
-                  {employee.email}
-                  {employee.team ? ` · ${employee.team}` : ""}
-                  {employee.location ? ` · ${employee.location}` : ""}
+              <div className="flex items-center gap-3">
+                <Avatar label={employee.name || employee.email} />
+                <div>
+                  <div className="font-medium text-[var(--ink)]">{employee.name || employee.email}</div>
+                  <div className="text-[var(--ink-mid)]">
+                    {employee.email}
+                    {employee.team ? ` · ${employee.team}` : ""}
+                    {employee.location ? ` · ${employee.location}` : ""}
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-2">

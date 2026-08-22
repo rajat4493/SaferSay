@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
@@ -10,11 +11,21 @@ export default function SurveySendPage() {
   const params = useParams();
   const router = useRouter();
   const surveyId = params.surveyId as string;
+  const [status, setStatus] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    fetch(`/api/cycles/${surveyId}`)
+      .then((response) => response.json())
+      .then((data: { ok?: boolean; cycle?: { status: string } }) => {
+        if (data.ok && data.cycle) setStatus(data.cycle.status);
+      })
+      .catch(() => undefined);
+  }, [surveyId]);
 
   return (
     <AppShell title="Send" subtitle="Prepare, queue, and send confidential invite links to your employees.">
       <div className="space-y-[9px]">
-        <SurveyStageTabs active="Send" />
+        <SurveyStageTabs active="Send" status={status} />
 
         <InviteOutboxPanel cycleId={surveyId} />
 

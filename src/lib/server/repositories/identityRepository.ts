@@ -91,6 +91,12 @@ export class IdentityRepository {
     );
   }
 
+  /** Self-service display name -- tenant_id scoped so a user can only ever rename their own row. */
+  async updateUserName(userId: string, tenantId: string, name: string): Promise<boolean> {
+    const result = await this.db.query(`update identity.users set name = $3 where id = $1 and tenant_id = $2`, [userId, tenantId, name]);
+    return (result.rowCount ?? 0) > 0;
+  }
+
   async emitOnboardingEvent(tenantId: string, userId: string, eventKey: OnboardingEventKey) {
     await this.db.query(
       `insert into identity.onboarding_events (tenant_id, user_id, event_key)

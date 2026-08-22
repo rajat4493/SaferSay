@@ -18,6 +18,7 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Avatar } from "@/components/Avatar";
 import { BrandMark } from "@/components/BrandMark";
 import { useBrand } from "@/components/BrandProvider";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
@@ -144,11 +145,10 @@ export function AppShell({
           onClick={() => setAccountMenuOpen((current) => !current)}
           className="flex w-full items-center gap-2.5 rounded-[10px] px-1.5 py-1.5 text-left transition hover:bg-[var(--bg-hover)]"
         >
-          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--ink)] text-[11px] font-semibold text-white">
-            {(info?.tenantName ?? brand.name).slice(0, 1).toUpperCase()}
-          </div>
+          <Avatar label={info?.userName || info?.userEmail || brand.name} />
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[13px] font-medium text-[var(--ink)]">{info?.tenantName ?? brand.name}</div>
+            <div className="truncate text-[13px] font-medium text-[var(--ink)]">{info?.userName || info?.userEmail || brand.name}</div>
+            <div className="truncate text-[11.5px] text-[var(--ink-faint)]">{info?.tenantName ?? brand.name}</div>
             <RoleTag />
           </div>
           <ChevronDown size={14} strokeWidth={1.8} className={`shrink-0 text-[var(--ink-faint)] transition-transform ${accountMenuOpen ? "rotate-180" : ""}`} />
