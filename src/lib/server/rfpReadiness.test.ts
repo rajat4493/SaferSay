@@ -15,10 +15,16 @@ describe("legal pages", () => {
   });
 
   it("both pages are honest about not yet having final legal review, rather than presenting as fully binding", () => {
+    // Both pages render the disclaimer via the shared LegalDraftBanner
+    // component rather than inlining the text -- check whichever the page
+    // actually uses, so this doesn't false-fail on the shared-component
+    // refactor while still guarding that the disclaimer is shown somewhere.
     const privacy = readFileSync("src/app/privacy/page.tsx", "utf8");
     const dpa = readFileSync("src/app/dpa/page.tsx", "utf8");
-    expect(privacy).toMatch(/legal (counsel|review)/i);
-    expect(dpa).toMatch(/legal (counsel|review)/i);
+    const banner = existsSync("src/components/LegalDraftBanner.tsx") ? readFileSync("src/components/LegalDraftBanner.tsx", "utf8") : "";
+    const usesBanner = (source: string) => source.includes("LegalDraftBanner");
+    expect(usesBanner(privacy) ? banner : privacy).toMatch(/legal (counsel|review)/i);
+    expect(usesBanner(dpa) ? banner : dpa).toMatch(/legal (counsel|review)/i);
   });
 });
 
