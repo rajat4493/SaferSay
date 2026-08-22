@@ -243,6 +243,20 @@ export type ResponseAnswerInput = {
 /** A multiple_choice/ranking option, or one column of a matrix row. */
 export type QuestionOption = { key: string; label: string };
 
+/**
+ * Structural-only skip-logic condition (Option B -- see plan history).
+ * `attribute` is deliberately restricted to the two respondent facts
+ * identity.employees actually carries and responses.submissions already
+ * snapshots at invite time (segment_team/segment_location) -- there is no
+ * role or tenure column in this schema. Never a prior answer -- enforced
+ * in the /api/cycles/[id]/questions PATCH validation, not just this type.
+ */
+export type ShowIfCondition = {
+  attribute: "team" | "location";
+  op: "eq" | "neq";
+  value: string;
+};
+
 export type RespondentSurveyQuestion = {
   id: string;
   position: number;
@@ -254,6 +268,7 @@ export type RespondentSurveyQuestion = {
   // Only set for matrix-row questions; rows sharing a matrix_group_id
   // render as one grid on the taker surface.
   matrixGroupId: string | null;
+  showIf: ShowIfCondition | null;
 };
 
 export type RespondentSurveySession = {

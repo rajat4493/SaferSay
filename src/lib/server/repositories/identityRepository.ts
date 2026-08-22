@@ -1060,24 +1060,25 @@ export class IdentityRepository {
       email: string;
       name: string | null;
       team: string | null;
-    }>("select id, email, name, team from identity.employees where tenant_id = $1 and employment_status = 'active'", [
+      location: string | null;
+    }>("select id, email, name, team, location from identity.employees where tenant_id = $1 and employment_status = 'active'", [
       tenantId,
     ]);
 
     const issued: IssuedParticipantToken[] = [];
     for (const employee of employees.rows) {
       const rawToken = randomBytes(32).toString("base64url");
-      // team is already canonicalized by normalizeTeamLabel at import time
-      // -- snapshot it here so a later employee-record change (a re-import,
-      // a department rename) can't retroactively reshuffle this cycle's
-      // anonymity groups after invites already went out.
+      // team/location are snapshotted here so a later employee-record
+      // change (a re-import, a team/office rename) can't retroactively
+      // reshuffle this cycle's anonymity groups -- or which branch-gated
+      // questions someone sees -- after invites already went out.
       const result = await this.db.query<{ id: string }>(
         `insert into identity.survey_participants
-          (id, tenant_id, cycle_id, employee_id, token_hash, token_status, issued_at, team)
-         values ($1, $2, $3, $4, $5, 'issued', now(), $6)
+          (id, tenant_id, cycle_id, employee_id, token_hash, token_status, issued_at, team, location)
+         values ($1, $2, $3, $4, $5, 'issued', now(), $6, $7)
          on conflict (cycle_id, employee_id) do nothing
          returning id`,
-        [randomUUID(), tenantId, cycleId, employee.id, hashServerToken(rawToken), employee.team],
+        [randomUUID(), tenantId, cycleId, employee.id, hashServerToken(rawToken), employee.team, employee.location],
       );
       if (result.rowCount === 1) {
         issued.push({ employeeId: employee.id, email: employee.email, name: employee.name ?? undefined, rawToken });
@@ -1132,8 +1133,10 @@ export class IdentityRepository {
       tenant_id: string;
       cycle_id: string;
       token_status: "issued" | "spent" | "revoked";
+      team: string | null;
+      location: string | null;
     }>(
-      `select tenant_id, cycle_id, token_status
+      `select tenant_id, cycle_id, token_status, team, location
        from identity.survey_participants
        where token_hash = $1`,
       [tokenHash],

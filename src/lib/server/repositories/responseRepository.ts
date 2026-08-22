@@ -7,6 +7,7 @@ import {
   ProtectedOptionReport,
   QuestionBankItem,
   QuestionType,
+  ShowIfCondition,
   ReportScope,
   RespondentSurveySession,
   CycleTrendQuestion,
@@ -115,8 +116,9 @@ export class ResponseRepository {
       is_optional: boolean;
       options: Array<{ key: string; label: string }> | null;
       matrix_group_id: string | null;
+      show_if: ShowIfCondition | null;
     }>(
-      `select id, position, question_text, question_type, construct, is_optional, options, matrix_group_id
+      `select id, position, question_text, question_type, construct, is_optional, options, matrix_group_id, show_if
        from responses.template_questions
        where template_id = (
          select template_id from responses.survey_cycles where id = $1
@@ -138,6 +140,7 @@ export class ResponseRepository {
         optional: question.is_optional,
         options: question.options,
         matrixGroupId: question.matrix_group_id,
+        showIf: question.show_if,
       })),
     };
   }
@@ -572,9 +575,12 @@ export class ResponseRepository {
     cycleId: string,
     questions: Array<{
       text: string;
-      type: "likert_5" | "enps_0_10" | "open_text";
+      type: QuestionType;
       construct: string | null;
       optional: boolean;
+      options: { key: string; label: string }[] | null;
+      showIf: ShowIfCondition | null;
+      matrixGroupId: string | null;
     }>,
   ): Promise<{ ok: true } | { ok: false; error: "not_found" | "not_draft" | "empty" }> {
     if (questions.length === 0) return { ok: false, error: "empty" };
@@ -591,9 +597,21 @@ export class ResponseRepository {
     for (let index = 0; index < questions.length; index += 1) {
       const question = questions[index];
       await this.db.query(
-        `insert into responses.template_questions (id, template_id, position, question_text, question_type, construct, is_optional)
-         values ($1, $2, $3, $4, $5, $6, $7)`,
-        [randomUUID(), cycle.template_id, index + 1, question.text, question.type, question.construct, question.optional],
+        `insert into responses.template_questions
+          (id, template_id, position, question_text, question_type, construct, is_optional, options, show_if, matrix_group_id)
+         values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10)`,
+        [
+          randomUUID(),
+          cycle.template_id,
+          index + 1,
+          question.text,
+          question.type,
+          question.construct,
+          question.optional,
+          question.options ? JSON.stringify(question.options) : null,
+          question.showIf ? JSON.stringify(question.showIf) : null,
+          question.matrixGroupId,
+        ],
       );
     }
     return { ok: true };

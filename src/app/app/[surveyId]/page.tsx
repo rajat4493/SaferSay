@@ -8,7 +8,20 @@ import { SkeletonCard, SkeletonText } from "@/components/Skeleton";
 import { SurveyStageTabs } from "@/components/SurveyStageTabs";
 import { useToast } from "@/components/ToastProvider";
 
-type CycleQuestion = { id: string; position: number; text: string; type: string; construct: string | null; optional: boolean };
+type QuestionOption = { key: string; label: string };
+type ShowIf = { attribute: "team" | "location"; op: "eq" | "neq"; value: string } | null;
+type QuestionType = "likert_5" | "enps_0_10" | "open_text" | "multiple_choice" | "ranking" | "matrix";
+
+type CycleQuestion = {
+  id: string;
+  position: number;
+  text: string;
+  type: QuestionType;
+  construct: string | null;
+  optional: boolean;
+  options: QuestionOption[] | null;
+  showIf: ShowIf;
+};
 
 type CycleDetail = {
   cycle: { id: string; name: string; status: string; minGroupSize: number; createdAt: string };
@@ -16,7 +29,17 @@ type CycleDetail = {
   questions: CycleQuestion[];
 };
 
-type DraftQuestion = { text: string; type: string; construct: string | null; optional: boolean };
+type DraftQuestion = { text: string; type: QuestionType; construct: string | null; optional: boolean; options: QuestionOption[]; showIf: ShowIf };
+
+const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
+  likert_5: "Rating scale (1-5)",
+  enps_0_10: "eNPS scale (0-10)",
+  open_text: "Open text",
+  multiple_choice: "Multiple choice",
+  ranking: "Ranking",
+  matrix: "Matrix row",
+};
+const OPTION_TYPES: QuestionType[] = ["multiple_choice", "ranking", "matrix"];
 
 export default function SurveyBuildPage() {
   const params = useParams();
@@ -61,7 +84,14 @@ function SurveyBuildContent({ surveyId }: { surveyId: string }) {
       detail.questions
         .slice()
         .sort((a, b) => a.position - b.position)
-        .map((question) => ({ text: question.text, type: question.type, construct: question.construct, optional: question.optional })),
+        .map((question) => ({
+          text: question.text,
+          type: question.type,
+          construct: question.construct,
+          optional: question.optional,
+          options: question.options ?? [],
+          showIf: question.showIf,
+        })),
     );
     setEditing(true);
   }
@@ -80,12 +110,42 @@ function SurveyBuildContent({ surveyId }: { surveyId: string }) {
     setDraftQuestions((current) => current.map((question, i) => (i === index ? { ...question, text } : question)));
   }
 
+  function editDraftType(index: number, type: QuestionType) {
+    setDraftQuestions((current) =>
+      current.map((question, i) => (i === index ? { ...question, type, options: OPTION_TYPES.includes(type) ? question.options : [] } : question)),
+    );
+  }
+
+  function editDraftShowIf(index: number, showIf: ShowIf) {
+    setDraftQuestions((current) => current.map((question, i) => (i === index ? { ...question, showIf } : question)));
+  }
+
+  function addDraftOption(index: number) {
+    setDraftQuestions((current) =>
+      current.map((question, i) => (i === index ? { ...question, options: [...question.options, { key: randomKey(), label: "" }] } : question)),
+    );
+  }
+
+  function editDraftOptionLabel(index: number, optionIndex: number, label: string) {
+    setDraftQuestions((current) =>
+      current.map((question, i) =>
+        i === index ? { ...question, options: question.options.map((option, j) => (j === optionIndex ? { ...option, label } : option)) } : question,
+      ),
+    );
+  }
+
+  function removeDraftOption(index: number, optionIndex: number) {
+    setDraftQuestions((current) =>
+      current.map((question, i) => (i === index ? { ...question, options: question.options.filter((_, j) => j !== optionIndex) } : question)),
+    );
+  }
+
   function removeDraft(index: number) {
     setDraftQuestions((current) => current.filter((_, i) => i !== index));
   }
 
   function addDraft() {
-    setDraftQuestions((current) => [...current, { text: "", type: "likert_5", construct: null, optional: false }]);
+    setDraftQuestions((current) => [...current, { text: "", type: "likert_5", construct: null, optional: false, options: [], showIf: null }]);
   }
 
   async function saveQuestions() {
@@ -94,13 +154,17 @@ function SurveyBuildContent({ surveyId }: { surveyId: string }) {
       toast.show({ variant: "error", message: "A survey needs at least one question." });
       return;
     }
+    if (questions.some((question) => OPTION_TYPES.includes(question.type) && question.options.filter((option) => option.label.trim()).length < 2)) {
+      toast.show({ variant: "error", message: "Multiple choice, ranking, and matrix questions need at least two options." });
+      return;
+    }
 
     setSaving(true);
     try {
       const response = await fetch(`/api/cycles/${surveyId}/questions`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ questions }),
+        body: JSON.stringify({ questions: questions.map((question) => ({ ...question, options: question.options.filter((option) => option.label.trim()) })) }),
       });
       const result = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string };
       if (!response.ok || !result.ok) {
@@ -168,45 +232,92 @@ function SurveyBuildContent({ surveyId }: { surveyId: string }) {
                 <div className="mt-4">
                   <div className="space-y-2">
                     {draftQuestions.map((question, index) => (
-                      <div key={index} className="flex items-start gap-3 rounded-[var(--radius-input)] border border-[var(--border)] bg-white p-3 text-sm">
-                        <div className="flex-1">
-                          {question.construct ? <div className="label-text">{question.construct}</div> : null}
-                          <input
-                            value={question.text}
-                            onChange={(event) => editDraftText(index, event.target.value)}
-                            aria-label={`Question ${index + 1} text`}
-                            className="mt-1 w-full rounded-[var(--radius-input)] border border-transparent bg-transparent px-1 py-1 text-[14px] text-[var(--ink)] outline-none focus:border-[var(--border)]"
-                          />
-                        </div>
-                        <div className="flex flex-col gap-1">
+                      <div key={index} className="rounded-[var(--radius-input)] border border-[var(--border)] bg-white p-3 text-sm">
+                        <div className="flex items-start gap-3">
+                          <div className="flex-1">
+                            {question.construct ? <div className="label-text">{question.construct}</div> : null}
+                            <input
+                              value={question.text}
+                              onChange={(event) => editDraftText(index, event.target.value)}
+                              aria-label={`Question ${index + 1} text`}
+                              className="mt-1 w-full rounded-[var(--radius-input)] border border-transparent bg-transparent px-1 py-1 text-[14px] text-[var(--ink)] outline-none focus:border-[var(--border)]"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <button
+                              type="button"
+                              onClick={() => moveDraft(index, -1)}
+                              disabled={index === 0}
+                              className="rounded-[var(--radius-input)] border border-[var(--border)] p-1 text-[var(--ink-mid)] hover:bg-[var(--bg-hover)] disabled:cursor-not-allowed disabled:opacity-30"
+                              aria-label="Move question up"
+                            >
+                              <ArrowUp size={13} strokeWidth={1.8} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => moveDraft(index, 1)}
+                              disabled={index === draftQuestions.length - 1}
+                              className="rounded-[var(--radius-input)] border border-[var(--border)] p-1 text-[var(--ink-mid)] hover:bg-[var(--bg-hover)] disabled:cursor-not-allowed disabled:opacity-30"
+                              aria-label="Move question down"
+                            >
+                              <ArrowDown size={13} strokeWidth={1.8} />
+                            </button>
+                          </div>
                           <button
                             type="button"
-                            onClick={() => moveDraft(index, -1)}
-                            disabled={index === 0}
-                            className="rounded-[var(--radius-input)] border border-[var(--border)] p-1 text-[var(--ink-mid)] hover:bg-[var(--bg-hover)] disabled:cursor-not-allowed disabled:opacity-30"
-                            aria-label="Move question up"
+                            onClick={() => removeDraft(index)}
+                            disabled={draftQuestions.length <= 1}
+                            className="rounded-[var(--radius-input)] border border-[var(--border)] p-1 text-[var(--red)] hover:bg-[var(--red-bg)] disabled:cursor-not-allowed disabled:opacity-30"
+                            aria-label="Remove question"
                           >
-                            <ArrowUp size={13} strokeWidth={1.8} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => moveDraft(index, 1)}
-                            disabled={index === draftQuestions.length - 1}
-                            className="rounded-[var(--radius-input)] border border-[var(--border)] p-1 text-[var(--ink-mid)] hover:bg-[var(--bg-hover)] disabled:cursor-not-allowed disabled:opacity-30"
-                            aria-label="Move question down"
-                          >
-                            <ArrowDown size={13} strokeWidth={1.8} />
+                            <Trash2 size={13} strokeWidth={1.8} />
                           </button>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => removeDraft(index)}
-                          disabled={draftQuestions.length <= 1}
-                          className="rounded-[var(--radius-input)] border border-[var(--border)] p-1 text-[var(--red)] hover:bg-[var(--red-bg)] disabled:cursor-not-allowed disabled:opacity-30"
-                          aria-label="Remove question"
-                        >
-                          <Trash2 size={13} strokeWidth={1.8} />
-                        </button>
+
+                        <div className="mt-2 flex flex-wrap items-center gap-2 pl-1">
+                          <select
+                            value={question.type}
+                            onChange={(event) => editDraftType(index, event.target.value as QuestionType)}
+                            aria-label={`Question ${index + 1} type`}
+                            className="admin-input h-8 w-auto text-xs"
+                          >
+                            {Object.entries(QUESTION_TYPE_LABELS).map(([value, label]) => (
+                              <option key={value} value={value}>
+                                {label}
+                              </option>
+                            ))}
+                          </select>
+
+                          <ShowIfPicker value={question.showIf} onChange={(showIf) => editDraftShowIf(index, showIf)} />
+                        </div>
+
+                        {OPTION_TYPES.includes(question.type) ? (
+                          <div className="mt-2 space-y-1.5 pl-1">
+                            {question.options.map((option, optionIndex) => (
+                              <div key={option.key} className="flex items-center gap-2">
+                                <input
+                                  value={option.label}
+                                  onChange={(event) => editDraftOptionLabel(index, optionIndex, event.target.value)}
+                                  placeholder={`Option ${optionIndex + 1}`}
+                                  aria-label={`Question ${index + 1} option ${optionIndex + 1}`}
+                                  className="admin-input h-8 flex-1 text-xs"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => removeDraftOption(index, optionIndex)}
+                                  className="rounded-[var(--radius-input)] border border-[var(--border)] p-1 text-[var(--red)] hover:bg-[var(--red-bg)]"
+                                  aria-label={`Remove option ${optionIndex + 1}`}
+                                >
+                                  <Trash2 size={12} strokeWidth={1.8} />
+                                </button>
+                              </div>
+                            ))}
+                            <button type="button" onClick={() => addDraftOption(index)} className="btn-secondary px-2.5 py-1 text-xs">
+                              <Plus size={12} strokeWidth={1.8} />
+                              Add option
+                            </button>
+                          </div>
+                        ) : null}
                       </div>
                     ))}
                   </div>
@@ -238,6 +349,11 @@ function SurveyBuildContent({ surveyId }: { surveyId: string }) {
                         <div key={question.id} className="rounded-[var(--radius-input)] border border-[var(--border)] bg-white p-3 text-[13px]">
                           {question.construct ? <div className="label-text">{question.construct}</div> : null}
                           <div className="mt-1 text-[var(--ink)]">{question.text}</div>
+                          <div className="mt-1 text-xs text-[var(--ink-faint)]">
+                            {QUESTION_TYPE_LABELS[question.type]}
+                            {question.options?.length ? ` · ${question.options.length} options` : ""}
+                            {question.showIf ? ` · Shown only if ${question.showIf.attribute} ${question.showIf.op === "eq" ? "is" : "isn't"} "${question.showIf.value}"` : ""}
+                          </div>
                         </div>
                       ))
                   )}
@@ -259,5 +375,45 @@ function SurveyBuildContent({ surveyId }: { surveyId: string }) {
         )}
       </div>
     </AppShell>
+  );
+}
+
+function randomKey() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+}
+
+/**
+ * Structural-only skip-logic picker: team/location only, never a prior
+ * answer -- the dropdown itself is the UI-side half of the Option-B
+ * restriction the /api/cycles/[id]/questions PATCH handler enforces
+ * server-side. "Show to everyone" is the default and clears the condition.
+ */
+function ShowIfPicker({ value, onChange }: { value: ShowIf; onChange: (value: ShowIf) => void }) {
+  const enabled = value !== null;
+  return (
+    <div className="flex items-center gap-1.5">
+      <select
+        value={enabled ? value.attribute : "everyone"}
+        onChange={(event) => {
+          const attribute = event.target.value;
+          onChange(attribute === "everyone" ? null : { attribute: attribute as "team" | "location", op: "eq", value: value?.value ?? "" });
+        }}
+        aria-label="Show this question to"
+        className="admin-input h-8 w-auto text-xs"
+      >
+        <option value="everyone">Show to everyone</option>
+        <option value="team">Only if team is...</option>
+        <option value="location">Only if location is...</option>
+      </select>
+      {enabled ? (
+        <input
+          value={value.value}
+          onChange={(event) => onChange({ ...value, value: event.target.value })}
+          placeholder={value.attribute === "team" ? "e.g. Engineering" : "e.g. Remote"}
+          aria-label={`${value.attribute} value`}
+          className="admin-input h-8 w-32 text-xs"
+        />
+      ) : null}
+    </div>
   );
 }

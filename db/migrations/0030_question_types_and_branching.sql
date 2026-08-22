@@ -4,10 +4,13 @@
 -- one migration since both touch template_questions/question_bank.
 --
 -- Branching is deliberately restricted to structural respondent attributes
--- (team/role/tenure_bucket) that the department-suppression code already
--- treats as a suppressible grouping key -- never a prior answer. show_if is
--- validated at the application layer (see responseRepository.ts) to enforce
--- that restriction; the check constraint here only guards the JSON shape.
+-- (team/location -- the only two identity.employees columns that already
+-- get snapshotted onto responses.submissions at invite time; there is no
+-- role or tenure column in this schema) that the department-suppression
+-- code already treats as a suppressible grouping key -- never a prior
+-- answer. show_if is validated at the application layer (see the
+-- /api/cycles/[id]/questions PATCH handler) to enforce that restriction;
+-- the check constraint here only guards the JSON shape.
 
 alter table responses.template_questions
   drop constraint template_questions_question_type_check;
@@ -37,12 +40,19 @@ alter table responses.question_bank add column options jsonb;
 -- grid. Null for every other question type.
 alter table responses.template_questions add column matrix_group_id uuid;
 
--- Structural-only skip-logic condition: { "attribute": "team"|"role"|
--- "tenure_bucket", "op": "eq"|"neq", "value": text }. Never references a
--- prior answer -- enforced at the application layer, not just documented,
--- since the whole point of Option B is that this can't quietly grow into
--- opinion-based branching later.
+-- Structural-only skip-logic condition: { "attribute": "team"|"location",
+-- "op": "eq"|"neq", "value": text }. Never references a prior answer --
+-- enforced at the application layer, not just documented, since the whole
+-- point of Option B is that this can't quietly grow into opinion-based
+-- branching later.
 alter table responses.template_questions add column show_if jsonb;
+
+-- location wasn't previously snapshotted at invite time the way team is
+-- (0020_participant_team_snapshot.sql) -- only team was needed until now.
+-- Branching on location needs the same snapshot-at-issuance guarantee: an
+-- employee's location changing mid-cycle must not reshuffle who sees a
+-- location-gated question after invites already went out.
+alter table identity.survey_participants add column if not exists location text;
 
 -- multiple_choice/ranking/matrix answers carry no scalar value of their
 -- own -- their content lives entirely in responses.answer_options below,
