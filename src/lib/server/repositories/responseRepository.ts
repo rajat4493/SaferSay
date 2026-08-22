@@ -144,6 +144,19 @@ export class ResponseRepository {
     };
   }
 
+  /**
+   * SUPPRESSION ASSUMPTION -- read before adding branching/skip logic.
+   * This method (and getDepartmentProtectedReport, getCrossCycleTrendForTenant
+   * below) assume every respondent in a cycle is a candidate to answer every
+   * question, so "n answered" and "n were shown" are the same number. Skip
+   * logic breaks that: branch membership itself becomes disclosive (a small
+   * follow-up population reveals how someone answered the gating question,
+   * even with the follow-up's own content suppressed), and each of these
+   * functions would need re-auditing for that new leak class, not just reuse.
+   * Do not add conditional/branching question logic without redesigning
+   * suppression for it first -- see plan history: "Design thinking: survey
+   * branching vs. the k-anonymity engine."
+   */
   async getProtectedReportForTenant(
     tenantId: string,
     cycleId: string,
@@ -290,6 +303,8 @@ export class ResponseRepository {
     return result;
   }
 
+  // SUPPRESSION ASSUMPTION -- see getProtectedReportForTenant above before
+  // adding branching/skip logic; same "answered == shown" assumption applies.
   private async getDepartmentProtectedReport(
     tenantId: string,
     cycleId: string,
@@ -537,6 +552,12 @@ export class ResponseRepository {
    * k-anonymity protection (min_group_size), unchanged from the single-cycle
    * report -- this is a pivot of the same protected data, not a new
    * aggregation path around it.
+   *
+   * SUPPRESSION ASSUMPTION -- see getProtectedReportForTenant above before
+   * adding branching/skip logic. This is also where a real k-anonymity leak
+   * (exact respondent counts shipped for below-threshold points) was found
+   * and fixed -- extra reason to re-audit this function specifically if
+   * per-question "was shown" ever stops being identical to "answered".
    */
   async getCrossCycleTrendForTenant(tenantId: string, tenantName?: string): Promise<CycleTrendQuestion[]> {
     const cycles = await this.listCyclesForTenant(tenantId, tenantName);
