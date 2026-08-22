@@ -84,18 +84,14 @@ export function SosButton({ token }: { token: string }) {
                     <X size={18} strokeWidth={1.8} />
                   </button>
                 </div>
-                <p className="mt-2 text-[13px] leading-[1.6] text-[var(--ink-mid)]">
-                  This is different from the rest of the survey. It shares your name and email directly with your workspace&apos;s
-                  safety contact -- it is not part of your anonymous responses and will never appear in any aggregate report.
-                </p>
+                <p className="mt-2 text-[13px] leading-[1.6] text-[var(--ink-mid)]">This is different from the rest of the survey — sending it means someone will know it was you.</p>
 
                 <ul className="mt-3 space-y-1.5 text-[12.5px] leading-[1.5] text-[var(--ink-mid)]">
-                  <li>• Your name and email will be shared with a specific person at your workplace.</li>
-                  <li>• This is separate from the anonymous survey and won&apos;t appear in any aggregate report.</li>
-                  <li>• This is a voluntary, one-time disclosure for this report only -- it doesn&apos;t change how the rest of your answers are handled.</li>
+                  <li>• Your name and email go to a specific person at your workplace, along with this message.</li>
+                  <li>• It stays separate from your anonymous answers and never shows up in any survey results.</li>
+                  <li>• It&apos;s a one-time thing, just for this message — the rest of your survey stays anonymous either way.</li>
                   <li className="font-medium text-[var(--ink)]">
-                    • This does not guarantee legal protection or protection from retaliation -- that depends on your
-                    jurisdiction and your employer&apos;s own policies.
+                    • It doesn&apos;t guarantee protection from retaliation — that depends on your workplace and local law, not on this form.
                   </li>
                 </ul>
 

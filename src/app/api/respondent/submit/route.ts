@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
 
       const tokenHash = hashServerToken(body.token);
       const participant = await new IdentityRepository(adminPool).findIssuedToken(tokenHash);
-      if (!participant) throw new Error("Token is invalid or already spent.");
+      if (!participant) throw new Error("This link isn't valid.");
 
       const submission = await withTenantContext(tenantPool, participant.tenant_id, (client) =>
         submitWithSeveredRepositories({ db: client, rawToken: body.token, answers: body.answers }),

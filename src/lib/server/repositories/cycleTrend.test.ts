@@ -61,6 +61,32 @@ describe("getCrossCycleTrendForTenant", () => {
     expect(point?.average).toBeNull();
   });
 
+  it("never exposes the real respondent count for a protected point, even though report_question_trend() always computes it server-side", async () => {
+    // Regression test: report_question_trend() (0019_cross_cycle_comparison.sql)
+    // always returns the real count(*) as n and only nulls average below
+    // min_group_size -- getCrossCycleTrendForTenant must suppress n itself,
+    // the same way it already suppresses average, or a below-threshold
+    // point's exact respondent count reaches the client just unrendered,
+    // which is not the same as not being exposed.
+    const db = fakeDb({
+      cycles: [
+        { id: "cycle-b", name: "Q2 Pulse", status: "closed", min_group_size: 5, created_at: "2026-04-01", response_count: 8 },
+        { id: "cycle-a", name: "Q1 Pulse", status: "closed", min_group_size: 5, created_at: "2026-01-01", response_count: 2 },
+      ],
+      trend: [
+        { cycle_id: "cycle-a", question_id: "q-a1", question_text: "Team trust", n: 2, average: null, protected: true },
+        { cycle_id: "cycle-b", question_id: "q-b1", question_text: "Team trust", n: 8, average: "4.0", protected: false },
+      ],
+    });
+
+    const result = await new ResponseRepository(db).getCrossCycleTrendForTenant(tenantId);
+    const protectedPoint = result[0].points.find((p) => p.cycleId === "cycle-a");
+    const realPoint = result[0].points.find((p) => p.cycleId === "cycle-b");
+
+    expect(protectedPoint?.n).toBe(0); // NOT 2 -- the real count must never reach the client
+    expect(realPoint?.n).toBe(8); // unprotected points still report their real n
+  });
+
   it("omits a question with only one cycle of history -- nothing to compare, so no trend line", async () => {
     const db = fakeDb({
       cycles: [

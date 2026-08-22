@@ -144,6 +144,19 @@ export class ResponseRepository {
     };
   }
 
+  /**
+   * SUPPRESSION ASSUMPTION -- read before adding branching/skip logic.
+   * This method (and getDepartmentProtectedReport, getCrossCycleTrendForTenant
+   * below) assume every respondent in a cycle is a candidate to answer every
+   * question, so "n answered" and "n were shown" are the same number. Skip
+   * logic breaks that: branch membership itself becomes disclosive (a small
+   * follow-up population reveals how someone answered the gating question,
+   * even with the follow-up's own content suppressed), and each of these
+   * functions would need re-auditing for that new leak class, not just reuse.
+   * Do not add conditional/branching question logic without redesigning
+   * suppression for it first -- see plan history: "Design thinking: survey
+   * branching vs. the k-anonymity engine."
+   */
   async getProtectedReportForTenant(
     tenantId: string,
     cycleId: string,
@@ -290,6 +303,8 @@ export class ResponseRepository {
     return result;
   }
 
+  // SUPPRESSION ASSUMPTION -- see getProtectedReportForTenant above before
+  // adding branching/skip logic; same "answered == shown" assumption applies.
   private async getDepartmentProtectedReport(
     tenantId: string,
     cycleId: string,
@@ -465,10 +480,49 @@ export class ResponseRepository {
     return (result.rowCount ?? 0) > 0;
   }
 
+  /**
+   * Replaces a draft cycle's questions wholesale. Only ever called for
+   * status = 'draft' cycles (enforced by the caller before this runs) --
+   * once a cycle opens, tokens may already be usable and answers.question_id
+   * FKs into these rows, so rewriting them post-open would risk orphaning
+   * submitted answers or breaking cross-question comparability.
+   */
+  async updateTemplateQuestions(
+    tenantId: string,
+    cycleId: string,
+    questions: Array<{
+      text: string;
+      type: "likert_5" | "enps_0_10" | "open_text";
+      construct: string | null;
+      optional: boolean;
+    }>,
+  ): Promise<{ ok: true } | { ok: false; error: "not_found" | "not_draft" | "empty" }> {
+    if (questions.length === 0) return { ok: false, error: "empty" };
+
+    const cycleResult = await this.db.query<{ template_id: string; status: string }>(
+      `select template_id, status from responses.survey_cycles where tenant_id = $1 and id = $2 limit 1`,
+      [tenantId, cycleId],
+    );
+    const cycle = cycleResult.rows[0];
+    if (!cycle) return { ok: false, error: "not_found" };
+    if (cycle.status !== "draft") return { ok: false, error: "not_draft" };
+
+    await this.db.query(`delete from responses.template_questions where template_id = $1`, [cycle.template_id]);
+    for (let index = 0; index < questions.length; index += 1) {
+      const question = questions[index];
+      await this.db.query(
+        `insert into responses.template_questions (id, template_id, position, question_text, question_type, construct, is_optional)
+         values ($1, $2, $3, $4, $5, $6, $7)`,
+        [randomUUID(), cycle.template_id, index + 1, question.text, question.type, question.construct, question.optional],
+      );
+    }
+    return { ok: true };
+  }
+
   async closeCycle(tenantId: string, cycleId: string) {
     const result = await this.db.query(
       `update responses.survey_cycles
-       set status = 'closed'
+       set status = 'closed', actual_closed_at = now()
        where tenant_id = $1 and id = $2 and status <> 'closed'`,
       [tenantId, cycleId],
     );
@@ -498,6 +552,12 @@ export class ResponseRepository {
    * k-anonymity protection (min_group_size), unchanged from the single-cycle
    * report -- this is a pivot of the same protected data, not a new
    * aggregation path around it.
+   *
+   * SUPPRESSION ASSUMPTION -- see getProtectedReportForTenant above before
+   * adding branching/skip logic. This is also where a real k-anonymity leak
+   * (exact respondent counts shipped for below-threshold points) was found
+   * and fixed -- extra reason to re-audit this function specifically if
+   * per-question "was shown" ever stops being identical to "answered".
    */
   async getCrossCycleTrendForTenant(tenantId: string, tenantName?: string): Promise<CycleTrendQuestion[]> {
     const cycles = await this.listCyclesForTenant(tenantId, tenantName);
@@ -535,7 +595,15 @@ export class ResponseRepository {
         cycleId: cycle.id,
         cycleName: cycle.name,
         cycleCreatedAt: cycle.createdAt,
-        n: row.n,
+        // report_question_trend() always computes the real count(*) as n,
+        // same as it always computes the real average -- protected only
+        // says whether n cleared min_group_size. average is correctly
+        // nulled below threshold; n must be too, or a below-threshold
+        // point's exact respondent count ships to the client just not
+        // rendered, which is not the same as not being exposed (same
+        // "never reveal exact n" rule getDepartmentProtectedReport
+        // enforces for department-scoped reports).
+        n: row.protected ? 0 : row.n,
         average: row.protected || row.average === null ? null : Number(row.average),
         protected: row.protected,
       });

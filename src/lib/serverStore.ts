@@ -152,9 +152,9 @@ export async function getInviteTargets(cycleId = getDefaultCycle().id): Promise<
 export async function submitServerResponse(rawToken: string, answers: Array<{ questionId: string; numberValue: number }>) {
   const tokenHash = hashServerToken(rawToken);
   const participant = memoryStore.participants.find((item) => item.tokenHash === tokenHash);
-  if (!participant || participant.status !== "issued") {
-    throw new Error("Token is invalid or already spent.");
-  }
+  if (!participant) throw new Error("This link isn't valid.");
+  if (participant.status === "spent") throw new Error("You've already completed this survey.");
+  if (participant.status !== "issued") throw new Error("This invite is no longer active.");
 
   const submission: ServerSubmission = {
     id: randomUUID(),

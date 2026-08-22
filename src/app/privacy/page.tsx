@@ -1,111 +1,205 @@
 import { BackToAppLink } from "@/components/BackToAppLink";
+import { LegalDraftBanner } from "@/components/LegalDraftBanner";
 
-const sections: Array<[string, React.ReactNode]> = [
-  [
-    "Who is the controller, who is the processor",
-    <>
-      SaferSay is operated by MindscopeAI LLP. When your employer runs a survey through SaferSay, your{" "}
-      <strong>employer is the data controller</strong> for that survey -- they decide who is surveyed, what
-      questions are asked, and who on their team can view protected results. MindscopeAI LLP acts as a{" "}
-      <strong>data processor</strong>, processing data only on the employer&apos;s instructions and only for the
-      purposes described here. If you have a question about a specific survey, your employer (not MindscopeAI LLP)
-      is usually the right first contact -- but you can also reach us directly (see below).
-    </>,
-  ],
-  [
-    "What we collect, and how it's kept apart",
-    <>
-      SaferSay is built around a hard technical separation between two categories of data, described in full on
-      the <a href="/security" className="underline">security page</a>:
-      <ul className="mt-2 list-disc space-y-1 pl-5">
-        <li><strong>Identity data</strong> -- your name, email, team, and participation status (whether you&apos;ve completed a survey), used only to confirm eligibility and prevent duplicate responses.</li>
-        <li><strong>Response data</strong> -- your answers, stored with no name, email, employee ID, IP address, or user agent attached.</li>
-      </ul>
-      These live in separate database schemas with database-level access controls preventing identity data from
-      ever being joined to response content, except in the one narrow, consent-based exception below.
-    </>,
-  ],
-  [
-    "The one exception: voluntary safety reports",
-    <>
-      If a survey includes an &quot;I need help&quot; option and you choose to use it, you are explicitly told
-      beforehand that doing so shares your name, email, and message with your employer&apos;s designated safety
-      contact, separately from your anonymous survey answers, and asked to confirm before sending. This is the
-      only path by which your identity is ever linked to anything you&apos;ve written.
-    </>,
-  ],
-  [
-    "How long we keep it",
-    <>
-      Response data is retained for 24 months from collection by default; your employer can configure a different
-      retention period in their workspace settings. Identity data (the employee list) is retained for as long as
-      your employer keeps you as an active participant, or until your employer removes you or requests deletion.
-    </>,
-  ],
-  [
-    "Where it's stored",
-    <>
-      Data residency defaults to the EU and is configurable per workspace by the employer. Sub-processors used to
-      deliver the service are listed below.
-    </>,
-  ],
-  [
-    "Sub-processors",
-    <>
-      <ul className="mt-1 list-disc space-y-1 pl-5">
-        <li><strong>Supabase</strong> -- primary database hosting</li>
-        <li><strong>Vercel</strong> -- application hosting and content delivery</li>
-        <li><strong>Resend</strong> -- transactional email (invite and reminder delivery), unless your employer has configured their own mail server</li>
-        <li><strong>Stripe</strong> -- billing and payment processing (receives billing metadata only -- never survey answers or participant tokens)</li>
-      </ul>
-      We will update this list, and notify customers in advance, before adding or replacing a sub-processor that
-      handles personal data.
-    </>,
-  ],
-  [
-    "Your rights",
-    <>
-      Depending on your jurisdiction, you may have the right to access, correct, or request deletion of your
-      personal data. Because your employer is the controller, requests are generally directed to them first;
-      MindscopeAI LLP will assist the employer in fulfilling verified requests within the timeframe required by
-      applicable law.
-    </>,
-  ],
-  [
-    "Contact",
-    <>
-      Questions about this notice, or requests you&apos;d like to route to us directly:{" "}
-      <a href="mailto:privacy@safersay.com" className="underline">privacy@safersay.com</a>.
-    </>,
-  ],
-];
+const LAST_UPDATED = "21 August 2026";
+const LEGAL_ENTITY = process.env.LEGAL_ENTITY_NAME ?? "MindscopeAI LLP";
+const PRIVACY_CONTACT = process.env.PRIVACY_CONTACT_EMAIL || "privacy@[your-domain]";
 
 export default function PrivacyPage() {
   return (
     <main className="min-h-screen bg-[var(--bg)] px-4 py-10 text-[var(--ink)] sm:px-6">
       <div className="mx-auto max-w-3xl">
         <BackToAppLink />
-
         <h1 className="page-title mt-4">Privacy Notice</h1>
-        <p className="mt-1.5 secondary-text">Last reviewed: draft, pending final legal sign-off. See note below.</p>
+        <p className="mt-1.5 secondary-text">Last updated {LAST_UPDATED}. Operated by {LEGAL_ENTITY} (&quot;SaferSay&quot;, &quot;we&quot;, &quot;us&quot;).</p>
 
-        <div className="card mt-4 border-[var(--amber-border,#e8c468)] bg-[var(--amber-bg,#fdf6e3)]">
-          <p className="text-[13px] leading-[1.6] text-[var(--ink)]">
-            <strong>This page reflects the platform&apos;s actual architecture and data-handling behavior</strong> --
-            it is not placeholder text. It has not yet had final review by qualified legal counsel and should not
-            be treated as a binding privacy notice until that review is complete.
-          </p>
+        <div className="mt-6">
+          <LegalDraftBanner />
         </div>
 
-        <div className="mt-4 space-y-3">
-          {sections.map(([title, body]) => (
-            <div key={title} className="card">
-              <h2 className="section-title">{title}</h2>
-              <div className="mt-2 secondary-text leading-[1.6]">{body}</div>
-            </div>
-          ))}
-        </div>
+        <Section title="1. Two kinds of people this notice covers">
+          <P>
+            SaferSay is a confidential employee-feedback platform. This notice covers personal data for two different groups,
+            and we process each very differently:
+          </P>
+          <Ul
+            items={[
+              <>
+                <B>Customer Users</B> — the HR/People leads, workspace admins, and survey creators at a company (a
+                &quot;Customer&quot;) who sign in to SaferSay to build surveys and view aggregate results.
+              </>,
+              <>
+                <B>Respondents</B> — the Customer&apos;s employees who receive a survey link and answer it. Respondents never
+                create a SaferSay account or sign in.
+              </>,
+            ]}
+          />
+          <P>
+            For Respondents, the Customer is the data controller and SaferSay is a data processor acting on the Customer&apos;s
+            instructions (see our{" "}
+            <a href="/dpa" className="font-medium text-[var(--green)] underline">
+              Data Processing Agreement
+            </a>
+            ). If you are a Respondent with a question about how your employer is using SaferSay, please contact your employer
+            first — we can only act on a Customer&apos;s instructions regarding their employees&apos; data.
+          </P>
+        </Section>
+
+        <Section title="2. The confidentiality architecture, in plain terms">
+          <P>
+            SaferSay&apos;s entire design is built around one guarantee: <B>your employer sees grouped numbers, never who said
+            what.</B> Concretely:
+          </P>
+          <Ul
+            items={[
+              "Identity data (who was invited, whether they responded) and response data (the actual answers) are stored in structurally separate tables with no direct join between them.",
+              "A Respondent's survey link uses a random, single-use token — not their email address or name — to access the survey.",
+              "Aggregate results are only ever shown once a minimum number of people have responded (5 by default), so no individual's answer can be reverse-engineered from a small group.",
+              "Every time someone at a Customer views or exports a report, that access is logged in an audit trail the Customer's admins can review.",
+            ]}
+          />
+          <P>A fuller technical explanation is published at /security.</P>
+        </Section>
+
+        <Section title="3. What we collect">
+          <Ul
+            items={[
+              <>
+                <B>From Customer Users:</B> name, work email, role, and authentication data (via Google or Microsoft
+                sign-in — we never see or store your password).
+              </>,
+              <>
+                <B>From Customers, about Respondents:</B> work email, name, team/department, and (optionally) manager email,
+                imported by the Customer to issue survey invitations.
+              </>,
+              <>
+                <B>From Respondents directly:</B> survey answers (numeric scores and free-text comments), stored separately
+                from any identifying information as described above. If a Respondent uses the optional &quot;request support&quot;
+                (SOS) feature, the message they write and their identity are sent to their employer&apos;s designated safety
+                contact — this is the one deliberate, opt-in exception to the anonymity guarantee, and it requires explicit
+                on-screen consent before anything is sent.
+              </>,
+              "Standard technical data (IP address, browser type, timestamps) for security and abuse prevention — see Section 8.",
+            ]}
+          />
+        </Section>
+
+        <Section title="4. Why we process this data (legal basis)">
+          <Ul
+            items={[
+              "Performance of a contract — running surveys and delivering results is the service the Customer pays for.",
+              "Legitimate interests — securing the platform, preventing abuse, and improving the product, balanced against your rights.",
+              "Consent — specifically for the SOS/support feature, which only ever activates on the Respondent's explicit, informed action.",
+              "Legal obligation — where we're required to retain or disclose data by law.",
+            ]}
+          />
+        </Section>
+
+        <Section title="5. How long we keep data">
+          <P>
+            Survey response and participation data is kept for a Customer-configurable retention period, defaulting to 24
+            months from when a survey closes, after which it is automatically and permanently deleted. Customers can extend
+            this period as part of their plan. Account data for Customer Users is kept for the life of the account plus a
+            reasonable period for legal/accounting purposes after closure. Audit logs are retained longer than survey data,
+            since they exist to demonstrate accountability, not to be forgotten on the same schedule.
+          </P>
+        </Section>
+
+        <Section title="6. Who we share data with (Sub-processors)">
+          <P>We use the following subprocessors to run the service. None of them can see individual survey answers linked to a name.</P>
+          <Ul
+            items={[
+              "Supabase — database hosting and authentication (EU region).",
+              "Vercel — application hosting.",
+              "Resend — transactional email delivery (survey invitations and reminders).",
+              "Stripe — payment processing (billing data only; never survey content).",
+              "Sentry — error monitoring, where enabled, to catch bugs before they cause data problems.",
+            ]}
+          />
+          <P>We do not sell personal data, and we do not use survey response content to train any AI/ML model.</P>
+        </Section>
+
+        <Section title="7. International data transfers">
+          <P>
+            Our default data residency is the EU. Where a subprocessor is based outside the EU/UK, we rely on Standard
+            Contractual Clauses or an equivalent adequacy mechanism to ensure the same level of protection applies.
+          </P>
+        </Section>
+
+        <Section title="8. Your rights">
+          <P>
+            Subject to applicable law (including UK/EU GDPR), you may have the right to access, correct, delete, restrict, or
+            port your personal data, and to object to certain processing. Respondents should raise these requests with their
+            employer in the first instance; Customer Users can contact us directly at{" "}
+            <a href={`mailto:${PRIVACY_CONTACT}`} className="font-medium text-[var(--green)] underline">
+              {PRIVACY_CONTACT}
+            </a>
+            .
+          </P>
+        </Section>
+
+        <Section title="9. Security">
+          <P>
+            We use encryption in transit and at rest, role-based access control, per-tenant database isolation, audit
+            logging, and rate limiting on public endpoints. No system is perfectly secure; see Section 11 for how we handle
+            incidents.
+          </P>
+        </Section>
+
+        <Section title="10. Children's data">
+          <P>SaferSay is a workplace product and is not directed at, or knowingly used by, children.</P>
+        </Section>
+
+        <Section title="11. Data breach notification">
+          <P>
+            If we become aware of a personal data breach affecting Customer data, we will notify the affected Customer
+            without undue delay, consistent with our obligations under the Data Processing Agreement.
+          </P>
+        </Section>
+
+        <Section title="12. Changes to this notice">
+          <P>We&apos;ll update the &quot;last updated&quot; date above when this notice changes, and notify Customers of material changes.</P>
+        </Section>
+
+        <Section title="13. Contact">
+          <P>
+            Questions about this notice can be sent to{" "}
+            <a href={`mailto:${PRIVACY_CONTACT}`} className="font-medium text-[var(--green)] underline">
+              {PRIVACY_CONTACT}
+            </a>
+            .
+          </P>
+        </Section>
       </div>
     </main>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="mt-8">
+      <h2 className="section-title">{title}</h2>
+      <div className="mt-2 space-y-3">{children}</div>
+    </section>
+  );
+}
+
+function P({ children }: { children: React.ReactNode }) {
+  return <p className="secondary-text">{children}</p>;
+}
+
+function B({ children }: { children: React.ReactNode }) {
+  return <span className="font-semibold text-[var(--ink)]">{children}</span>;
+}
+
+function Ul({ items }: { items: React.ReactNode[] }) {
+  return (
+    <ul className="list-disc space-y-1.5 pl-5">
+      {items.map((item, index) => (
+        <li key={index} className="secondary-text">
+          {item}
+        </li>
+      ))}
+    </ul>
   );
 }

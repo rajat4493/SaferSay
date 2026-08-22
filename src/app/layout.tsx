@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { DM_Serif_Display, Inter } from "next/font/google";
 import { BrandProvider } from "@/components/BrandProvider";
 import { DataProvider } from "@/components/DataProvider";
@@ -25,6 +25,15 @@ export const metadata: Metadata = {
   title: "SaferSay — Confidential Employee Surveys",
   description:
     "A self-serve confidential employee survey product for small HR and startup teams.",
+  manifest: "/manifest.json",
+  icons: {
+    icon: "/safersay-mark.svg",
+    apple: "/safersay-mark.svg",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0d4f37",
 };
 
 export default function RootLayout({

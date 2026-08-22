@@ -91,6 +91,12 @@ export class IdentityRepository {
     );
   }
 
+  /** Self-service display name -- tenant_id scoped so a user can only ever rename their own row. */
+  async updateUserName(userId: string, tenantId: string, name: string): Promise<boolean> {
+    const result = await this.db.query(`update identity.users set name = $3 where id = $1 and tenant_id = $2`, [userId, tenantId, name]);
+    return (result.rowCount ?? 0) > 0;
+  }
+
   async emitOnboardingEvent(tenantId: string, userId: string, eventKey: OnboardingEventKey) {
     await this.db.query(
       `insert into identity.onboarding_events (tenant_id, user_id, event_key)
@@ -270,7 +276,21 @@ export class IdentityRepository {
     return result.rows;
   }
 
-  async listTenantsWithStats(): Promise<TenantDirectoryEntry[]> {
+  /**
+   * Paginated + optionally name-filtered -- the unpaginated version loaded
+   * every tenant with per-row subqueries and left the console to filter
+   * client-side, which doesn't hold up past a couple hundred tenants.
+   * `count(*) over()` gets the filtered total in the same round trip
+   * instead of a second query.
+   */
+  async listTenantsWithStats(params: { search?: string; limit?: number; offset?: number } = {}): Promise<{
+    tenants: TenantDirectoryEntry[];
+    total: number;
+  }> {
+    const limit = Math.min(Math.max(params.limit ?? 50, 1), 200);
+    const offset = Math.max(params.offset ?? 0, 0);
+    const search = params.search?.trim();
+
     const result = await this.db.query<{
       id: string;
       name: string;
@@ -281,6 +301,7 @@ export class IdentityRepository {
       latest_cycle_name: string | null;
       latest_cycle_status: string | null;
       last_activity_at: string | null;
+      total_count: string;
     }>(
       `select
          t.id,
@@ -294,22 +315,29 @@ export class IdentityRepository {
          greatest(
            t.updated_at,
            coalesce((select max(oe.occurred_at) from identity.onboarding_events oe where oe.tenant_id = t.id), t.updated_at)
-         )::text as last_activity_at
+         )::text as last_activity_at,
+         count(*) over()::text as total_count
        from identity.tenants t
        left join identity.tenant_settings ts on ts.tenant_id = t.id
-       order by last_activity_at desc nulls last`,
+       ${search ? "where t.name ilike $3" : ""}
+       order by last_activity_at desc nulls last
+       limit $1 offset $2`,
+      search ? [limit, offset, `%${search}%`] : [limit, offset],
     );
-    return result.rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      slug: row.slug,
-      createdAt: row.created_at,
-      planTier: row.plan_tier,
-      employeeCount: Number(row.employee_count),
-      latestCycleName: row.latest_cycle_name,
-      latestCycleStatus: row.latest_cycle_status,
-      lastActivityAt: row.last_activity_at,
-    }));
+    return {
+      tenants: result.rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        slug: row.slug,
+        createdAt: row.created_at,
+        planTier: row.plan_tier,
+        employeeCount: Number(row.employee_count),
+        latestCycleName: row.latest_cycle_name,
+        latestCycleStatus: row.latest_cycle_status,
+        lastActivityAt: row.last_activity_at,
+      })),
+      total: Number(result.rows[0]?.total_count ?? 0),
+    };
   }
 
   async getTenantDetail(tenantId: string): Promise<TenantDetail | null> {
@@ -864,6 +892,18 @@ export class IdentityRepository {
     return imported.length;
   }
 
+  /**
+   * All employee emails for a tenant, unpaginated -- used only to validate
+   * that a CSV import's manager_email column references a real employee
+   * (see /api/employees/import) before treating it as verified enough to
+   * report on. Not for display: EmployeeRecord's fuller shape and
+   * pagination live in listEmployees below.
+   */
+  async listAllEmployeeEmails(tenantId: string): Promise<Set<string>> {
+    const result = await this.db.query<{ email: string }>(`select email from identity.employees where tenant_id = $1`, [tenantId]);
+    return new Set(result.rows.map((row) => row.email));
+  }
+
   async listEmployees(
     tenantId: string,
     options: { search?: string; limit?: number; offset?: number } = {},
@@ -1110,7 +1150,7 @@ export class IdentityRepository {
        where token_hash = $1 and token_status = 'issued'`,
       [tokenHash],
     );
-    if (result.rowCount !== 1) throw new Error("Token is invalid or already spent.");
+    if (result.rowCount !== 1) throw new Error("You've already completed this survey.");
   }
 
   async getReminderTargets(cycleId: string) {

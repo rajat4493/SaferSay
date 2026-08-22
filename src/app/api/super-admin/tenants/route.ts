@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ ok: true, tenant });
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const session = await getSessionContext();
   if (!session) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
@@ -33,13 +33,21 @@ export async function GET() {
       currentTenant: session.tenant,
       homeTenantId: session.homeTenantId,
       tenants: [],
+      total: 0,
     });
   }
 
+  const search = request.nextUrl.searchParams.get("q") ?? undefined;
+  const limit = Number(request.nextUrl.searchParams.get("limit") ?? 50);
+  const offset = Number(request.nextUrl.searchParams.get("offset") ?? 0);
+
   const db = getDatabasePool();
-  const tenants = db
-    ? await new IdentityRepository(db).listTenantsWithStats()
-    : [{ ...session.tenant, employeeCount: 0, latestCycleName: null, latestCycleStatus: null, lastActivityAt: null }];
+  const { tenants, total } = db
+    ? await new IdentityRepository(db).listTenantsWithStats({ search, limit, offset })
+    : {
+        tenants: [{ ...session.tenant, employeeCount: 0, latestCycleName: null, latestCycleStatus: null, lastActivityAt: null, planTier: "standard" as const, createdAt: new Date().toISOString() }],
+        total: 1,
+      };
 
   return NextResponse.json({
     ok: true,
@@ -47,5 +55,6 @@ export async function GET() {
     currentTenant: session.tenant,
     homeTenantId: session.homeTenantId,
     tenants,
+    total,
   });
 }

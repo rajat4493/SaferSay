@@ -14,6 +14,8 @@ export async function GET() {
   return NextResponse.json({
     ok: true,
     tenant: session.tenant,
+    userEmail: session.email,
+    userName: session.name,
     role: session.role,
     isSuperAdmin: session.isSuperAdmin,
     isImpersonating: isPlatformOwnerImpersonating(session),

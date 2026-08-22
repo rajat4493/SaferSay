@@ -18,12 +18,24 @@ export function RoleTag() {
   // from "Workspace Owner" (a customer's tenant admin) -- same word for
   // both was a real source of confusion in QA.
   if (info.isSuperAdmin && info.isImpersonating) {
-    return <p className="text-[11.5px] font-medium text-[var(--red)]">Platform Owner → {info.tenantName}</p>;
+    return <Pill tone="red">Platform Owner → {info.tenantName}</Pill>;
   }
 
   if (info.isSuperAdmin) {
-    return <p className="text-[11.5px] text-[var(--ink-faint)]">Platform Owner</p>;
+    return <Pill tone="neutral">Platform Owner</Pill>;
   }
 
-  return <p className="text-[11.5px] text-[var(--ink-faint)]">{roleLabels[info.role] ?? "Member"}</p>;
+  return <Pill tone="neutral">{roleLabels[info.role] ?? "Member"}</Pill>;
+}
+
+function Pill({ tone, children }: { tone: "neutral" | "red"; children: React.ReactNode }) {
+  return (
+    <span
+      className={`mt-0.5 inline-flex rounded-[var(--radius-pill)] px-1.5 py-0.5 text-[10.5px] font-medium ${
+        tone === "red" ? "bg-[var(--red-bg)] text-[var(--red)]" : "bg-[var(--bg-active)] text-[var(--ink-mid)]"
+      }`}
+    >
+      {children}
+    </span>
+  );
 }

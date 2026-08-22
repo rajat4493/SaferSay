@@ -9,6 +9,8 @@ export type TenantSessionInfo = {
   isSuperAdmin: boolean;
   isImpersonating: boolean;
   tenantName: string;
+  userEmail: string;
+  userName: string | null;
 };
 
 export function useTenantSession() {
@@ -25,6 +27,8 @@ export function useTenantSession() {
           isSuperAdmin: data.isSuperAdmin,
           isImpersonating: data.isImpersonating,
           tenantName: data.tenant?.name ?? "",
+          userEmail: data.userEmail ?? "",
+          userName: data.userName ?? null,
         });
       })
       .catch(() => undefined)

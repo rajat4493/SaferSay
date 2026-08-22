@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { UserPlus } from "lucide-react";
 import { Card } from "@/components/AppShell";
+import { Avatar } from "@/components/Avatar";
 import { SkeletonRow } from "@/components/Skeleton";
 import { useToast } from "@/components/ToastProvider";
 import type { TeamRole, UserRole } from "@/lib/server/repositories/types";
@@ -128,9 +129,12 @@ export function TeamPanel() {
         ) : (
           team.map((member) => (
             <div key={member.id} className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-[var(--border)] p-3 text-[13px] last:border-b-0">
-              <div>
-                <div className="font-medium text-[var(--ink)]">{member.name || member.email}</div>
-                <div className="text-[var(--ink-mid)]">{member.email}</div>
+              <div className="flex items-center gap-3">
+                <Avatar label={member.name || member.email} />
+                <div>
+                  <div className="font-medium text-[var(--ink)]">{member.name || member.email}</div>
+                  <div className="text-[var(--ink-mid)]">{member.email}</div>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <span

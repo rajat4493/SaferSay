@@ -161,7 +161,7 @@ export default function SurveyResultsPage() {
               </option>
             ))}
           </select>
-          <span className="icon-btn">
+          <span className="icon-btn" aria-hidden="true">
             <Calendar size={15} strokeWidth={1.8} />
           </span>
         </>

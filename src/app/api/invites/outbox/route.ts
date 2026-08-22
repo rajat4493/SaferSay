@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getSessionContext } from "@/lib/server/authSession";
 import { withTenantScopedDb } from "@/lib/server/db/tenantPool";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
+import { ResponseRepository } from "@/lib/server/repositories/responseRepository";
 import { canRunSurvey } from "@/lib/permissions";
 
 export async function GET(request: NextRequest) {
@@ -42,6 +43,12 @@ export async function POST(request: NextRequest) {
     const cycleId = body.cycleId ?? (await repo.getLatestCycleIdForTenant(tenant.id));
     if (!cycleId) return null;
 
+    // Preparing/queuing invites against a closed survey would let sends
+    // happen for a cycle that's no longer collecting -- same guard the
+    // send-queue route applies before it will actually deliver anything.
+    const cycle = await new ResponseRepository(db).getCycleForTenant(tenant.id, cycleId);
+    if (cycle?.status === "closed") return "closed" as const;
+
     const invitesPrepared = await repo.prepareInviteOutbox(tenant.id, cycleId);
     const remindersPrepared = body.includeReminders ? await repo.prepareReminderOutbox(tenant.id, cycleId) : 0;
 
@@ -53,5 +60,6 @@ export async function POST(request: NextRequest) {
   });
 
   if (!result) return NextResponse.json({ ok: false, error: "Create a survey cycle before preparing invites." }, { status: 400 });
+  if (result === "closed") return NextResponse.json({ ok: false, error: "This survey is closed. No further invites can be prepared." }, { status: 400 });
   return NextResponse.json({ ok: true, tenant, ...result });
 }

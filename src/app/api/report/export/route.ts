@@ -3,8 +3,12 @@ import { getSessionContext, isPlatformOwnerImpersonating } from "@/lib/server/au
 import { getDatabasePool } from "@/lib/server/db/pool";
 import { getTenantPool, withTenantContext, type Queryable } from "@/lib/server/db/tenantPool";
 import { ResponseRepository } from "@/lib/server/repositories/responseRepository";
+import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import { resolveTenantFromApiKey } from "@/lib/server/apiKeyAuth";
 import { canViewSurveyResults } from "@/lib/permissions";
+import { renderReportPdf } from "@/lib/server/reportPdf";
+import { logReportExported } from "@/lib/server/auditLog";
+import type { ProtectedReport } from "@/lib/server/repositories/types";
 
 /**
  * Read-only report export for external tools (PowerBI/Tableau, a
@@ -15,15 +19,17 @@ import { canViewSurveyResults } from "@/lib/permissions";
  * /api/report -- an export can never see anything the in-app report
  * couldn't, protected rows stay protected here too.
  */
-async function resolveTenantId(request: NextRequest): Promise<{ tenantId: string; isSession: boolean } | null> {
+async function resolveTenantId(
+  request: NextRequest,
+): Promise<{ tenantId: string; actorRole: "customer_admin" | "survey_creator" | "auditor" | "employee"; actorId: string } | null> {
   const apiKeyTenantId = await resolveTenantFromApiKey(request);
-  if (apiKeyTenantId) return { tenantId: apiKeyTenantId, isSession: false };
+  if (apiKeyTenantId) return { tenantId: apiKeyTenantId, actorRole: "customer_admin", actorId: "api-key-integration" };
 
   const session = await getSessionContext();
   if (!session) return null;
   if (!canViewSurveyResults(session.role)) return null;
   if (isPlatformOwnerImpersonating(session)) return null;
-  return { tenantId: session.tenant.id, isSession: true };
+  return { tenantId: session.tenant.id, actorRole: session.role, actorId: session.email };
 }
 
 function toCsv(rows: Array<{ label?: string; n: number; average: number | null }>) {
@@ -39,16 +45,26 @@ export async function GET(request: NextRequest) {
   }
 
   const cycleId = request.nextUrl.searchParams.get("cycleId");
-  const format = request.nextUrl.searchParams.get("format") === "json" ? "json" : "csv";
+  const formatParam = request.nextUrl.searchParams.get("format");
+  const format = formatParam === "json" ? "json" : formatParam === "pdf" ? "pdf" : "csv";
 
   const run = async (db: Queryable) => {
     const repo = new ResponseRepository(db);
+    const tenant = await new IdentityRepository(db).findTenantById(resolved.tenantId);
     if (cycleId) {
       const cycle = await repo.getCycleForTenant(resolved.tenantId, cycleId);
-      if (!cycle) return { cycle: null, report: { protected: true as const, n: 0, rows: [] } };
-      return { cycle, report: await repo.getProtectedReportForTenant(resolved.tenantId, cycle.id, cycle.minGroupSize) };
+      if (!cycle) {
+        const emptyReport: ProtectedReport = { protected: true, n: 0, rows: [] };
+        return { cycle: null, tenantName: tenant?.name ?? "SaferSay", report: emptyReport };
+      }
+      return {
+        cycle,
+        tenantName: tenant?.name ?? "SaferSay",
+        report: await repo.getProtectedReportForTenant(resolved.tenantId, cycle.id, cycle.minGroupSize),
+      };
     }
-    return repo.getLatestProtectedReportForTenant(resolved.tenantId);
+    const latest = await repo.getLatestProtectedReportForTenant(resolved.tenantId);
+    return { ...latest, tenantName: tenant?.name ?? "SaferSay" };
   };
 
   const tenantPool = getTenantPool();
@@ -60,8 +76,30 @@ export async function GET(request: NextRequest) {
         return run(adminPool);
       })();
 
+  logReportExported(resolved.tenantId, resolved.actorRole, resolved.actorId, result.cycle?.id ?? null, format).catch((error) => {
+    console.error(`Audit log for report_exported (${result.cycle?.id ?? "latest"}) failed:`, error);
+  });
+
   if (format === "json") {
     return NextResponse.json({ ok: true, cycle: result.cycle, report: result.report });
+  }
+
+  const filename = result.cycle?.name ?? "safersay-report";
+
+  if (format === "pdf") {
+    const pdfBytes = await renderReportPdf({
+      tenantName: result.tenantName,
+      cycleName: filename,
+      minGroupSize: result.cycle?.minGroupSize ?? 5,
+      report: result.report as ProtectedReport,
+    });
+    return new NextResponse(Buffer.from(pdfBytes), {
+      status: 200,
+      headers: {
+        "content-type": "application/pdf",
+        "content-disposition": `attachment; filename="${filename}.pdf"`,
+      },
+    });
   }
 
   const rows = result.report.protected ? [] : result.report.rows;
@@ -70,7 +108,7 @@ export async function GET(request: NextRequest) {
     status: 200,
     headers: {
       "content-type": "text/csv",
-      "content-disposition": `attachment; filename="${result.cycle?.name ?? "safersay-report"}.csv"`,
+      "content-disposition": `attachment; filename="${filename}.csv"`,
     },
   });
 }
