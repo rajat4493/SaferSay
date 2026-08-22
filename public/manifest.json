@@ -1,0 +1,17 @@
+{
+  "name": "SaferSay",
+  "short_name": "SaferSay",
+  "description": "Confidential employee surveys — grouped results only, never who said what.",
+  "start_url": "/app",
+  "display": "standalone",
+  "background_color": "#fbfaf7",
+  "theme_color": "#0d4f37",
+  "icons": [
+    {
+      "src": "/safersay-mark.svg",
+      "sizes": "128x128",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
