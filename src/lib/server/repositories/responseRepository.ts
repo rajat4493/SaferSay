@@ -1,6 +1,16 @@
 import { randomUUID } from "crypto";
 import type { Queryable } from "@/lib/server/db/tenantPool";
-import { ResponseAnswerInput, ProtectedReport, ProtectedTextReport, QuestionBankItem, ReportScope, RespondentSurveySession, CycleTrendQuestion } from "./types";
+import {
+  ResponseAnswerInput,
+  ProtectedReport,
+  ProtectedTextReport,
+  ProtectedOptionReport,
+  QuestionBankItem,
+  QuestionType,
+  ReportScope,
+  RespondentSurveySession,
+  CycleTrendQuestion,
+} from "./types";
 
 const MAX_TREND_CYCLES = 6;
 
@@ -61,12 +71,21 @@ export class ResponseRepository {
     );
 
     for (const answer of params.answers) {
+      const answerId = randomUUID();
       await this.db.query(
         `insert into responses.answers
           (id, submission_id, question_id, number_value, text_value)
          values ($1, $2, $3, $4, $5)`,
-        [randomUUID(), submissionId, answer.questionId, answer.numberValue ?? null, answer.textValue ?? null],
+        [answerId, submissionId, answer.questionId, answer.numberValue ?? null, answer.textValue ?? null],
       );
+
+      for (const [index, optionKey] of (answer.optionKeys ?? []).entries()) {
+        await this.db.query(
+          `insert into responses.answer_options (id, answer_id, option_key, rank)
+           values ($1, $2, $3, $4)`,
+          [randomUUID(), answerId, optionKey, answer.ranked ? index + 1 : null],
+        );
+      }
     }
     return { submissionId };
   }
@@ -91,11 +110,13 @@ export class ResponseRepository {
       id: string;
       position: number;
       question_text: string;
-      question_type: "likert_5" | "enps_0_10" | "open_text";
+      question_type: QuestionType;
       construct: string | null;
       is_optional: boolean;
+      options: Array<{ key: string; label: string }> | null;
+      matrix_group_id: string | null;
     }>(
-      `select id, position, question_text, question_type, construct, is_optional
+      `select id, position, question_text, question_type, construct, is_optional, options, matrix_group_id
        from responses.template_questions
        where template_id = (
          select template_id from responses.survey_cycles where id = $1
@@ -115,6 +136,8 @@ export class ResponseRepository {
         type: question.question_type,
         construct: question.construct,
         optional: question.is_optional,
+        options: question.options,
+        matrixGroupId: question.matrix_group_id,
       })),
     };
   }
@@ -257,6 +280,63 @@ export class ResponseRepository {
         label: entry.label,
         n: entry.n,
         answers: entry.answers,
+      })),
+    };
+  }
+
+  /**
+   * Per-option tallies for multiple_choice/ranking/matrix questions.
+   * Suppression is applied twice, deliberately: first the whole-cycle gate
+   * (same as every other report method -- too few respondents overall,
+   * nothing is releasable), then a second, per-option gate inside
+   * responses.report_option_tallies -- one respondent picking a rare
+   * option is exactly as identifying as a numeric outlier, so each
+   * option's own pick-count must independently clear min_n. An option that
+   * doesn't clear it is dropped from the row entirely, not zeroed out --
+   * showing "0 for this option, hidden for that one" would itself leak who
+   * picked the hidden one by elimination.
+   */
+  async getProtectedOptionReport(tenantId: string, cycleId: string, minGroupSize = 5): Promise<ProtectedOptionReport> {
+    const countResult = await this.db.query<{ n: string }>(
+      "select count(*)::text as n from responses.submissions where tenant_id = $1 and cycle_id = $2",
+      [tenantId, cycleId],
+    );
+    const n = Number(countResult.rows[0]?.n ?? 0);
+    if (n < minGroupSize) return { protected: true, n, rows: [] };
+
+    const result = await this.db.query<{
+      question_id: string;
+      question_text: string;
+      option_key: string;
+      n: number;
+      avg_rank: string | null;
+    }>(
+      `select r.question_id, q.question_text, r.option_key, r.n, r.avg_rank
+       from responses.report_option_tallies($1, $2) r
+       join responses.survey_cycles c on c.id = $1
+       join responses.template_questions q on q.id = r.question_id
+       where c.tenant_id = $3
+         and r.protected = false`,
+      [cycleId, minGroupSize, tenantId],
+    );
+
+    const byQuestion = new Map<string, { label: string; options: Array<{ optionKey: string; n: number; avgRank: number | null }> }>();
+    for (const row of result.rows) {
+      let entry = byQuestion.get(row.question_id);
+      if (!entry) {
+        entry = { label: row.question_text, options: [] };
+        byQuestion.set(row.question_id, entry);
+      }
+      entry.options.push({ optionKey: row.option_key, n: row.n, avgRank: row.avg_rank === null ? null : Number(row.avg_rank) });
+    }
+
+    return {
+      protected: false,
+      n,
+      rows: Array.from(byQuestion.entries()).map(([questionId, entry]) => ({
+        questionId,
+        label: entry.label,
+        options: entry.options,
       })),
     };
   }

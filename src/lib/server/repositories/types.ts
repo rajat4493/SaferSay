@@ -226,19 +226,34 @@ export type PilotIdentitySummary = {
   sentInvites: number;
 };
 
+export type QuestionType = "likert_5" | "enps_0_10" | "open_text" | "multiple_choice" | "ranking" | "matrix";
+
 export type ResponseAnswerInput = {
   questionId: string;
   numberValue?: number;
   textValue?: string;
+  // multiple_choice/matrix: the selected option keys, no rank. ranking:
+  // every ranked option key, in the respondent's chosen order -- set
+  // `ranked: true` so the repository stores each key's array position as
+  // its rank; other types must leave `ranked` unset.
+  optionKeys?: string[];
+  ranked?: boolean;
 };
+
+/** A multiple_choice/ranking option, or one column of a matrix row. */
+export type QuestionOption = { key: string; label: string };
 
 export type RespondentSurveyQuestion = {
   id: string;
   position: number;
   text: string;
-  type: "likert_5" | "enps_0_10" | "open_text";
+  type: QuestionType;
   construct: string | null;
   optional: boolean;
+  options: QuestionOption[] | null;
+  // Only set for matrix-row questions; rows sharing a matrix_group_id
+  // render as one grid on the taker surface.
+  matrixGroupId: string | null;
 };
 
 export type RespondentSurveySession = {
@@ -316,3 +331,24 @@ export type CycleTrendQuestion = {
   questionText: string;
   points: CycleTrendPoint[];
 };
+
+/**
+ * Per-option tallies for multiple_choice/ranking/matrix questions. Each
+ * option's pick-count is suppressed independently (see
+ * responses.report_option_tallies, 0030) -- a rare option is as
+ * identifying as a numeric outlier -- so `options` only ever contains
+ * options that individually cleared the threshold, never the full set
+ * with some counts zeroed out (that would still leak "someone picked the
+ * missing one"). `avgRank` is only meaningful for ranking questions.
+ */
+export type ProtectedOptionReport =
+  | { protected: true; n: number; rows: [] }
+  | {
+      protected: false;
+      n: number;
+      rows: Array<{
+        questionId: string;
+        label?: string;
+        options: Array<{ optionKey: string; n: number; avgRank: number | null }>;
+      }>;
+    };
