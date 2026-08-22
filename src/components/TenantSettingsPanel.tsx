@@ -16,6 +16,7 @@ type Settings = {
   safetyContactEmail: string | null;
   smtpConfigured: boolean;
   smtpFromEmail: string | null;
+  slackConnected: boolean;
 };
 
 type ApiKey = { id: string; label: string | null; createdAt: string; revokedAt: string | null };
@@ -47,6 +48,8 @@ export function TenantSettingsPanel() {
   const [smtpPassword, setSmtpPassword] = useState("");
   const [smtpFromEmail, setSmtpFromEmail] = useState("");
   const [savingSmtp, setSavingSmtp] = useState(false);
+  const [slackWebhookUrl, setSlackWebhookUrl] = useState("");
+  const [savingSlack, setSavingSlack] = useState(false);
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [newApiKeyLabel, setNewApiKeyLabel] = useState("");
   const [createdApiKey, setCreatedApiKey] = useState("");
@@ -138,6 +141,39 @@ export function TenantSettingsPanel() {
     if (data.ok) {
       setSettings(data.settings);
       toast.show({ variant: "success", message: "Removed. Invite and reminder emails will send from SaferSay again." });
+    }
+  }
+
+  async function saveSlack() {
+    setSavingSlack(true);
+    const response = await fetch("/api/tenants/settings", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ slackWebhookUrl }),
+    });
+    const data = await response.json().catch(() => ({ ok: false }));
+    setSavingSlack(false);
+    if (data.ok) {
+      setSettings(data.settings);
+      setSlackWebhookUrl("");
+      toast.show({ variant: "success", message: "Slack connected. Team updates can now be shared to your channel." });
+    } else {
+      toast.show({ variant: "error", message: data.error ?? "Couldn't connect Slack." });
+    }
+  }
+
+  async function clearSlack() {
+    setSavingSlack(true);
+    const response = await fetch("/api/tenants/settings", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ slackClear: true }),
+    });
+    const data = await response.json().catch(() => ({ ok: false }));
+    setSavingSlack(false);
+    if (data.ok) {
+      setSettings(data.settings);
+      toast.show({ variant: "success", message: "Disconnected Slack." });
     }
   }
 
@@ -374,6 +410,42 @@ export function TenantSettingsPanel() {
             </button>
           ) : null}
         </div>
+      </Card>
+
+      <Card>
+        <h2 className="section-title">Slack</h2>
+        <p className="mt-1.5 secondary-text">
+          {settings.slackConnected
+            ? "Slack is connected. Team updates can be posted to your channel from the update-drafting page."
+            : "Connect a Slack incoming webhook to share team updates directly to a channel, instead of copying them as email."}
+        </p>
+        {settings.slackConnected ? (
+          <div className="mt-3">
+            <button onClick={clearSlack} disabled={savingSlack} className="btn-secondary">
+              Disconnect Slack
+            </button>
+          </div>
+        ) : (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <input
+              value={slackWebhookUrl}
+              onChange={(e) => setSlackWebhookUrl(e.target.value)}
+              placeholder="https://hooks.slack.com/services/..."
+              aria-label="Slack incoming webhook URL"
+              className="admin-input flex-1"
+            />
+            <button onClick={saveSlack} disabled={savingSlack || !slackWebhookUrl.trim()} className="btn-primary shrink-0">
+              {savingSlack ? "Connecting..." : "Connect Slack"}
+            </button>
+          </div>
+        )}
+        <p className="mt-2 text-xs text-[var(--ink-faint)]">
+          Create one at{" "}
+          <a href="https://api.slack.com/messaging/webhooks" target="_blank" rel="noreferrer" className="underline">
+            api.slack.com/messaging/webhooks
+          </a>{" "}
+          for the channel you want updates posted to.
+        </p>
       </Card>
 
       <Card>

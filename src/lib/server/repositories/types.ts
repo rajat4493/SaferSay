@@ -154,6 +154,9 @@ export type TenantSelfSettings = {
   // reminder email falls back to the global Resend sender.
   smtpConfigured: boolean;
   smtpFromEmail: string | null;
+  // Never the webhook URL itself -- just enough for the settings UI to
+  // show "connected" vs "not connected", same convention as smtpConfigured.
+  slackConnected: boolean;
 };
 
 export type CycleAction = {

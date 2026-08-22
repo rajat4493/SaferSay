@@ -550,6 +550,26 @@ export class IdentityRepository {
     );
   }
 
+  /** Returns null when no webhook is configured -- callers fall back to "not connected", matching getSmtpConfig's null convention. */
+  async getSlackWebhookUrl(tenantId: string): Promise<string | null> {
+    const result = await this.db.query<{ slack_webhook_url_encrypted: string | null }>(
+      `select slack_webhook_url_encrypted from identity.tenant_settings where tenant_id = $1`,
+      [tenantId],
+    );
+    const encrypted = result.rows[0]?.slack_webhook_url_encrypted;
+    return encrypted ? decryptSecret(encrypted) : null;
+  }
+
+  /** Pass null to disconnect Slack. */
+  async setSlackWebhookUrl(tenantId: string, url: string | null) {
+    await this.db.query(
+      `insert into identity.tenant_settings (tenant_id, slack_webhook_url_encrypted)
+       values ($1, $2)
+       on conflict (tenant_id) do update set slack_webhook_url_encrypted = excluded.slack_webhook_url_encrypted, updated_at = now()`,
+      [tenantId, url ? encryptSecret(url) : null],
+    );
+  }
+
   /**
    * The one deliberate, auditable, grep-able place identity is read for a
    * survey token outside the normal severed flow -- do NOT widen
@@ -733,6 +753,7 @@ export class IdentityRepository {
       safety_contact_email: string | null;
       smtp_host: string | null;
       smtp_from_email: string | null;
+      slack_webhook_url_encrypted: string | null;
     }>(
       `select
          coalesce(default_min_group_size, 5) as default_min_group_size,
@@ -741,7 +762,8 @@ export class IdentityRepository {
          coalesce(features, '{}'::jsonb) as features,
          safety_contact_email,
          smtp_host,
-         smtp_from_email
+         smtp_from_email,
+         slack_webhook_url_encrypted
        from identity.tenant_settings where tenant_id = $1`,
       [tenantId],
     );
@@ -756,6 +778,7 @@ export class IdentityRepository {
       // "configured" vs "not configured" without ever round-tripping the secret.
       smtpConfigured: Boolean(row?.smtp_host),
       smtpFromEmail: row?.smtp_from_email ?? null,
+      slackConnected: Boolean(row?.slack_webhook_url_encrypted),
     };
   }
 
