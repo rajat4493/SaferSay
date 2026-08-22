@@ -105,7 +105,7 @@ export default function PrivacyPage() {
           </P>
         </Section>
 
-        <Section title="6. Who we share data with">
+        <Section title="6. Who we share data with (Sub-processors)">
           <P>We use the following subprocessors to run the service. None of them can see individual survey answers linked to a name.</P>
           <Ul
             items={[

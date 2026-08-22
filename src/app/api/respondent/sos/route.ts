@@ -4,7 +4,7 @@ import { getTenantPool, withTenantContext, type Queryable } from "@/lib/server/d
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import { sendSosAlert } from "@/lib/server/sosDelivery";
 import { hashServerToken } from "@/lib/server/tokenHashing";
-import { checkRateLimit } from "@/lib/server/rateLimit";
+import { checkRateLimit, getClientIp } from "@/lib/server/rateLimit";
 
 /**
  * Respondent-facing (token-gated, not staff-role-gated), same as
@@ -30,14 +30,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "You must acknowledge before sending." }, { status: 400 });
   }
 
-  // Tighter than the other respondent routes -- this sends a real alert
-  // to a human safety contact, so it must not be spammable.
-  const rateLimit = await checkRateLimit({ request, routeKey: "respondent-sos", limit: 5, windowSeconds: 300 });
-  if (!rateLimit.allowed) {
-    return NextResponse.json(
-      { ok: false, error: "Too many attempts. Please wait a few minutes and try again." },
-      { status: 429, headers: { "retry-after": String(rateLimit.retryAfterSeconds) } },
-    );
+  // Every successful send emails a real person -- keep this tight. Keyed
+  // by IP (guards a script hammering the endpoint) and separately by the
+  // token itself (guards one compromised/shared link from spamming the
+  // safety contact repeatedly).
+  const ipCheck = await checkRateLimit(`sos-ip:${getClientIp(request)}`, 5, 300);
+  const tokenCheck = await checkRateLimit(`sos-token:${hashServerToken(body.token)}`, 3, 3600);
+  if (!ipCheck.allowed || !tokenCheck.allowed) {
+    return NextResponse.json({ ok: false, error: "Too many attempts. Try again later." }, { status: 429 });
   }
 
   const adminPool = getDatabasePool();

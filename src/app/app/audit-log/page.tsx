@@ -31,6 +31,7 @@ const actionLabels: Record<string, string> = {
   team_invite_sent: "Invited a teammate",
   team_member_removed: "Removed a teammate",
   data_retention_purged: "Automatic data retention purge ran",
+  deletion_requested: "Requested account/workspace deletion",
 };
 
 const roleLabels: Record<string, string> = {

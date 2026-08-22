@@ -5,23 +5,23 @@ import { submitWithSeveredRepositories } from "@/lib/server/confidentialSubmissi
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import { submitServerResponse } from "@/lib/serverStore";
 import { hashServerToken } from "@/lib/server/tokenHashing";
-import { checkRateLimit } from "@/lib/server/rateLimit";
+import { checkRateLimit, getClientIp } from "@/lib/server/rateLimit";
 
 export async function POST(request: NextRequest) {
-  const rateLimit = await checkRateLimit({ request, routeKey: "respondent-submit", limit: 10, windowSeconds: 60 });
-  if (!rateLimit.allowed) {
-    return NextResponse.json(
-      { ok: false, error: "Too many attempts. Please wait a moment and try again." },
-      { status: 429, headers: { "retry-after": String(rateLimit.retryAfterSeconds) } },
-    );
-  }
-
   const body = (await request.json().catch(() => ({}))) as {
     token: string;
     answers: Array<{ questionId: string; numberValue?: number; textValue?: string }>;
   };
   if (!body.token || !Array.isArray(body.answers)) {
     return NextResponse.json({ ok: false, error: "Survey token and answers are required." }, { status: 400 });
+  }
+
+  // Guards against token-guessing, not against a single legitimate
+  // respondent -- a real submission is a one-time action per person, so a
+  // generous per-IP ceiling here only ever bites automated attempts.
+  const { allowed } = await checkRateLimit(`submit:${getClientIp(request)}`, 30, 60);
+  if (!allowed) {
+    return NextResponse.json({ ok: false, error: "Too many attempts. Try again in a minute." }, { status: 429 });
   }
 
   const adminPool = getDatabasePool();

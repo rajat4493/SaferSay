@@ -4,18 +4,15 @@ import { getTenantPool, withTenantContext } from "@/lib/server/db/tenantPool";
 import { getRespondentSurveySession } from "@/lib/server/respondentSessionService";
 import { hashServerToken } from "@/lib/server/tokenHashing";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
-import { checkRateLimit } from "@/lib/server/rateLimit";
+import { checkRateLimit, getClientIp } from "@/lib/server/rateLimit";
 
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
   if (!token) return NextResponse.json({ ok: false, error: "Survey token is required." }, { status: 400 });
 
-  const rateLimit = await checkRateLimit({ request, routeKey: "respondent-session", limit: 30, windowSeconds: 60 });
-  if (!rateLimit.allowed) {
-    return NextResponse.json(
-      { ok: false, error: "Too many attempts. Please wait a moment and try again." },
-      { status: 429, headers: { "retry-after": String(rateLimit.retryAfterSeconds) } },
-    );
+  const { allowed } = await checkRateLimit(`session:${getClientIp(request)}`, 30, 60);
+  if (!allowed) {
+    return NextResponse.json({ ok: false, error: "Too many attempts. Try again in a minute." }, { status: 429 });
   }
 
   const adminPool = getDatabasePool();
