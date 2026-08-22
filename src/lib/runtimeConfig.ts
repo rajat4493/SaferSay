@@ -106,6 +106,17 @@ export function runtimeChecks(): RuntimeCheck[] {
       requiredForProduction: true,
       purpose: "Authenticates the scheduled job (vercel.json cron) that deletes survey data past each tenant's retention window -- the route refuses to run without it, so retention silently never happens otherwise.",
     },
+    {
+      key: "CYCLE_SCHEDULER_SECRET",
+      label: "Recurring survey scheduler",
+      configured: Boolean(process.env.CYCLE_SCHEDULER_SECRET || process.env.CRON_SECRET),
+      // Not a hard gate -- unlike retention purge, nothing breaks silently
+      // if this is unconfigured; a tenant just can't set up a recurring
+      // survey until it is (the "make this recurring" toggle would create
+      // a recurrence that never fires). Worth fixing, not launch-blocking.
+      requiredForProduction: false,
+      purpose: "Authenticates the scheduled job (vercel.json cron) that creates -- and optionally sends -- a tenant's recurring survey cycles.",
+    },
   ];
 }
 

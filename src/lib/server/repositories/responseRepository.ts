@@ -735,4 +735,58 @@ export class ResponseRepository {
       report: await this.getProtectedReportForTenant(tenantId, cycle.id, cycle.min_group_size, scope),
     };
   }
+
+  async createRecurrence(params: {
+    tenantId: string;
+    templateSlug: string;
+    interval: "weekly" | "monthly" | "quarterly";
+    autoSend: boolean;
+  }) {
+    const id = randomUUID();
+    await this.db.query(
+      `insert into responses.survey_recurrences (id, tenant_id, template_slug, interval, auto_send, next_run_at)
+       values ($1, $2, $3, $4, $5, $6)`,
+      [id, params.tenantId, params.templateSlug, params.interval, params.autoSend, nextRunAtFrom(new Date(), params.interval)],
+    );
+    return { id };
+  }
+
+  async listRecurrencesForTenant(tenantId: string) {
+    const result = await this.db.query<{
+      id: string;
+      template_slug: string;
+      interval: "weekly" | "monthly" | "quarterly";
+      auto_send: boolean;
+      next_run_at: string;
+      disabled_at: string | null;
+    }>(
+      `select id, template_slug, interval, auto_send, next_run_at, disabled_at
+       from responses.survey_recurrences
+       where tenant_id = $1
+       order by created_at desc`,
+      [tenantId],
+    );
+    return result.rows.map((row) => ({
+      id: row.id,
+      templateSlug: row.template_slug,
+      interval: row.interval,
+      autoSend: row.auto_send,
+      nextRunAt: row.next_run_at,
+      disabled: row.disabled_at !== null,
+    }));
+  }
+
+  async deleteRecurrence(tenantId: string, recurrenceId: string) {
+    const result = await this.db.query(`delete from responses.survey_recurrences where tenant_id = $1 and id = $2`, [tenantId, recurrenceId]);
+    return (result.rowCount ?? 0) > 0;
+  }
+}
+
+/** Anchors to "now" at creation/run time, not calendar boundaries -- a monthly recurrence created on the 15th fires on the 15th of each following month, not the 1st. */
+export function nextRunAtFrom(from: Date, interval: "weekly" | "monthly" | "quarterly"): Date {
+  const next = new Date(from);
+  if (interval === "weekly") next.setDate(next.getDate() + 7);
+  else if (interval === "monthly") next.setMonth(next.getMonth() + 1);
+  else next.setMonth(next.getMonth() + 3);
+  return next;
 }

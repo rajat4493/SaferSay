@@ -7,6 +7,7 @@ import { Avatar } from "@/components/Avatar";
 import { SkeletonCard } from "@/components/Skeleton";
 import { useToast } from "@/components/ToastProvider";
 import { useTenantSession } from "@/lib/useTenantSession";
+import { surveyTemplates } from "@/lib/templates";
 
 type Settings = {
   minGroupSize: number;
@@ -20,6 +21,7 @@ type Settings = {
 };
 
 type ApiKey = { id: string; label: string | null; createdAt: string; revokedAt: string | null };
+type Recurrence = { id: string; templateSlug: string; interval: "weekly" | "monthly" | "quarterly"; autoSend: boolean; nextRunAt: string; disabled: boolean };
 
 const featureLabels: Record<string, string> = {
   customQuestions: "Custom question editing",
@@ -58,6 +60,11 @@ export function TenantSettingsPanel() {
   const [deletionRequested, setDeletionRequested] = useState(false);
   const [nameDraft, setNameDraft] = useState<string | null>(null);
   const [savingName, setSavingName] = useState(false);
+  const [recurrences, setRecurrences] = useState<Recurrence[]>([]);
+  const [newRecurrenceTemplate, setNewRecurrenceTemplate] = useState(surveyTemplates[0]?.slug ?? "");
+  const [newRecurrenceInterval, setNewRecurrenceInterval] = useState<Recurrence["interval"]>("monthly");
+  const [newRecurrenceAutoSend, setNewRecurrenceAutoSend] = useState(false);
+  const [creatingRecurrence, setCreatingRecurrence] = useState(false);
   const toast = useToast();
   const { info: sessionInfo } = useTenantSession();
 
@@ -75,8 +82,16 @@ export function TenantSettingsPanel() {
       .catch(() => setApiKeys([]));
   }
 
+  function loadRecurrences() {
+    fetch("/api/recurrences")
+      .then((response) => response.json())
+      .then((data: { ok?: boolean; recurrences?: Recurrence[] }) => setRecurrences(data.ok ? (data.recurrences ?? []) : []))
+      .catch(() => setRecurrences([]));
+  }
+
   useEffect(load, []);
   useEffect(loadApiKeys, []);
+  useEffect(loadRecurrences, []);
 
   async function saveName() {
     const name = (nameDraft ?? "").trim();
@@ -197,6 +212,28 @@ export function TenantSettingsPanel() {
   async function revokeApiKey(id: string) {
     await fetch(`/api/tenants/api-keys?id=${id}`, { method: "DELETE" });
     loadApiKeys();
+  }
+
+  async function createRecurrence() {
+    setCreatingRecurrence(true);
+    const response = await fetch("/api/recurrences", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ templateSlug: newRecurrenceTemplate, interval: newRecurrenceInterval, autoSend: newRecurrenceAutoSend }),
+    });
+    const data = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+    setCreatingRecurrence(false);
+    if (data.ok) {
+      loadRecurrences();
+      toast.show({ variant: "success", message: "Recurring survey scheduled." });
+    } else {
+      toast.show({ variant: "error", message: data.error ?? "Couldn't schedule that survey." });
+    }
+  }
+
+  async function cancelRecurrence(id: string) {
+    await fetch(`/api/recurrences/${id}`, { method: "DELETE" });
+    loadRecurrences();
   }
 
   async function commitMinGroupSize() {
@@ -446,6 +483,49 @@ export function TenantSettingsPanel() {
           </a>{" "}
           for the channel you want updates posted to.
         </p>
+      </Card>
+
+      <Card>
+        <h2 className="section-title">Recurring surveys</h2>
+        <p className="mt-1.5 secondary-text">Automatically create a new survey from a template on a schedule, instead of starting each one by hand.</p>
+
+        <div className="mt-4 flex flex-wrap items-end gap-2">
+          <select value={newRecurrenceTemplate} onChange={(e) => setNewRecurrenceTemplate(e.target.value)} aria-label="Template to recur" className="admin-input h-9 w-auto">
+            {surveyTemplates.map((template) => (
+              <option key={template.slug} value={template.slug}>
+                {template.name}
+              </option>
+            ))}
+          </select>
+          <select value={newRecurrenceInterval} onChange={(e) => setNewRecurrenceInterval(e.target.value as Recurrence["interval"])} aria-label="Recurrence interval" className="admin-input h-9 w-auto">
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+            <option value="quarterly">Quarterly</option>
+          </select>
+          <label className="flex h-9 items-center gap-1.5 text-[13px] text-[var(--ink-mid)]">
+            <input type="checkbox" checked={newRecurrenceAutoSend} onChange={(e) => setNewRecurrenceAutoSend(e.target.checked)} />
+            Send automatically
+          </label>
+          <button onClick={createRecurrence} disabled={creatingRecurrence} className="btn-primary h-9">
+            {creatingRecurrence ? "Scheduling..." : "Schedule"}
+          </button>
+        </div>
+
+        {recurrences.length > 0 ? (
+          <div className="mt-4 space-y-1.5">
+            {recurrences.map((recurrence) => (
+              <div key={recurrence.id} className="flex items-center justify-between rounded-[var(--radius-input)] border border-[var(--border)] bg-white p-2.5 text-[13px]">
+                <span>
+                  {surveyTemplates.find((t) => t.slug === recurrence.templateSlug)?.name ?? recurrence.templateSlug} · {recurrence.interval}
+                  {recurrence.autoSend ? " · sends automatically" : " · created as draft"}
+                </span>
+                <button onClick={() => cancelRecurrence(recurrence.id)} className="text-xs font-medium text-[var(--red)] hover:underline">
+                  Cancel
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </Card>
 
       <Card>
