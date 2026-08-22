@@ -181,6 +181,12 @@ export type EmployeeImportRecord = {
   // the org chart, no separate builder needed. See
   // docs/strategy/SAFERSAY_FINAL_ARCHITECTURE.md §5.
   managerEmail?: string;
+  // Only ever set by the HRIS sync webhook (/api/employees/sync), never
+  // CSV import -- matching still keys on email either way (see
+  // 0031_employee_sync.sql); these ride along for a future vendor
+  // connector to reconcile against without a schema change then.
+  externalId?: string;
+  sourceSystem?: string;
 };
 
 export type IssuedParticipantToken = {

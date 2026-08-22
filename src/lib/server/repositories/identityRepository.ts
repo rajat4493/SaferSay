@@ -880,12 +880,28 @@ export class IdentityRepository {
     for (const employee of employees) {
       const id = randomUUID();
       await this.db.query(
-        `insert into identity.employees (id, tenant_id, email, name, team, location, manager_email)
-         values ($1, $2, $3, $4, $5, $6, $7)
+        `insert into identity.employees (id, tenant_id, email, name, team, location, manager_email, external_id, source_system)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          on conflict (tenant_id, email)
-         do update set name = excluded.name, team = excluded.team, location = excluded.location, manager_email = excluded.manager_email
+         do update set
+           name = excluded.name, team = excluded.team, location = excluded.location, manager_email = excluded.manager_email,
+           -- coalesce, not overwrite: a plain CSV import never supplies
+           -- these, and must not blank out a value an earlier HRIS sync
+           -- already set for this employee.
+           external_id = coalesce(excluded.external_id, identity.employees.external_id),
+           source_system = coalesce(excluded.source_system, identity.employees.source_system)
          returning id, email, name, team, location, manager_email`,
-        [id, tenantId, employee.email, employee.name ?? null, normalizeTeamLabel(employee.team), employee.location ?? null, employee.managerEmail ?? null],
+        [
+          id,
+          tenantId,
+          employee.email,
+          employee.name ?? null,
+          normalizeTeamLabel(employee.team),
+          employee.location ?? null,
+          employee.managerEmail ?? null,
+          employee.externalId ?? null,
+          employee.sourceSystem ?? null,
+        ],
       );
       imported.push(employee);
     }
