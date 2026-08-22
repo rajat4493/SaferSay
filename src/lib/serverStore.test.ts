@@ -20,7 +20,7 @@ describe("server-side confidential spine", () => {
     await submitServerResponse(targets[0].token, [{ questionId: "q_role", numberValue: 4 }]);
     await expect(
       submitServerResponse(targets[0].token, [{ questionId: "q_role", numberValue: 4 }]),
-    ).rejects.toThrow(/already spent/);
+    ).rejects.toThrow(/already completed/);
 
     const protectedReport = await getProtectedServerReport();
     expect(protectedReport).toEqual({ protected: true, n: 1, rows: [] });

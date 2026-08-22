@@ -63,13 +63,13 @@ describe("live survey cycle (product spine)", () => {
     await submitServerResponse(target.token, [{ questionId: "q1", numberValue: 3 }]);
 
     await expect(submitServerResponse(target.token, [{ questionId: "q1", numberValue: 5 }])).rejects.toThrow(
-      "Token is invalid or already spent.",
+      "You've already completed this survey.",
     );
   });
 
   it("rejects an unknown token", async () => {
     await expect(submitServerResponse("not-a-real-token", [{ questionId: "q1", numberValue: 3 }])).rejects.toThrow(
-      "Token is invalid or already spent.",
+      "This link isn't valid.",
     );
   });
 });

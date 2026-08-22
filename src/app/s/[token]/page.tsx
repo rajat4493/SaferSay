@@ -40,6 +40,7 @@ export default function RespondentTokenPage() {
   const [selectedValue, setSelectedValue] = useState<number | null>(null);
   const [textValue, setTextValue] = useState("");
   const [error, setError] = useState("");
+  const [invalidReason, setInvalidReason] = useState<string | undefined>(undefined);
 
   const localParticipant = data.identity.participants.find((item) => item.token === token);
   const localQuestions = useMemo(
@@ -68,7 +69,7 @@ export default function RespondentTokenPage() {
     let active = true;
     async function loadSession() {
       const response = await fetch(`/api/respondent/session?token=${encodeURIComponent(token)}`);
-      const result = (await response.json().catch(() => ({}))) as { ok?: boolean; session?: SurveySession; error?: string };
+      const result = (await response.json().catch(() => ({}))) as { ok?: boolean; session?: SurveySession; error?: string; reason?: string };
       if (!active) return;
 
       if (response.ok && result.session) {
@@ -83,7 +84,8 @@ export default function RespondentTokenPage() {
         return;
       }
 
-      setError(result.error ?? "This survey link is not active.");
+      setError(result.error ?? "This link isn't valid.");
+      setInvalidReason(result.reason);
       setStep("invalid");
     }
     loadSession();
@@ -108,7 +110,9 @@ export default function RespondentTokenPage() {
         });
         if (!response.ok) {
           const result = (await response.json().catch(() => ({}))) as { error?: string };
-          setError(result.error ?? "Your response could not be submitted.");
+          const message = result.error ?? "Your response couldn't be submitted.";
+          setError(message);
+          setInvalidReason(message === "You've already completed this survey." ? "already_submitted" : undefined);
           setStep("invalid");
           return;
         }
@@ -223,7 +227,7 @@ export default function RespondentTokenPage() {
         {step === "loading" ? (
           <Panel title="Checking your link" text="This takes a moment." />
         ) : step === "invalid" ? (
-          <Panel title="This link is not active" text={error || "The token is missing, already submitted, or no longer valid."} />
+          <Panel {...invalidLinkCopy(invalidReason, error)} />
         ) : step === "intro" ? (
           <div className="rounded-[var(--radius-shell)] border border-[var(--border)] bg-white p-8 shadow-[var(--shadow-elevated)]">
             <div className="taker-icon-circle mb-5">
@@ -396,6 +400,23 @@ function ConfidentialityRow({ tone, heading, description }: { tone: "green" | "r
       </div>
     </div>
   );
+}
+
+// A dead link isn't one thing -- "you already answered this" and "this
+// link doesn't exist" call for different words, not one generic message.
+// `reason` comes from the API when it knows which; falls back to the
+// server's own error text, then a plain default, when it doesn't.
+function invalidLinkCopy(reason: string | undefined, error: string): { title: string; text: string } {
+  if (reason === "already_submitted") {
+    return { title: "You've already taken this survey", text: "Thanks again for sharing your answers — there's nothing more to do here." };
+  }
+  if (reason === "revoked") {
+    return { title: "This invite is no longer active", text: "Your workplace turned this link off. If that seems wrong, check with whoever sent it to you." };
+  }
+  return {
+    title: "This link isn't working",
+    text: error || "It may be mistyped, or the survey it points to no longer exists. Ask whoever sent it for a fresh link.",
+  };
 }
 
 function Panel({ title, text }: { title: string; text: string }) {

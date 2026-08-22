@@ -1128,7 +1128,7 @@ export class IdentityRepository {
        where token_hash = $1 and token_status = 'issued'`,
       [tokenHash],
     );
-    if (result.rowCount !== 1) throw new Error("Token is invalid or already spent.");
+    if (result.rowCount !== 1) throw new Error("You've already completed this survey.");
   }
 
   async getReminderTargets(cycleId: string) {

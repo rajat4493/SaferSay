@@ -97,7 +97,7 @@ describeIfDb("Postgres live survey cycle", () => {
         rawToken: rawTokens[4],
         answers: [{ questionId, numberValue: 5 }],
       }),
-    ).rejects.toThrow("Token is invalid or already spent.");
+    ).rejects.toThrow("You've already completed this survey.");
   }, 30_000);
 });
 
