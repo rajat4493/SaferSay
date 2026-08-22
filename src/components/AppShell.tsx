@@ -27,6 +27,8 @@ import { SignOutButton } from "@/components/SignOutButton";
 import { useTenantSession } from "@/lib/useTenantSession";
 import { canAccessAuditLog, canAccessPeople, canAccessSecurityProof, canAccessWorkspace, canViewSurveyResults } from "@/lib/permissions";
 import type { UserRole } from "@/lib/server/repositories/types";
+import { brandFontOptions } from "@/lib/brand";
+import { deriveAccentPalette } from "@/lib/brandTheme";
 
 type NavItemConfig = {
   href: string;
@@ -97,6 +99,14 @@ export function AppShell({
   const visiblePrimaryItems = filterItems(primaryNavItems);
   const visibleFoldedItems = filterItems(foldedMenuItems);
 
+  // Console/super-admin pages don't render AppShell at all (separate
+  // shell), so this override never reaches that surface -- deliberately,
+  // per the white-label scoping decision.
+  const themeOverrides: React.CSSProperties = {
+    ...(brand.accentColor ? (deriveAccentPalette(brand.accentColor) as React.CSSProperties) : {}),
+    ...(brand.fontFamily ? ({ "--font-body": brandFontOptions.find((option) => option.value === brand.fontFamily)?.stack } as React.CSSProperties) : {}),
+  };
+
   const sidebarContent = (
     <>
       <div className="flex items-center justify-between px-4 pt-4 pb-3">
@@ -158,7 +168,7 @@ export function AppShell({
   );
 
   return (
-    <div className="flex min-h-screen bg-[var(--bg)] text-[var(--ink)]">
+    <div className="flex min-h-screen bg-[var(--bg)] text-[var(--ink)]" style={themeOverrides}>
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-[var(--radius-button)] focus:bg-[var(--ink)] focus:px-4 focus:py-2 focus:text-[13px] focus:font-semibold focus:text-white"

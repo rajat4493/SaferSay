@@ -7,6 +7,8 @@ import { useBrand } from "@/components/BrandProvider";
 import { useSurveyData } from "@/components/DataProvider";
 import { SosButton } from "@/components/SosButton";
 import { questionBank, submitTokenResponse } from "@/lib/localData";
+import { brandFontOptions, type BrandTheme } from "@/lib/brand";
+import { deriveAccentPalette } from "@/lib/brandTheme";
 
 type QuestionOption = { key: string; label: string };
 
@@ -25,6 +27,10 @@ type SurveySession = {
   cycleName: string;
   templateName: string;
   questions: SurveyQuestion[];
+  // Only present on the real API-backed session (respondents never sign
+  // in, so this rides along on the session fetch -- see
+  // respondentSessionService.ts). The local-dev fallback session has none.
+  brand?: BrandTheme;
 };
 
 type Answer = {
@@ -38,7 +44,7 @@ type Answer = {
 export default function RespondentTokenPage() {
   const params = useParams<{ token: string }>();
   const token = params.token;
-  const { brand } = useBrand();
+  const { brand: defaultUiBrand } = useBrand();
   const { data, setData } = useSurveyData();
   const [step, setStep] = useState<"loading" | "intro" | "survey" | "done" | "invalid">("loading");
   const [session, setSession] = useState<SurveySession | null>(null);
@@ -65,6 +71,11 @@ export default function RespondentTokenPage() {
     [],
   );
   const questions = session?.questions ?? localQuestions;
+  const brand = session?.brand ?? defaultUiBrand;
+  const themeOverrides: React.CSSProperties = {
+    ...(brand.accentColor ? (deriveAccentPalette(brand.accentColor) as React.CSSProperties) : {}),
+    ...(brand.fontFamily ? ({ "--font-body": brandFontOptions.find((option) => option.value === brand.fontFamily)?.stack } as React.CSSProperties) : {}),
+  };
   const current = answers.length;
   const question = questions[current];
   const progressPercent = questions.length ? Math.round((current / questions.length) * 100) : 0;
@@ -225,7 +236,7 @@ export default function RespondentTokenPage() {
   }, [step, question, selectedValue, usesKeyboardSelect, scaleOptions.join(","), isScaleQuestion]);
 
   return (
-    <main className="taker-surface flex min-h-screen items-center justify-center p-4 sm:p-8">
+    <main className="taker-surface flex min-h-screen items-center justify-center p-4 sm:p-8" style={themeOverrides}>
       <div className="w-full max-w-xl">
         <div className="taker-chrome mb-6 flex items-center justify-between">
           <span className="text-[14px] font-semibold tracking-[-0.15px] text-[var(--ink)]">{brand.name}</span>

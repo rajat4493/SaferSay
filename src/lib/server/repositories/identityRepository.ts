@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from "crypto";
 import type { Queryable } from "@/lib/server/db/tenantPool";
 import { hashServerToken } from "@/lib/server/tokenHashing";
 import { decryptSecret, encryptSecret } from "@/lib/server/secretCrypto";
+import type { BrandTheme } from "@/lib/brand";
 import {
   AuditLogRecord,
   CycleAction,
@@ -547,6 +548,21 @@ export class IdentityRepository {
         config ? encryptSecret(config.password) : null,
         config?.fromEmail ?? null,
       ],
+    );
+  }
+
+  /** Returns null when the tenant has never saved a brand -- callers fall back to defaultBrand (see BrandProvider.tsx). */
+  async getBrand(tenantId: string): Promise<BrandTheme | null> {
+    const result = await this.db.query<{ brand: BrandTheme | null }>(`select brand from identity.tenant_settings where tenant_id = $1`, [tenantId]);
+    return result.rows[0]?.brand ?? null;
+  }
+
+  async setBrand(tenantId: string, brand: BrandTheme) {
+    await this.db.query(
+      `insert into identity.tenant_settings (tenant_id, brand)
+       values ($1, $2::jsonb)
+       on conflict (tenant_id) do update set brand = excluded.brand, updated_at = now()`,
+      [tenantId, JSON.stringify(brand)],
     );
   }
 
