@@ -1,13 +1,9 @@
 /**
- * Pure differencing-attack guard, shared by getDepartmentReleasability's
- * single-remainder rule and the manager-rollup sibling check
- * (managerRollupService.ts): among a set of same-level groups, if exactly
- * one would be the lone suppressed remainder against an otherwise-fully-
- * visible set of peers, bundle it into suppression too -- otherwise its
- * exact count is inferable by subtracting every visible peer from a
- * known total. No SQL, no schema knowledge -- just the math -- so it can
- * be reused across both callers without either repository reaching into
- * the other's schema.
+ * Pure differencing-attack guard for a set of peer groups: if exactly one
+ * group would be the lone suppressed remainder against otherwise-visible
+ * peers, suppress the smallest releasable peer too. Otherwise the first
+ * group's exact count is inferable by subtraction from a known total.
+ * No SQL or schema knowledge -- just the confidentiality math.
  */
 export function computeGroupReleasability<Id>(groups: Array<{ id: Id; n: number }>, minGroupSize: number): Map<Id, { n: number; releasable: boolean }> {
   const belowThreshold = groups.filter((row) => row.n < minGroupSize);

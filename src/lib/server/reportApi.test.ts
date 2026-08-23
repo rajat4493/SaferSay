@@ -21,8 +21,12 @@ describe("real protected report flow", () => {
 
   it("suppresses a department-scoped request rather than silently rolling it up", () => {
     const route = readFileSync("src/app/api/report/route.ts", "utf8");
+    const reportType = readFileSync("src/lib/server/repositories/types.ts", "utf8");
+    const panel = readFileSync("src/components/ProtectedReportPanel.tsx", "utf8");
     expect(route).toContain('{ type: "department", department }');
     expect(route).not.toContain("getManagerRollupReport");
+    expect(reportType).not.toContain("rolledUpTo");
+    expect(panel).not.toContain("rolledUpTo");
   });
 
   it("uses the shared real report panel in admin and viewer pages", () => {

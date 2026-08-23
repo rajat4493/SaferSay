@@ -1253,11 +1253,9 @@ export class IdentityRepository {
   /**
    * All team labels in a manager's reporting subtree (the manager's own
    * team plus every descendant's team, deduped), via WITH RECURSIVE over
-   * manager_id (0035_manager_hierarchy.sql). Pure identity-side org-chart
-   * metadata, consumed by managerRollupService.ts to know which
-   * the response-side segment_team labels belong together -- this
-   * repository never reads responses.* itself; see that service for how
-   * the two sides are composed.
+   * manager_id (0035_manager_hierarchy.sql). This stays on the identity
+   * side for administrative workflows and future action planning; it must
+   * not be used to widen or release a protected survey report.
    */
   async getSubtreeTeamLabels(tenantId: string, rootManagerId: string): Promise<string[]> {
     const result = await this.db.query<{ team: string | null }>(
@@ -1277,10 +1275,8 @@ export class IdentityRepository {
    * every employee carrying that team label reports to the same manager.
    * Returns null when there's no clean single owner (the label is split
    * across multiple managers, or every such employee has manager_id null
-   * -- a flat org, or the label predates any hierarchy data): both cases
-   * tell managerRollupService.ts to fall back to org-wide directly rather
-   * than guess an owner, since a wrong guess here would misattribute
-   * whose subtree a rollup covers.
+   * -- a flat org, or the label predates any hierarchy data). This is
+   * identity-side metadata only and must not influence report disclosure.
    */
   async getTeamOwner(tenantId: string, team: string): Promise<string | null> {
     const result = await this.db.query<{ manager_id: string | null }>(
