@@ -53,6 +53,10 @@ describeIfDb("Postgres live manager-hierarchy rollup", () => {
   async function submitAllAnswers(tenantId: string, cycleId: string) {
     const identity = new IdentityRepository(pool);
     const response = new ResponseRepository(pool);
+    // A cycle only accepts submissions once it's actually open (sent) --
+    // see openCycle's doc comment and confidentialSubmissionService.ts's
+    // status guard.
+    await response.openCycle(tenantId, cycleId);
     const session = await response.getRespondentSurveySession(cycleId);
     const questionId = session!.questions[0].id;
     const outbox = await identity.getInviteOutbox(tenantId, cycleId);

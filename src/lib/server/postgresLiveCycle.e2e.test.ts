@@ -64,6 +64,11 @@ describeIfDb("Postgres live survey cycle", () => {
     expect(queued).toBe(6);
 
     const response = new ResponseRepository(pool);
+    // "Send invites" is what actually opens a cycle for responses (see
+    // openCycle's doc comment) -- a still-draft cycle must reject
+    // submissions even against already-issued tokens, so this step is
+    // required here, not just realism.
+    expect(await response.openCycle(tenant.id, cycle.cycleId)).toBe(true);
     const session = await response.getRespondentSurveySession(cycle.cycleId);
     expect(session?.questions.length).toBeGreaterThan(0);
     const questionId = session!.questions[0].id;

@@ -68,6 +68,11 @@ describeIfDb("Postgres department-scoped protected report", () => {
     const session = await response.getRespondentSurveySession(cycle.cycleId);
     const questionId = session!.questions[0].id;
 
+    // A cycle only accepts submissions once it's actually been sent/opened
+    // -- see openCycle's doc comment and confidentialSubmissionService.ts's
+    // status guard.
+    expect(await response.openCycle(tenant.id, cycle.cycleId)).toBe(true);
+
     const outbox = await identity.getInviteOutbox(tenant.id, cycle.cycleId);
     const rawTokens = outbox.rows.map((row) => row.respondentPath!.replace("/s/", ""));
     for (const rawToken of rawTokens) {
