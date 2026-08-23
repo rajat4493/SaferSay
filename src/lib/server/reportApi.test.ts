@@ -19,9 +19,10 @@ describe("real protected report flow", () => {
     expect(repo).not.toContain("identity.survey_participants");
   });
 
-  it("routes a department-scoped request through the manager-hierarchy rollup, not the plain org report", () => {
+  it("suppresses a department-scoped request rather than silently rolling it up", () => {
     const route = readFileSync("src/app/api/report/route.ts", "utf8");
-    expect(route).toContain("getManagerRollupReport(db, tenantId, cycle.id, cycle.minGroupSize, department)");
+    expect(route).toContain('{ type: "department", department }');
+    expect(route).not.toContain("getManagerRollupReport");
   });
 
   it("uses the shared real report panel in admin and viewer pages", () => {

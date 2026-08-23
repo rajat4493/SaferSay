@@ -48,12 +48,13 @@ export async function POST(request: NextRequest) {
     const identity = new IdentityRepository(db);
     const commitment = await identity.publishCycleCommitment(auth.session.tenant.id, cycle.id, statement, body.targetDate!);
     const recipients = body.sendUpdate === false ? [] : await identity.listCycleCommitmentRecipients(auth.session.tenant.id, cycle.id);
-    return { commitment, recipients };
+    const smtpConfig = body.sendUpdate === false ? null : await identity.getSmtpConfig(auth.session.tenant.id);
+    return { commitment, recipients, smtpConfig };
   });
   if ("error" in committed) return NextResponse.json({ ok: false, error: committed.error }, { status: 400 });
 
   const delivery = committed.recipients.length
-    ? await sendPublicCommitmentUpdate({ tenant: auth.session.tenant, recipients: committed.recipients, statement, targetDate: body.targetDate! })
+    ? await sendPublicCommitmentUpdate({ tenant: auth.session.tenant, recipients: committed.recipients, statement, targetDate: body.targetDate!, smtpConfig: committed.smtpConfig })
     : { sent: 0, failed: 0, errors: [] };
   await logAuditEvent({ tenantId: auth.session.tenant.id, actorRole: auth.session.role, actorId: auth.session.email, action: "commitment_published", targetType: "survey", targetId: body.cycleId });
   // Keep individual delivery errors (which may contain an email address) on

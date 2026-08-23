@@ -39,11 +39,13 @@ export async function POST(request: NextRequest) {
       if (cycle?.status === "closed") return "closed" as const;
 
       const queued = await repo.markOutboxQueued(tenant.id, cycleId, deliveryType);
-      if (queued > 0 && deliveryType === "invite") {
+      if (deliveryType === "invite") {
         const opened = await repo.openCycleWithSurveyCredit(tenant.id, cycleId);
         if (!opened.opened && opened.reason === "no_credit") throw new Error("Buy a survey credit before sending this survey. Drafts stay free until the cycle opens.");
         if (!opened.opened && opened.reason === "employee_limit") throw new Error("This launch includes more than 100 active employees. This credit covers up to 100; contact SaferSay for the right plan.");
         if (opened.opened) await repo.syncSurveyCreditBalance(tenant.id);
+      }
+      if (queued > 0 && deliveryType === "invite") {
         await repo.emitOnboardingEvent(tenant.id, userId, "queue");
       }
 

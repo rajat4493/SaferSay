@@ -1,7 +1,7 @@
 import type { Pool } from "pg";
 import { createTenantSurveyCycle } from "@/lib/server/surveyCycleService";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
-import { ResponseRepository, nextRunAtFrom } from "@/lib/server/repositories/responseRepository";
+import { nextRunAtFrom } from "@/lib/server/repositories/responseRepository";
 import { sendQueuedInviteDeliveries } from "@/lib/server/resendDelivery";
 
 export type RecurrenceRunResult = {
@@ -45,7 +45,6 @@ async function runOneRecurrence(
   recurrence: { id: string; tenant_id: string; template_slug: string; interval: "weekly" | "monthly" | "quarterly"; auto_send: boolean },
 ): Promise<RecurrenceRunResult> {
   const identity = new IdentityRepository(pool);
-  const response = new ResponseRepository(pool);
 
   try {
     const tenant = await identity.findTenantById(recurrence.tenant_id);
@@ -60,6 +59,11 @@ async function runOneRecurrence(
 
     let invitesSent: number | undefined;
     if (recurrence.auto_send) {
+      const opened = await identity.openCycleWithSurveyCredit(recurrence.tenant_id, cycle.cycleId);
+      if (!opened.opened) {
+        throw new Error(opened.reason === "no_credit" ? "No survey credit is available." : "Recurrence could not open this cycle.");
+      }
+      await identity.syncSurveyCreditBalance(recurrence.tenant_id);
       const prepared = await identity.prepareInviteOutbox(recurrence.tenant_id, cycle.cycleId);
       await identity.markOutboxQueued(recurrence.tenant_id, cycle.cycleId, "invite");
       const deliveries = await identity.getQueuedOutboxDeliveries(recurrence.tenant_id, cycle.cycleId, "invite", prepared || cycle.invitesPrepared || 10000);
@@ -67,7 +71,6 @@ async function runOneRecurrence(
       const delivery = await sendQueuedInviteDeliveries({ tenant, deliveries, smtpConfig });
       for (const id of delivery.sentIds) await identity.markOutboxSent(id);
       for (const id of delivery.failedIds) await identity.markOutboxFailed(id);
-      if (delivery.sent > 0) await response.openCycle(recurrence.tenant_id, cycle.cycleId);
       invitesSent = delivery.sent;
     }
 

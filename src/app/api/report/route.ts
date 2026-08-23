@@ -3,8 +3,8 @@ import { getSessionContext, isPlatformOwnerImpersonating } from "@/lib/server/au
 import { getDatabasePool } from "@/lib/server/db/pool";
 import { getTenantPool, withTenantContext, type Queryable } from "@/lib/server/db/tenantPool";
 import { ResponseRepository } from "@/lib/server/repositories/responseRepository";
-import { getManagerRollupReport } from "@/lib/server/managerRollupService";
 import { getProtectedServerReport } from "@/lib/serverStore";
+import { canViewSurveyResults } from "@/lib/permissions";
 
 /**
  * Reads a specific cycle's report when ?cycleId= is given (the
@@ -29,13 +29,11 @@ async function loadReportForCycle(
         if (!cycle) return { cycle: null, report: { protected: true as const, n: 0, rows: [] } };
         return {
           cycle: { id: cycle.id, name: cycle.name, minGroupSize: cycle.minGroupSize },
-          // A requested department that's too small on its own rolls up
-          // through the manager hierarchy (or straight to company-wide
-          // for a flat org) rather than just showing "not enough data" --
-          // see managerRollupService.ts. Falls back to the plain org
-          // report when no department was requested at all.
+          // A small segment is suppressed, never silently widened through a
+          // manager/team roll-up. Showing a related group instead leaks a
+          // count-derived clue and breaks the promise the picker implies.
           report: department
-            ? await getManagerRollupReport(db, tenantId, cycle.id, cycle.minGroupSize, department)
+            ? await repo.getProtectedReportForTenant(tenantId, cycle.id, cycle.minGroupSize, { type: "department", department })
             : await repo.getProtectedReportForTenant(tenantId, cycle.id, cycle.minGroupSize),
         };
       })();
@@ -55,6 +53,7 @@ export async function GET(request: NextRequest) {
   if (!session) {
     return NextResponse.json({ ok: false, error: "Unauthorized report access." }, { status: 401 });
   }
+  if (!canViewSurveyResults(session.role)) return NextResponse.json({ ok: false, error: "You don't have permission to view reports." }, { status: 403 });
 
   if (isPlatformOwnerImpersonating(session)) {
     // Hard architectural rule: the platform operator never has a path to

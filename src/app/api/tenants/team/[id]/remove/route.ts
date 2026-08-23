@@ -3,6 +3,7 @@ import { getSessionContext } from "@/lib/server/authSession";
 import { withTenantScopedDb } from "@/lib/server/db/tenantPool";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import { canManageTeam } from "@/lib/permissions";
+import { logTeamMemberRemoved } from "@/lib/server/auditLog";
 
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await getSessionContext();
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     }
 
     await repo.removeTeamMember(session.tenant.id, id);
-    return { team: await repo.listTeam(session.tenant.id) };
+    return { team: await repo.listTeam(session.tenant.id), removedRole: target.role };
   });
 
   if (result.error === "not-found") {
@@ -41,5 +42,6 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   if (result.error === "last-admin") {
     return NextResponse.json({ ok: false, error: "A workspace needs at least one Workspace Owner — invite another Workspace Owner before removing this one." }, { status: 400 });
   }
+  await logTeamMemberRemoved(session.tenant.id, session.role, session.email, result.removedRole);
   return NextResponse.json({ ok: true, team: result.team });
 }

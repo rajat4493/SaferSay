@@ -7,7 +7,5 @@ export async function GET() {
   return NextResponse.json({
     mode: getRuntimeMode(),
     productionReady: missingProduction.length === 0,
-    checks,
-    missingProduction: missingProduction.map((check) => check.label),
   });
 }

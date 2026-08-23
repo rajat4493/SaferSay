@@ -1,8 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getDatabasePool } from "@/lib/server/db/pool";
+import { isDevAuthAllowed } from "@/lib/server/devAuth";
 import { IdentityRepository, toTenantSlug } from "@/lib/server/repositories/identityRepository";
 
 export async function POST(request: NextRequest) {
+  // OAuth provisions real tenants. This seed helper must never create
+  // workspaces anonymously on an internet-facing production deployment.
+  if (!isDevAuthAllowed()) return NextResponse.json({ ok: false, error: "Not found." }, { status: 404 });
   const db = getDatabasePool();
   if (!db) {
     return NextResponse.json({ ok: false, error: "DATABASE_URL is required for tenant bootstrap." }, { status: 503 });

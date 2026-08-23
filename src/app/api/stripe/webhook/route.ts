@@ -24,6 +24,12 @@ export async function POST(request: NextRequest) {
 
   try {
     if (event.type === "checkout.session.completed") {
+      const session = event.data.object as Stripe.Checkout.Session;
+      // Delayed methods can complete Checkout before funds settle. Their
+      // credits are granted only by async_payment_succeeded below.
+      if (session.payment_status === "paid") await handleCheckoutCompleted(session);
+    }
+    if (event.type === "checkout.session.async_payment_succeeded") {
       await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
     }
     if (event.type === "customer.subscription.deleted") {
@@ -51,6 +57,9 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     // current catalogue but retain the signed session's explicit count so a
     // historical paid checkout can never silently grant zero credits.
     const credits = getCreditPackCredits(packId as CreditPackId) || Number(session.metadata.credits ?? 0);
+    if (!Number.isSafeInteger(credits) || credits < 1) {
+      throw new Error("Paid checkout did not contain a valid survey-credit pack.");
+    }
     const granted = await repo.grantSurveyCredits(tenantId, credits, `stripe:${session.id}`);
     const available = await repo.listAvailableSurveyCredits(tenantId);
     await repo.updateTenantPlan(tenantId, settings.planTier, { ...settings.features, aiInsights: true }, {
