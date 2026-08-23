@@ -24,48 +24,68 @@ export async function POST(request: NextRequest) {
   const deliveryType = body.deliveryType ?? "invite";
   const { tenant, userId } = session;
 
-  const result = await withTenantScopedDb(tenant.id, async (db) => {
-    const repo = new IdentityRepository(db);
-    const cycleId = body.cycleId ?? (await repo.getLatestCycleIdForTenant(tenant.id));
-    if (!cycleId) return null;
+  let result;
+  try {
+    result = await withTenantScopedDb(tenant.id, async (db) => {
+      const repo = new IdentityRepository(db);
+      const response = new ResponseRepository(db);
+      const cycleId = body.cycleId ?? (await repo.getLatestCycleIdForTenant(tenant.id));
+      if (!cycleId) return null;
 
-    // A closed cycle should never queue or send further invites/reminders --
-    // it's no longer collecting responses. Same guard applied on the
-    // outbox-prepare route; this is the point actual sending happens.
-    const cycle = await new ResponseRepository(db).getCycleForTenant(tenant.id, cycleId);
-    if (cycle?.status === "closed") return "closed" as const;
+      // A closed cycle should never queue or send further invites/reminders --
+      // it's no longer collecting responses. Same guard applied on the
+      // outbox-prepare route; this is the point actual sending happens.
+      const cycle = await response.getCycleForTenant(tenant.id, cycleId);
+      if (cycle?.status === "closed") return "closed" as const;
 
-    const queued = await repo.markOutboxQueued(tenant.id, cycleId, deliveryType);
-    if (queued > 0 && deliveryType === "invite") {
-      await repo.emitOnboardingEvent(tenant.id, userId, "queue");
-    }
+      const queued = await repo.markOutboxQueued(tenant.id, cycleId, deliveryType);
+      if (queued > 0 && deliveryType === "invite") {
+        await repo.emitOnboardingEvent(tenant.id, userId, "queue");
+      }
 
-    if (!body.sendNow) {
-      return { ok: true, cycleId, deliveryType, queued, ...(await repo.getInviteOutbox(tenant.id, cycleId)) };
-    }
+      if (!body.sendNow) {
+        // Queuing (this developer/test-mode path) is itself a genuine send
+        // action -- same as /api/invites/send, this is what makes the
+        // cycle's invite links usable, independent of whether a later
+        // dispatch step's emails actually succeed. Without this, the
+        // dev-mode Queue+Dispatch panel (the only working path in
+        // environments where real email delivery is restricted, e.g. an
+        // unverified Resend sandbox domain) could queue and even dispatch
+        // every invite and still leave the survey stuck in Draft forever.
+        if (queued > 0 && deliveryType === "invite") await response.openCycle(tenant.id, cycleId);
+        return { ok: true, cycleId, deliveryType, queued, ...(await repo.getInviteOutbox(tenant.id, cycleId)) };
+      }
 
-    const deliveries = await repo.getQueuedOutboxDeliveries(tenant.id, cycleId, deliveryType);
-    const smtpConfig = await repo.getSmtpConfig(tenant.id);
-    const delivery = await sendQueuedInviteDeliveries({ tenant, deliveries, smtpConfig });
-    // Sequential, not Promise.all: db is a single shared client under
-    // withTenantScopedDb (tenant-scoped connection), and pg clients can't
-    // run concurrent queries on one connection.
-    for (const id of delivery.sentIds) await repo.markOutboxSent(id);
-    for (const id of delivery.failedIds) await repo.markOutboxFailed(id);
+      const deliveries = await repo.getQueuedOutboxDeliveries(tenant.id, cycleId, deliveryType);
+      const smtpConfig = await repo.getSmtpConfig(tenant.id);
+      const delivery = await sendQueuedInviteDeliveries({ tenant, deliveries, smtpConfig });
+      // Sequential, not Promise.all: db is a single shared client under
+      // withTenantScopedDb (tenant-scoped connection), and pg clients can't
+      // run concurrent queries on one connection.
+      for (const id of delivery.sentIds) await repo.markOutboxSent(id);
+      for (const id of delivery.failedIds) await repo.markOutboxFailed(id);
 
-    if (deliveryType === "invite" && delivery.sent > 0) {
-      await repo.markFirstRunCompleted(tenant.id);
-    }
+      if (deliveryType === "invite" && queued > 0) {
+        await repo.markFirstRunCompleted(tenant.id);
+        await response.openCycle(tenant.id, cycleId);
+      }
 
-    return {
-      ok: delivery.failed === 0,
-      cycleId,
-      deliveryType,
-      queued,
-      delivery: { sent: delivery.sent, failed: delivery.failed, errors: delivery.errors.slice(0, 5) },
-      ...(await repo.getInviteOutbox(tenant.id, cycleId)),
-    };
-  });
+      return {
+        ok: delivery.failed === 0,
+        cycleId,
+        deliveryType,
+        queued,
+        delivery: { sent: delivery.sent, failed: delivery.failed, errors: delivery.errors.slice(0, 5) },
+        ...(await repo.getInviteOutbox(tenant.id, cycleId)),
+      };
+    });
+  } catch (error) {
+    console.error("invites/queue failed:", error);
+    return NextResponse.json(
+      { ok: false, error: error instanceof Error ? error.message : "Queuing invites failed unexpectedly." },
+      { status: 500 },
+    );
+  }
 
   if (!result) return NextResponse.json({ ok: false, error: "No survey cycle was found." }, { status: 400 });
   if (result === "closed") {

@@ -45,22 +45,37 @@ export default function SurveyResultsPage() {
     setSelectedDepartment("");
   }
 
+  // Client-side navigation between two surveys' results pages (e.g. the
+  // survey picker in the header) reuses this component without a full
+  // reload -- so a still-in-flight fetch for the PREVIOUS surveyId can
+  // resolve after the new one and overwrite state with the wrong survey's
+  // data if nothing checks "is this response still for the current
+  // survey" first. Real bug found in live testing: a fresh survey's
+  // results page briefly showed a different, older survey's report.
   useEffect(() => {
+    let cancelled = false;
     fetch(`/api/cycles/${surveyId}`)
       .then((response) => response.json())
       .then((data: { ok?: boolean; cycle?: { status: string } }) => {
-        if (data.ok && data.cycle) setStatus(data.cycle.status);
+        if (!cancelled && data.ok && data.cycle) setStatus(data.cycle.status);
       })
       .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
   }, [surveyId]);
 
   useEffect(() => {
+    let cancelled = false;
     fetch(`/api/report?cycleId=${encodeURIComponent(surveyId)}`)
       .then((response) => response.json())
       .then((data: { ok?: boolean; report?: { protected: boolean } }) => {
-        if (data.ok && data.report) setProtectedReport(data.report.protected);
+        if (!cancelled && data.ok && data.report) setProtectedReport(data.report.protected);
       })
       .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
   }, [surveyId]);
 
   const resultsState: ResultsState | null =
@@ -85,12 +100,16 @@ export default function SurveyResultsPage() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     fetch(`/api/report/departments?cycleId=${encodeURIComponent(surveyId)}`)
       .then((response) => response.json())
       .then((data: { ok?: boolean; departments?: string[] }) => {
-        if (data.ok) setDepartments(data.departments ?? []);
+        if (!cancelled && data.ok) setDepartments(data.departments ?? []);
       })
       .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
   }, [surveyId]);
 
   async function sendReminders() {

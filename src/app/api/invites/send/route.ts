@@ -30,58 +30,73 @@ export async function POST(request: NextRequest) {
   const deliveryType = body.deliveryType ?? "invite";
   const { tenant, userId } = session;
 
-  const result = await withTenantScopedDb(tenant.id, async (db) => {
-    const repo = new IdentityRepository(db);
-    const cycleId = body.cycleId ?? (await repo.getLatestCycleIdForTenant(tenant.id));
-    if (!cycleId) return null;
+  // A thrown exception anywhere in here used to produce a non-JSON 500 --
+  // the client could only report a generic "Request failed.", with no way
+  // to tell what actually went wrong. Most likely real-world source: the
+  // Resend SDK can throw (not just return { error }) for a rejected
+  // recipient, which is now also caught in sendQueuedInviteDeliveries
+  // itself, but this is a second line of defense for anything else.
+  let result;
+  try {
+    result = await withTenantScopedDb(tenant.id, async (db) => {
+      const repo = new IdentityRepository(db);
+      const cycleId = body.cycleId ?? (await repo.getLatestCycleIdForTenant(tenant.id));
+      if (!cycleId) return null;
 
-    const prepared =
-      deliveryType === "invite" ? await repo.prepareInviteOutbox(tenant.id, cycleId) : await repo.prepareReminderOutbox(tenant.id, cycleId);
-    const queued = await repo.markOutboxQueued(tenant.id, cycleId, deliveryType);
-    if (queued > 0 && deliveryType === "invite") {
-      await repo.emitOnboardingEvent(tenant.id, userId, "queue");
-    }
-    if (prepared > 0 && deliveryType === "invite") {
-      await repo.emitOnboardingEvent(tenant.id, userId, "outbox");
-    }
+      const prepared =
+        deliveryType === "invite" ? await repo.prepareInviteOutbox(tenant.id, cycleId) : await repo.prepareReminderOutbox(tenant.id, cycleId);
+      const queued = await repo.markOutboxQueued(tenant.id, cycleId, deliveryType);
+      if (queued > 0 && deliveryType === "invite") {
+        await repo.emitOnboardingEvent(tenant.id, userId, "queue");
+      }
+      if (prepared > 0 && deliveryType === "invite") {
+        await repo.emitOnboardingEvent(tenant.id, userId, "outbox");
+      }
 
-    const deliveries = await repo.getQueuedOutboxDeliveries(tenant.id, cycleId, deliveryType);
-    const smtpConfig = await repo.getSmtpConfig(tenant.id);
-    const delivery = await sendQueuedInviteDeliveries({ tenant, deliveries, smtpConfig });
-    // Sequential, not Promise.all: db is a single shared client under
-    // withTenantScopedDb (tenant-scoped connection), and pg clients can't
-    // run concurrent queries on one connection.
-    for (const id of delivery.sentIds) await repo.markOutboxSent(id);
-    for (const id of delivery.failedIds) await repo.markOutboxFailed(id);
+      const deliveries = await repo.getQueuedOutboxDeliveries(tenant.id, cycleId, deliveryType);
+      const smtpConfig = await repo.getSmtpConfig(tenant.id);
+      const delivery = await sendQueuedInviteDeliveries({ tenant, deliveries, smtpConfig });
+      // Sequential, not Promise.all: db is a single shared client under
+      // withTenantScopedDb (tenant-scoped connection), and pg clients can't
+      // run concurrent queries on one connection.
+      for (const id of delivery.sentIds) await repo.markOutboxSent(id);
+      for (const id of delivery.failedIds) await repo.markOutboxFailed(id);
 
-    if (deliveryType === "invite" && queued > 0) {
-      await repo.markFirstRunCompleted(tenant.id);
-      // Real founder-facing "the survey is live" transition -- see
-      // ResponseRepository.openCycle. A reminder implies the cycle is
-      // already open, so this only fires for the initial invite send.
-      //
-      // Gated on invites actually being queued (the admin genuinely sent),
-      // not on email delivery succeeding (delivery.sent > 0) -- a
-      // respondent's link works independently of whether the notification
-      // email reached them (an admin can always share it another way).
-      // Coupling "live" to email success meant a single flaky/misconfigured
-      // mail provider -- or, as found in live testing, an email provider's
-      // sandbox mode rejecting every recipient -- could permanently strand
-      // an entire survey in draft with valid, working invite links that
-      // nobody could use, because nothing ever flips the cycle open.
-      await new ResponseRepository(db).openCycle(tenant.id, cycleId);
-    }
+      if (deliveryType === "invite" && queued > 0) {
+        await repo.markFirstRunCompleted(tenant.id);
+        // Real founder-facing "the survey is live" transition -- see
+        // ResponseRepository.openCycle. A reminder implies the cycle is
+        // already open, so this only fires for the initial invite send.
+        //
+        // Gated on invites actually being queued (the admin genuinely sent),
+        // not on email delivery succeeding (delivery.sent > 0) -- a
+        // respondent's link works independently of whether the notification
+        // email reached them (an admin can always share it another way).
+        // Coupling "live" to email success meant a single flaky/misconfigured
+        // mail provider -- or, as found in live testing, an email provider's
+        // sandbox mode rejecting every recipient -- could permanently strand
+        // an entire survey in draft with valid, working invite links that
+        // nobody could use, because nothing ever flips the cycle open.
+        await new ResponseRepository(db).openCycle(tenant.id, cycleId);
+      }
 
-    return {
-      cycleId,
-      deliveryType,
-      prepared,
-      queued,
-      delivery: { sent: delivery.sent, failed: delivery.failed, errors: delivery.errors.slice(0, 5) },
-      ...(await repo.getInviteOutbox(tenant.id, cycleId)),
-      participation: await repo.getParticipationSummary(tenant.id, cycleId),
-    };
-  });
+      return {
+        cycleId,
+        deliveryType,
+        prepared,
+        queued,
+        delivery: { sent: delivery.sent, failed: delivery.failed, errors: delivery.errors.slice(0, 5) },
+        ...(await repo.getInviteOutbox(tenant.id, cycleId)),
+        participation: await repo.getParticipationSummary(tenant.id, cycleId),
+      };
+    });
+  } catch (error) {
+    console.error("invites/send failed:", error);
+    return NextResponse.json(
+      { ok: false, error: error instanceof Error ? error.message : "Sending invites failed unexpectedly." },
+      { status: 500 },
+    );
+  }
 
   if (!result) {
     return NextResponse.json({ ok: false, error: "Create a survey cycle before sending invites." }, { status: 400 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Download, EyeOff, FileText, RefreshCw, Share2 } from "lucide-react";
 import { Card } from "@/components/AppShell";
 import { AiSynthesisCard } from "@/components/AiSynthesisCard";
@@ -62,7 +62,18 @@ export function ProtectedReportPanel({
   const toast = useToast();
   const ShellCard = mode === "viewer" ? ViewerCard : Card;
 
+  // Guards against a stale response overwriting the current view -- e.g.
+  // navigating from one survey's results page to another's via client-side
+  // routing (no full reload) leaves the previous survey's /api/report
+  // fetch in flight, and without this check whichever response arrives
+  // last wins regardless of which cycle it was actually requested for.
+  // Real bug found in live testing: a fresh survey's results page briefly
+  // rendered a completely different, older survey's report.
+  const requestKeyRef = useRef<string>("");
+
   async function loadReport() {
+    const requestKey = `${cycleId ?? ""}|${department ?? ""}`;
+    requestKeyRef.current = requestKey;
     setLoading(true);
     const params = new URLSearchParams();
     if (cycleId) params.set("cycleId", cycleId);
@@ -71,13 +82,14 @@ export function ProtectedReportPanel({
     const reportUrl = query ? `/api/report?${query}` : "/api/report";
     const response = await fetch(reportUrl);
     const data = (await response.json().catch(() => ({ ok: false, error: "Report could not be loaded." }))) as ReportResponse;
+    if (requestKeyRef.current !== requestKey) return; // a newer request has since superseded this one
     setResult(data);
     setLoading(false);
     if (data.error) toast.show({ variant: "error", message: data.error });
     if (data.cycle?.id) {
       const actionsResponse = await fetch(`/api/report/action?cycleId=${data.cycle.id}`);
       const actionsData = (await actionsResponse.json().catch(() => ({}))) as { ok?: boolean; actions?: CycleAction[] };
-      if (actionsData.ok) setActions(actionsData.actions ?? []);
+      if (requestKeyRef.current === requestKey && actionsData.ok) setActions(actionsData.actions ?? []);
     }
   }
 

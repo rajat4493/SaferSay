@@ -63,21 +63,31 @@ export async function sendQueuedInviteDeliveries({
 
   for (const delivery of deliveries) {
     const message = buildInviteMessage({ tenant, delivery, appUrl: config.appUrl });
-    const result = await resend.emails.send({
-      from: config.fromEmail,
-      to: delivery.email,
-      subject: message.subject,
-      html: message.html,
-      text: message.text,
-    });
+    try {
+      const result = await resend.emails.send({
+        from: config.fromEmail,
+        to: delivery.email,
+        subject: message.subject,
+        html: message.html,
+        text: message.text,
+      });
 
-    if (result.error) {
+      if (result.error) {
+        failedIds.push(delivery.outboxId);
+        errors.push(`${delivery.email}: ${result.error.message}`);
+        continue;
+      }
+
+      sentIds.push(delivery.outboxId);
+    } catch (error) {
+      // The Resend SDK can throw (not just return { error }) -- e.g. its
+      // sandbox-mode rejection for an unverified recipient. Uncaught, this
+      // took down the whole request with a non-JSON 500, which the client
+      // could only report as a generic "Request failed." One bad
+      // recipient in a batch should fail that recipient, not the request.
       failedIds.push(delivery.outboxId);
-      errors.push(`${delivery.email}: ${result.error.message}`);
-      continue;
+      errors.push(`${delivery.email}: ${error instanceof Error ? error.message : "Email send failed."}`);
     }
-
-    sentIds.push(delivery.outboxId);
   }
 
   return { sent: sentIds.length, failed: failedIds.length, errors, sentIds, failedIds };
