@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 /**
  * Only ever renders when /api/dev/login confirms the bypass is enabled
@@ -9,7 +9,6 @@ import { useRouter, useSearchParams } from "next/navigation";
  * On the real deployment that check 404s, this panel simply never appears.
  */
 export function DevLoginPanel() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [available, setAvailable] = useState(false);
   const [email, setEmail] = useState("");
@@ -37,8 +36,15 @@ export function DevLoginPanel() {
         setError(data.error ?? "That email couldn't be used to sign in. Check it and try again.");
         return;
       }
-      router.push(searchParams.get("next") ?? "/app");
-      router.refresh();
+      // A hard navigation, not router.push()+refresh() -- the client
+      // Router Cache can hold a pre-login (unauthenticated) RSC payload
+      // for a route visited before signing in, and push() can render
+      // against that stale cache before refresh()'s invalidation lands,
+      // making a fresh super-admin session look unrecognized until a
+      // manual re-navigation. Dev-login is rare and never present on
+      // real production, so a full page load here is a fine trade for
+      // guaranteed-fresh state.
+      window.location.href = searchParams.get("next") ?? "/app";
     } finally {
       setSubmitting(false);
     }

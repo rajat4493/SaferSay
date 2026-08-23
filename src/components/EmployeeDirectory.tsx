@@ -25,6 +25,18 @@ export function EmployeeDirectory({ refreshKey = 0, justImportedCount = 0 }: { r
   const [newEmail, setNewEmail] = useState("");
   const [newName, setNewName] = useState("");
   const [addStatus, setAddStatus] = useState("");
+  // Reset loading to true the moment search or refreshKey changes, during
+  // render rather than in an effect (same pattern results/page.tsx uses
+  // for its department-picker reset) -- otherwise there's a stale-render
+  // window (up to 250ms, the debounce below) where loading is still false
+  // and total is still the pre-refresh value, which made the "just
+  // imported but not showing" warning fire falsely off stale state before
+  // the real refetch had even started.
+  const [loadKey, setLoadKey] = useState({ search, refreshKey });
+  if (loadKey.search !== search || loadKey.refreshKey !== refreshKey) {
+    setLoadKey({ search, refreshKey });
+    setLoading(true);
+  }
 
   const load = useCallback(async (searchValue: string) => {
     setLoading(true);

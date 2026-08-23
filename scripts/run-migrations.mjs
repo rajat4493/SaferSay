@@ -10,12 +10,23 @@
 //
 // Legacy databases (prod/preview) already had 0001-0029 applied by
 // hand before this tracking table existed. To backfill them without a
-// manual bootstrap step, a migration that fails with a Postgres
-// "already exists" class error (duplicate_table/duplicate_column/
-// duplicate_object) is treated as already applied -- it's recorded and
-// skipped rather than aborting the run. Any other failure still halts
-// the run immediately, so a genuinely broken migration is never
-// silently skipped.
+// manual bootstrap step, each file is split into its individual
+// top-level statements (see splitStatements below) and applied one at
+// a time, in its own transaction -- a statement that fails with a
+// Postgres "already exists" class error (duplicate_table/
+// duplicate_column/duplicate_object) is treated as already applied by
+// hand and skipped, while the rest of the file's statements still run.
+// This is deliberately per-statement, not per-file: a file can contain
+// a mix of already-applied and genuinely-new statements (this bit a
+// real deploy once -- 0029_data_retention.sql has three `alter table`
+// statements in one file, and an earlier per-file version of this
+// script silently dropped a new column when a different statement in
+// the same file turned out to already exist). Any other error still
+// halts the run immediately, so a genuinely broken migration is never
+// silently skipped. If a file fails partway through, it's simply not
+// recorded as applied -- the next run retries it, and the statements
+// that already succeeded are themselves now "already exists" and get
+// tolerated, so this is self-healing across retries.
 import pg from "pg";
 import { readdirSync, readFileSync } from "fs";
 import { fileURLToPath } from "url";
@@ -53,6 +64,80 @@ const pool = new Pool({
 // existed, not a real failure.
 const ALREADY_EXISTS_CODES = new Set(["42P07", "42701", "42710"]);
 
+// Splits a migration file into individual top-level SQL statements, on
+// semicolons -- but not semicolons inside a single-quoted string or a
+// dollar-quoted function body ($$...$$ / $tag$...$tag$, used by this
+// repo's SECURITY DEFINER functions), and skipping over `--` line
+// comments so a semicolon in a comment doesn't split anything either.
+function splitStatements(sql) {
+  const statements = [];
+  let current = "";
+  let dollarTag = null;
+  let i = 0;
+  while (i < sql.length) {
+    if (dollarTag) {
+      const closeIndex = sql.indexOf(dollarTag, i);
+      if (closeIndex === -1) {
+        current += sql.slice(i);
+        i = sql.length;
+      } else {
+        current += sql.slice(i, closeIndex + dollarTag.length);
+        i = closeIndex + dollarTag.length;
+        dollarTag = null;
+      }
+      continue;
+    }
+    const char = sql[i];
+    if (char === "$") {
+      const match = /^\$[a-zA-Z_]*\$/.exec(sql.slice(i));
+      if (match) {
+        dollarTag = match[0];
+        current += dollarTag;
+        i += dollarTag.length;
+        continue;
+      }
+    }
+    if (char === "'") {
+      current += char;
+      i += 1;
+      while (i < sql.length) {
+        current += sql[i];
+        if (sql[i] === "'") {
+          if (sql[i + 1] === "'") {
+            current += sql[i + 1];
+            i += 2;
+            continue;
+          }
+          i += 1;
+          break;
+        }
+        i += 1;
+      }
+      continue;
+    }
+    if (char === "-" && sql[i + 1] === "-") {
+      const endOfLine = sql.indexOf("\n", i);
+      const end = endOfLine === -1 ? sql.length : endOfLine + 1;
+      current += sql.slice(i, end);
+      i = end;
+      continue;
+    }
+    if (char === ";") {
+      current += char;
+      const trimmed = current.trim();
+      if (trimmed) statements.push(trimmed);
+      current = "";
+      i += 1;
+      continue;
+    }
+    current += char;
+    i += 1;
+  }
+  const trimmed = current.trim();
+  if (trimmed) statements.push(trimmed);
+  return statements;
+}
+
 await pool.query(
   "create table if not exists schema_migrations (filename text primary key, applied_at timestamptz not null default now())",
 );
@@ -64,27 +149,28 @@ for (const file of files) {
   if (applied.has(file)) {
     continue;
   }
-  const sql = readFileSync(path.join(migrationsDir, file), "utf8");
-  const client = await pool.connect();
-  let alreadyExists = false;
-  await client.query("begin");
-  try {
-    await client.query(sql);
-  } catch (error) {
-    if (!ALREADY_EXISTS_CODES.has(error.code)) {
-      console.error(`${file}: FAILED -- ${error.message}`);
-      process.exit(1);
+  const statements = splitStatements(readFileSync(path.join(migrationsDir, file), "utf8"));
+  let anyAlreadyExisted = false;
+  for (const statement of statements) {
+    const client = await pool.connect();
+    try {
+      await client.query("begin");
+      await client.query(statement);
+      await client.query("commit");
+    } catch (error) {
+      if (!ALREADY_EXISTS_CODES.has(error.code)) {
+        console.error(`${file}: FAILED -- ${error.message}`);
+        process.exit(1);
+      }
+      await client.query("rollback").catch(() => {});
+      anyAlreadyExisted = true;
+    } finally {
+      client.release();
     }
-    await client.query("rollback").catch(() => {});
-    alreadyExists = true;
-    console.log(`${file}: already applied (legacy) -- backfilling schema_migrations`);
-    await client.query("begin");
   }
-  await client.query("insert into schema_migrations (filename) values ($1)", [file]);
-  await client.query("commit");
-  if (!alreadyExists) console.log(`${file}: applied`);
+  await pool.query("insert into schema_migrations (filename) values ($1)", [file]);
+  console.log(anyAlreadyExisted ? `${file}: applied (some statements already existed)` : `${file}: applied`);
   appliedCount += 1;
-  client.release();
 }
 
 console.log(`Applied ${appliedCount} new migration(s); ${files.length - appliedCount} already up to date.`);

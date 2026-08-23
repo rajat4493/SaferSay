@@ -33,4 +33,20 @@ describe("run-migrations.mjs", () => {
   it("skips quietly instead of failing the build when run with --if-configured and no DATABASE_URL", () => {
     expect(source).toContain("--if-configured");
   });
+
+  it("tolerates already-exists errors per statement, not per file", () => {
+    // Regression test: 0029_data_retention.sql has three `alter table`
+    // statements in one file. An earlier per-file version of this
+    // tolerance logic rolled back and silently dropped a genuinely-new
+    // column when a different statement in the same file already
+    // existed -- see db/migrations/0037_fix_missing_retention_columns.sql.
+    // Applying/tolerating per statement (not per file) is what fixes
+    // that class of bug.
+    expect(source).toContain("function splitStatements(sql)");
+    expect(source).toContain("for (const statement of statements)");
+  });
+
+  it("respects dollar-quoted function bodies when splitting statements, so a ; inside a function isn't treated as a statement boundary", () => {
+    expect(source).toContain("dollarTag");
+  });
 });
