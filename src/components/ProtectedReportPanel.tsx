@@ -20,6 +20,11 @@ type ReportResponse = {
     protected: boolean;
     n: number;
     rows: Array<{ questionId: string; label?: string; n: number; average: number | null }>;
+    // Only set when a requested department was itself below the
+    // confidentiality threshold and this report widened to a manager's
+    // reporting subtree (or the whole company) to clear it -- see
+    // managerRollupService.ts. Absent/null means no widening happened.
+    rolledUpTo?: { label: string; teamsIncluded: string[] } | null;
   };
   textAnswers?: {
     protected: boolean;
@@ -247,6 +252,15 @@ export function ProtectedReportPanel({
           </div>
         ) : (
           <div className="space-y-4">
+            {report.rolledUpTo ? (
+              <div className="flex items-start gap-2 rounded-[var(--radius-input)] border border-[var(--border)] bg-[var(--bg)] p-3 text-[13px] text-[var(--ink-mid)]">
+                <EyeOff size={15} strokeWidth={1.8} className="mt-0.5 shrink-0 text-[var(--ink-faint)]" />
+                <span>
+                  {department} alone didn&apos;t have enough responses to show on its own. This view widens to{" "}
+                  <strong className="text-[var(--ink)]">{report.rolledUpTo.label}</strong> to protect everyone&apos;s confidentiality.
+                </span>
+              </div>
+            ) : null}
             {report.rows.map((row) => {
               const value = row.average ?? 0;
               const width = `${Math.min(100, Math.max(0, (value / 5) * 100))}%`;
