@@ -22,6 +22,12 @@ export default function SurveySendPage() {
       .catch(() => undefined);
   }, [surveyId]);
 
+  // A closed cycle has no sending action left. Handle bookmarked/direct
+  // Send URLs too, so the lifecycle always ends at the final report.
+  useEffect(() => {
+    if (status === "closed") router.replace(`/app/${surveyId}/results`);
+  }, [router, status, surveyId]);
+
   return (
     <AppShell title="Send" subtitle="Prepare, queue, and send confidential invite links to your employees.">
       <div className="space-y-[9px]">

@@ -53,4 +53,11 @@ describe("real protected report flow", () => {
     expect(identityRepo).toContain("openCycleWithSurveyCredit");
     expect(inviteRoute).toContain("openCycleWithSurveyCredit");
   });
+
+  it("routes a closed survey to its final results instead of its send step", () => {
+    const buildPage = readFileSync("src/app/app/[surveyId]/page.tsx", "utf8");
+    const sendPage = readFileSync("src/app/app/[surveyId]/send/page.tsx", "utf8");
+    expect(buildPage).toContain('detail.cycle.status === "closed" ? "results" : "send"');
+    expect(sendPage).toContain('if (status === "closed") router.replace(`/app/${surveyId}/results`)');
+  });
 });

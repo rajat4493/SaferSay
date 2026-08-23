@@ -371,8 +371,8 @@ function SurveyBuildContent({ surveyId }: { surveyId: string }) {
                 <ArrowLeft size={14} strokeWidth={1.8} />
                 Back to surveys
               </button>
-              <button onClick={() => router.push(`/app/${surveyId}/send`)} className="btn-primary">
-                Next: Send survey
+              <button onClick={() => router.push(`/app/${surveyId}/${detail.cycle.status === "closed" ? "results" : "send"}`)} className="btn-primary">
+                {detail.cycle.status === "closed" ? "View results" : "Next: Send survey"}
                 <ArrowRight size={14} strokeWidth={1.8} />
               </button>
             </div>
