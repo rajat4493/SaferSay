@@ -30,6 +30,7 @@ import type { UserRole } from "@/lib/server/repositories/types";
 
 export type AuditLogAction =
   | "survey_created"
+  | "survey_questions_updated"
   | "survey_closed"
   | "survey_deleted"
   | "invites_sent"
@@ -42,6 +43,7 @@ export type AuditLogAction =
   | "settings_updated"
   | "team_invite_sent"
   | "team_member_removed"
+  | "data_retention_purged"
   | "deletion_requested";
 
 export type AuditLogTargetType = "survey" | "workspace" | "people_list" | null;
@@ -186,6 +188,73 @@ export async function logSurveyCreated(
     targetType: "survey",
     targetId: surveyId,
     details: templateName ? `from ${templateName} template` : undefined,
+  });
+}
+
+/**
+ * Helper: Log a draft survey's questions being edited/reordered.
+ */
+export async function logSurveyQuestionsUpdated(
+  tenantId: string,
+  actorRole: UserRole,
+  actorId: string,
+  surveyId: string,
+  questionCount: number
+): Promise<void> {
+  await logAuditEvent({
+    tenantId,
+    actorRole,
+    actorId,
+    action: "survey_questions_updated",
+    targetType: "survey",
+    targetId: surveyId,
+    safeCounts: { question_count: questionCount },
+  });
+}
+
+/**
+ * Helper: Log a report export (CSV/JSON/PDF pull of aggregate results).
+ * surveyId is null for a tenant-wide "latest cycle" export with no
+ * specific cycleId query param.
+ */
+export async function logReportExported(
+  tenantId: string,
+  actorRole: UserRole,
+  actorId: string,
+  surveyId: string | null,
+  format: "csv" | "json" | "pdf"
+): Promise<void> {
+  await logAuditEvent({
+    tenantId,
+    actorRole,
+    actorId,
+    action: "report_exported",
+    targetType: "survey",
+    targetId: surveyId ?? undefined,
+    details: `format: ${format}`,
+  });
+}
+
+/**
+ * Helper: Log an automatic data-retention purge run for a tenant (aggregate
+ * counts only -- which cycles/submissions were deleted, never which
+ * respondent's data specifically, matching the audit guard's rules for
+ * every other aggregate-only action).
+ */
+export async function logDataRetentionPurged(
+  tenantId: string,
+  retentionMonths: number,
+  cyclesPurged: number,
+  submissionsDeleted: number
+): Promise<void> {
+  await logAuditEvent({
+    tenantId,
+    actorRole: "customer_admin",
+    actorId: "system-retention-job",
+    action: "data_retention_purged",
+    targetType: "workspace",
+    safeCounts: { cycles_purged: cyclesPurged, submissions_deleted: submissionsDeleted },
+    details: `retention window: ${retentionMonths} months`,
   });
 }
 

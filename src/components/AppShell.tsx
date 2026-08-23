@@ -6,6 +6,7 @@ import {
   ClipboardList,
   CreditCard,
   Home,
+  Library,
   Lock,
   LockKeyhole,
   Menu,
@@ -17,15 +18,18 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Avatar } from "@/components/Avatar";
 import { BrandMark } from "@/components/BrandMark";
 import { useBrand } from "@/components/BrandProvider";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import { RoleTag } from "@/components/RoleTag";
 import { SignOutButton } from "@/components/SignOutButton";
 import { useTenantSession } from "@/lib/useTenantSession";
-import { canAccessAuditLog, canAccessPeople, canAccessSecurityProof, canAccessWorkspace, canViewSurveyResults } from "@/lib/permissions";
+import { canAccessAuditLog, canAccessPeople, canAccessSecurityProof, canAccessWorkspace, canCreateSurvey, canViewSurveyResults } from "@/lib/permissions";
 import type { UserRole } from "@/lib/server/repositories/types";
+import { brandFontOptions } from "@/lib/brand";
+import { deriveAccentPalette } from "@/lib/brandTheme";
 
 type NavItemConfig = {
   href: string;
@@ -46,6 +50,7 @@ const primaryNavItems: NavItemConfig[] = [
 ];
 
 const foldedMenuItems: NavItemConfig[] = [
+  { href: "/app/questions", label: "Question bank", icon: Library, hideForPureOwner: true, visible: canCreateSurvey },
   { href: "/app/workspace/settings", label: "Settings", icon: Settings, hideForPureOwner: true, visible: canAccessWorkspace },
   { href: "/app/workspace/billing", label: "Billing", icon: CreditCard, hideForPureOwner: true, visible: canAccessWorkspace },
   { href: "/app/workspace/team", label: "Team", icon: UserPlus, hideForPureOwner: true, visible: canAccessWorkspace },
@@ -70,6 +75,17 @@ export function AppShell({
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
 
+  // Escape closes the mobile drawer from anywhere, matching native dialog
+  // behavior -- required since the drawer is role="dialog" aria-modal.
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setMobileNavOpen(false);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [mobileNavOpen]);
+
   // Pure Owner mode: signed in as the platform's super admin, not currently
   // acting inside any customer's workspace. No survey-running nav belongs
   // here -- that only appears once the Owner has explicitly entered a tenant.
@@ -85,6 +101,14 @@ export function AppShell({
   const visiblePrimaryItems = filterItems(primaryNavItems);
   const visibleFoldedItems = filterItems(foldedMenuItems);
 
+  // Console/super-admin pages don't render AppShell at all (separate
+  // shell), so this override never reaches that surface -- deliberately,
+  // per the white-label scoping decision.
+  const themeOverrides: React.CSSProperties = {
+    ...(brand.accentColor ? (deriveAccentPalette(brand.accentColor) as React.CSSProperties) : {}),
+    ...(brand.fontFamily ? ({ "--font-body": brandFontOptions.find((option) => option.value === brand.fontFamily)?.stack } as React.CSSProperties) : {}),
+  };
+
   const sidebarContent = (
     <>
       <div className="flex items-center justify-between px-4 pt-4 pb-3">
@@ -97,7 +121,7 @@ export function AppShell({
         </button>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-2.5 py-2">
+      <nav aria-label="Primary" className="flex-1 overflow-y-auto px-2.5 py-2">
         <div className="space-y-0.5">
           {visiblePrimaryItems.map((item) => (
             <NavLink key={item.href} item={item} active={pathname === item.href} onNavigate={() => setMobileNavOpen(false)} />
@@ -133,11 +157,10 @@ export function AppShell({
           onClick={() => setAccountMenuOpen((current) => !current)}
           className="flex w-full items-center gap-2.5 rounded-[10px] px-1.5 py-1.5 text-left transition hover:bg-[var(--bg-hover)]"
         >
-          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--ink)] text-[11px] font-semibold text-white">
-            {(info?.tenantName ?? brand.name).slice(0, 1).toUpperCase()}
-          </div>
+          <Avatar label={info?.userName || info?.userEmail || brand.name} />
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[13px] font-medium text-[var(--ink)]">{info?.tenantName ?? brand.name}</div>
+            <div className="truncate text-[13px] font-medium text-[var(--ink)]">{info?.userName || info?.userEmail || brand.name}</div>
+            <div className="truncate text-[11.5px] text-[var(--ink-faint)]">{info?.tenantName ?? brand.name}</div>
             <RoleTag />
           </div>
           <ChevronDown size={14} strokeWidth={1.8} className={`shrink-0 text-[var(--ink-faint)] transition-transform ${accountMenuOpen ? "rotate-180" : ""}`} />
@@ -147,7 +170,14 @@ export function AppShell({
   );
 
   return (
-    <div className="flex min-h-screen bg-[var(--bg)] text-[var(--ink)]">
+    <div className="flex min-h-screen bg-[var(--bg)] text-[var(--ink)]" style={themeOverrides}>
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-[var(--radius-button)] focus:bg-[var(--ink)] focus:px-4 focus:py-2 focus:text-[13px] focus:font-semibold focus:text-white"
+      >
+        Skip to main content
+      </a>
+
       {/* Desktop sidebar -- always visible at lg+ */}
       <aside className="sticky top-0 hidden h-screen w-[230px] shrink-0 flex-col border-r border-[var(--border-soft)] bg-[var(--bg-sidebar)] lg:flex">{sidebarContent}</aside>
 
@@ -155,7 +185,14 @@ export function AppShell({
       {mobileNavOpen ? (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div className="absolute inset-0 bg-black/30" onClick={() => setMobileNavOpen(false)} />
-          <aside className="absolute inset-y-0 left-0 flex w-[240px] flex-col border-r border-[var(--border-soft)] bg-[var(--bg-sidebar)]">{sidebarContent}</aside>
+          <aside
+            role="dialog"
+            aria-modal="true"
+            aria-label="Navigation"
+            className="absolute inset-y-0 left-0 flex w-[240px] flex-col border-r border-[var(--border-soft)] bg-[var(--bg-sidebar)]"
+          >
+            {sidebarContent}
+          </aside>
         </div>
       ) : null}
 
@@ -173,7 +210,7 @@ export function AppShell({
           </Link>
         </header>
 
-        <section className="flex-1 overflow-y-auto px-5 py-10 lg:px-12 lg:py-16">
+        <main id="main-content" className="flex-1 overflow-y-auto px-5 py-10 lg:px-12 lg:py-16">
           <div className="mx-auto max-w-[1080px]">
             <div className="mb-8 flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -185,7 +222,7 @@ export function AppShell({
             <ImpersonationBanner />
             {children}
           </div>
-        </section>
+        </main>
       </div>
     </div>
   );
@@ -196,6 +233,7 @@ function NavLink({ item, active, onNavigate }: { item: NavItemConfig; active: bo
     <Link
       href={item.href}
       onClick={onNavigate}
+      aria-current={active ? "page" : undefined}
       className={`flex h-12 items-center gap-3 rounded-[10px] px-4 text-[15px] font-medium transition ${
         active ? "bg-[var(--bg-active)] text-[var(--ss-green-700)]" : "text-[#454A46] hover:bg-[var(--bg-hover)] hover:text-[var(--ink)]"
       }`}

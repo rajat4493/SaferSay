@@ -10,10 +10,14 @@ export type EmployeeCsvPreview = {
 const requiredHeaders = ["email"];
 const optionalHeaders = ["name", "team", "location", "manager_email"];
 const acceptedHeaders = new Set([...requiredHeaders, ...optionalHeaders]);
+const MAX_ROWS = 10000;
 
 export function parseEmployeeCsv(input: string): EmployeeCsvPreview {
   const rows = parseCsvRows(input).filter((row) => row.some((cell) => cell.trim().length > 0));
   if (rows.length === 0) return { employees: [], errors: ["The file is empty."], headers: [], totalRows: 0 };
+  if (rows.length - 1 > MAX_ROWS) {
+    return { employees: [], errors: [`This file has more than ${MAX_ROWS} rows. Split it into smaller batches and import separately.`], headers: [], totalRows: rows.length - 1 };
+  }
 
   const headers = rows[0].map((header) => normalizeHeader(header));
   const errors: string[] = [];
@@ -53,12 +57,25 @@ export function parseEmployeeCsv(input: string): EmployeeCsvPreview {
       return;
     }
     emails.add(email);
+
+    const managerEmailRaw = readCell(row, managerEmailIndex).toLowerCase();
+    if (managerEmailRaw) {
+      if (!isValidEmail(managerEmailRaw)) {
+        errors.push(`Row ${rowNumber}: manager_email is not a valid email.`);
+        return;
+      }
+      if (managerEmailRaw === email) {
+        errors.push(`Row ${rowNumber}: manager_email cannot be the same as the employee's own email.`);
+        return;
+      }
+    }
+
     employees.push({
       email,
       name: readCell(row, nameIndex) || undefined,
       team: readCell(row, teamIndex) || undefined,
       location: readCell(row, locationIndex) || undefined,
-      managerEmail: readCell(row, managerEmailIndex) || undefined,
+      managerEmail: managerEmailRaw || undefined,
     });
   });
 

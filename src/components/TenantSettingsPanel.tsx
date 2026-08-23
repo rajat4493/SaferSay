@@ -3,8 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Card } from "@/components/AppShell";
+import { Avatar } from "@/components/Avatar";
 import { SkeletonCard } from "@/components/Skeleton";
 import { useToast } from "@/components/ToastProvider";
+import { useTenantSession } from "@/lib/useTenantSession";
+import { surveyTemplates } from "@/lib/templates";
 
 type Settings = {
   minGroupSize: number;
@@ -14,9 +17,11 @@ type Settings = {
   safetyContactEmail: string | null;
   smtpConfigured: boolean;
   smtpFromEmail: string | null;
+  slackConnected: boolean;
 };
 
 type ApiKey = { id: string; label: string | null; createdAt: string; revokedAt: string | null };
+type Recurrence = { id: string; templateSlug: string; interval: "weekly" | "monthly" | "quarterly"; autoSend: boolean; nextRunAt: string; disabled: boolean };
 
 const featureLabels: Record<string, string> = {
   customQuestions: "Custom question editing",
@@ -45,13 +50,23 @@ export function TenantSettingsPanel() {
   const [smtpPassword, setSmtpPassword] = useState("");
   const [smtpFromEmail, setSmtpFromEmail] = useState("");
   const [savingSmtp, setSavingSmtp] = useState(false);
+  const [slackWebhookUrl, setSlackWebhookUrl] = useState("");
+  const [savingSlack, setSavingSlack] = useState(false);
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [newApiKeyLabel, setNewApiKeyLabel] = useState("");
   const [createdApiKey, setCreatedApiKey] = useState("");
   const [creatingApiKey, setCreatingApiKey] = useState(false);
   const [requestingDeletion, setRequestingDeletion] = useState(false);
   const [deletionRequested, setDeletionRequested] = useState(false);
+  const [nameDraft, setNameDraft] = useState<string | null>(null);
+  const [savingName, setSavingName] = useState(false);
+  const [recurrences, setRecurrences] = useState<Recurrence[]>([]);
+  const [newRecurrenceTemplate, setNewRecurrenceTemplate] = useState(surveyTemplates[0]?.slug ?? "");
+  const [newRecurrenceInterval, setNewRecurrenceInterval] = useState<Recurrence["interval"]>("monthly");
+  const [newRecurrenceAutoSend, setNewRecurrenceAutoSend] = useState(false);
+  const [creatingRecurrence, setCreatingRecurrence] = useState(false);
   const toast = useToast();
+  const { info: sessionInfo } = useTenantSession();
 
   function load() {
     fetch("/api/tenants/settings")
@@ -67,8 +82,39 @@ export function TenantSettingsPanel() {
       .catch(() => setApiKeys([]));
   }
 
+  function loadRecurrences() {
+    fetch("/api/recurrences")
+      .then((response) => response.json())
+      .then((data: { ok?: boolean; recurrences?: Recurrence[] }) => setRecurrences(data.ok ? (data.recurrences ?? []) : []))
+      .catch(() => setRecurrences([]));
+  }
+
   useEffect(load, []);
   useEffect(loadApiKeys, []);
+  useEffect(loadRecurrences, []);
+
+  async function saveName() {
+    const name = (nameDraft ?? "").trim();
+    if (!name) return;
+    setSavingName(true);
+    const response = await fetch("/api/account", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    const data = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+    setSavingName(false);
+    if (data.ok) {
+      toast.show({ variant: "success", message: "Name updated." });
+      setNameDraft(null);
+      // Full reload keeps this in sync with every other place the signed-in
+      // user's name is shown (AppShell's account card) without threading a
+      // refetch callback through useTenantSession.
+      window.location.reload();
+    } else {
+      toast.show({ variant: "error", message: data.error ?? "Couldn't update your name." });
+    }
+  }
 
   async function saveSmtp() {
     setSavingSmtp(true);
@@ -113,6 +159,39 @@ export function TenantSettingsPanel() {
     }
   }
 
+  async function saveSlack() {
+    setSavingSlack(true);
+    const response = await fetch("/api/tenants/settings", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ slackWebhookUrl }),
+    });
+    const data = await response.json().catch(() => ({ ok: false }));
+    setSavingSlack(false);
+    if (data.ok) {
+      setSettings(data.settings);
+      setSlackWebhookUrl("");
+      toast.show({ variant: "success", message: "Slack connected. Team updates can now be shared to your channel." });
+    } else {
+      toast.show({ variant: "error", message: data.error ?? "Couldn't connect Slack." });
+    }
+  }
+
+  async function clearSlack() {
+    setSavingSlack(true);
+    const response = await fetch("/api/tenants/settings", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ slackClear: true }),
+    });
+    const data = await response.json().catch(() => ({ ok: false }));
+    setSavingSlack(false);
+    if (data.ok) {
+      setSettings(data.settings);
+      toast.show({ variant: "success", message: "Disconnected Slack." });
+    }
+  }
+
   async function createApiKey() {
     setCreatingApiKey(true);
     setCreatedApiKey("");
@@ -133,6 +212,28 @@ export function TenantSettingsPanel() {
   async function revokeApiKey(id: string) {
     await fetch(`/api/tenants/api-keys?id=${id}`, { method: "DELETE" });
     loadApiKeys();
+  }
+
+  async function createRecurrence() {
+    setCreatingRecurrence(true);
+    const response = await fetch("/api/recurrences", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ templateSlug: newRecurrenceTemplate, interval: newRecurrenceInterval, autoSend: newRecurrenceAutoSend }),
+    });
+    const data = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+    setCreatingRecurrence(false);
+    if (data.ok) {
+      loadRecurrences();
+      toast.show({ variant: "success", message: "Recurring survey scheduled." });
+    } else {
+      toast.show({ variant: "error", message: data.error ?? "Couldn't schedule that survey." });
+    }
+  }
+
+  async function cancelRecurrence(id: string) {
+    await fetch(`/api/recurrences/${id}`, { method: "DELETE" });
+    loadRecurrences();
   }
 
   async function commitMinGroupSize() {
@@ -244,6 +345,28 @@ export function TenantSettingsPanel() {
   return (
     <div className="space-y-[9px]">
       <Card>
+        <h2 className="section-title">Your account</h2>
+        <p className="mt-1.5 secondary-text">The display name shown to your teammates in this workspace.</p>
+        <div className="mt-4 flex items-center gap-3">
+          <Avatar label={nameDraft ?? sessionInfo?.userName ?? sessionInfo?.userEmail ?? "?"} />
+          <input
+            value={nameDraft ?? sessionInfo?.userName ?? ""}
+            onChange={(event) => setNameDraft(event.target.value)}
+            placeholder={sessionInfo?.userEmail ?? "Your name"}
+            aria-label="Display name"
+            className="admin-input max-w-xs"
+          />
+          <button
+            onClick={saveName}
+            disabled={savingName || nameDraft === null || nameDraft.trim() === (sessionInfo?.userName ?? "")}
+            className="btn-secondary"
+          >
+            {savingName ? "Saving..." : "Save"}
+          </button>
+        </div>
+      </Card>
+
+      <Card>
         <h2 className="section-title">Confidentiality threshold</h2>
         <p className="mt-1.5 secondary-text">
           The minimum number of responses required before any group&apos;s results unlock. You can tune this within a safe range, but it
@@ -324,6 +447,85 @@ export function TenantSettingsPanel() {
             </button>
           ) : null}
         </div>
+      </Card>
+
+      <Card>
+        <h2 className="section-title">Slack</h2>
+        <p className="mt-1.5 secondary-text">
+          {settings.slackConnected
+            ? "Slack is connected. Team updates can be posted to your channel from the update-drafting page."
+            : "Connect a Slack incoming webhook to share team updates directly to a channel, instead of copying them as email."}
+        </p>
+        {settings.slackConnected ? (
+          <div className="mt-3">
+            <button onClick={clearSlack} disabled={savingSlack} className="btn-secondary">
+              Disconnect Slack
+            </button>
+          </div>
+        ) : (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <input
+              value={slackWebhookUrl}
+              onChange={(e) => setSlackWebhookUrl(e.target.value)}
+              placeholder="https://hooks.slack.com/services/..."
+              aria-label="Slack incoming webhook URL"
+              className="admin-input flex-1"
+            />
+            <button onClick={saveSlack} disabled={savingSlack || !slackWebhookUrl.trim()} className="btn-primary shrink-0">
+              {savingSlack ? "Connecting..." : "Connect Slack"}
+            </button>
+          </div>
+        )}
+        <p className="mt-2 text-xs text-[var(--ink-faint)]">
+          Create one at{" "}
+          <a href="https://api.slack.com/messaging/webhooks" target="_blank" rel="noreferrer" className="underline">
+            api.slack.com/messaging/webhooks
+          </a>{" "}
+          for the channel you want updates posted to.
+        </p>
+      </Card>
+
+      <Card>
+        <h2 className="section-title">Recurring surveys</h2>
+        <p className="mt-1.5 secondary-text">Automatically create a new survey from a template on a schedule, instead of starting each one by hand.</p>
+
+        <div className="mt-4 flex flex-wrap items-end gap-2">
+          <select value={newRecurrenceTemplate} onChange={(e) => setNewRecurrenceTemplate(e.target.value)} aria-label="Template to recur" className="admin-input h-9 w-auto">
+            {surveyTemplates.map((template) => (
+              <option key={template.slug} value={template.slug}>
+                {template.name}
+              </option>
+            ))}
+          </select>
+          <select value={newRecurrenceInterval} onChange={(e) => setNewRecurrenceInterval(e.target.value as Recurrence["interval"])} aria-label="Recurrence interval" className="admin-input h-9 w-auto">
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+            <option value="quarterly">Quarterly</option>
+          </select>
+          <label className="flex h-9 items-center gap-1.5 text-[13px] text-[var(--ink-mid)]">
+            <input type="checkbox" checked={newRecurrenceAutoSend} onChange={(e) => setNewRecurrenceAutoSend(e.target.checked)} />
+            Send automatically
+          </label>
+          <button onClick={createRecurrence} disabled={creatingRecurrence} className="btn-primary h-9">
+            {creatingRecurrence ? "Scheduling..." : "Schedule"}
+          </button>
+        </div>
+
+        {recurrences.length > 0 ? (
+          <div className="mt-4 space-y-1.5">
+            {recurrences.map((recurrence) => (
+              <div key={recurrence.id} className="flex items-center justify-between rounded-[var(--radius-input)] border border-[var(--border)] bg-white p-2.5 text-[13px]">
+                <span>
+                  {surveyTemplates.find((t) => t.slug === recurrence.templateSlug)?.name ?? recurrence.templateSlug} · {recurrence.interval}
+                  {recurrence.autoSend ? " · sends automatically" : " · created as draft"}
+                </span>
+                <button onClick={() => cancelRecurrence(recurrence.id)} className="text-xs font-medium text-[var(--red)] hover:underline">
+                  Cancel
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </Card>
 
       <Card>

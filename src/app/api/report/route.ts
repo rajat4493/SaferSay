@@ -1,9 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSessionContext, isPlatformOwnerImpersonating } from "@/lib/server/authSession";
 import { getDatabasePool } from "@/lib/server/db/pool";
-import { getTenantPool, withTenantContext } from "@/lib/server/db/tenantPool";
+import { getTenantPool, withTenantContext, type Queryable } from "@/lib/server/db/tenantPool";
 import { ResponseRepository } from "@/lib/server/repositories/responseRepository";
-import type { ReportScope } from "@/lib/server/repositories/types";
+import { getManagerRollupReport } from "@/lib/server/managerRollupService";
 import { getProtectedServerReport } from "@/lib/serverStore";
 import { canViewSurveyResults } from "@/lib/permissions";
 
@@ -14,6 +14,7 @@ import { canViewSurveyResults } from "@/lib/permissions";
  * /api/invites/outbox and /api/invites/queue.
  */
 async function loadReportForCycle(
+  db: Queryable,
   repo: ResponseRepository,
   tenantId: string,
   cycleId: string | null,
@@ -22,16 +23,21 @@ async function loadReportForCycle(
 ) {
   // department scope only applies when a specific cycle is requested --
   // the no-cycleId "latest cycle" convenience path stays org-scoped.
-  const scope: ReportScope | undefined = cycleId && department ? { type: "department", department } : undefined;
-
   const result = !cycleId
-    ? await repo.getLatestProtectedReportForTenant(tenantId, scope, tenantName)
+    ? await repo.getLatestProtectedReportForTenant(tenantId, undefined, tenantName)
     : await (async () => {
         const cycle = await repo.getCycleForTenant(tenantId, cycleId, tenantName);
         if (!cycle) return { cycle: null, report: { protected: true as const, n: 0, rows: [] } };
         return {
           cycle: { id: cycle.id, name: cycle.name, minGroupSize: cycle.minGroupSize },
-          report: await repo.getProtectedReportForTenant(tenantId, cycle.id, cycle.minGroupSize, scope),
+          // A requested department that's too small on its own rolls up
+          // through the manager hierarchy (or straight to company-wide
+          // for a flat org) rather than just showing "not enough data" --
+          // see managerRollupService.ts. Falls back to the plain org
+          // report when no department was requested at all.
+          report: department
+            ? await getManagerRollupReport(db, tenantId, cycle.id, cycle.minGroupSize, department)
+            : await repo.getProtectedReportForTenant(tenantId, cycle.id, cycle.minGroupSize),
         };
       })();
 
@@ -71,7 +77,7 @@ export async function GET(request: NextRequest) {
   const { tenant } = session;
   if (tenantPool) {
     const result = await withTenantContext(tenantPool, tenant.id, (client) =>
-      loadReportForCycle(new ResponseRepository(client), tenant.id, cycleId, tenant.name, department),
+      loadReportForCycle(client, new ResponseRepository(client), tenant.id, cycleId, tenant.name, department),
     );
     return NextResponse.json({ ok: true, tenant, ...result });
   }
@@ -80,7 +86,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       ok: true,
       tenant,
-      ...(await loadReportForCycle(new ResponseRepository(adminPool), tenant.id, cycleId, tenant.name, department)),
+      ...(await loadReportForCycle(adminPool, new ResponseRepository(adminPool), tenant.id, cycleId, tenant.name, department)),
     });
   }
   return NextResponse.json({ ok: true, cycle: null, report: await getProtectedServerReport() });

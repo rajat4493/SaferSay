@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Plus, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
 import { ConsoleCard, HealthBadge, PlanBadge, formatDate } from "@/components/console/ConsoleUI";
 
 type TenantEntry = {
@@ -16,6 +16,8 @@ type TenantEntry = {
   planTier: string;
   createdAt: string;
 };
+
+const PAGE_SIZE = 50;
 
 function deriveHealth(tenant: TenantEntry): "ok" | "attention" | "at_risk" {
   if (tenant.employeeCount === 0) return "at_risk";
@@ -31,29 +33,39 @@ export function TenantsDirectory() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [tenants, setTenants] = useState<TenantEntry[] | null>(null);
+  const [total, setTotal] = useState(0);
   const [search, setSearch] = useState(searchParams.get("q") ?? "");
+  // Debounced separately from `search` so every keystroke doesn't fire a
+  // request -- the server does the filtering now, not a client-side
+  // .filter() over an unpaginated full table load.
+  const [query, setQuery] = useState(search);
+  const [page, setPage] = useState(0);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setQuery(search);
+      setPage(0);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   function load() {
-    fetch("/api/super-admin/tenants")
+    const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(page * PAGE_SIZE) });
+    if (query.trim()) params.set("q", query.trim());
+    fetch(`/api/super-admin/tenants?${params.toString()}`)
       .then((response) => response.json())
       .then((data) => {
         if (!data.ok) return;
         setTenants(data.tenants ?? []);
+        setTotal(data.total ?? 0);
       })
       .catch(() => undefined);
   }
 
-  useEffect(load, []);
-
-  const filtered = useMemo(() => {
-    if (!tenants) return [];
-    const query = search.trim().toLowerCase();
-    if (!query) return tenants;
-    return tenants.filter((tenant) => tenant.name.toLowerCase().includes(query));
-  }, [tenants, search]);
+  useEffect(load, [query, page]);
 
   async function submitCreate() {
     if (!newName.trim()) return;
@@ -74,6 +86,9 @@ export function TenantsDirectory() {
       setSubmitting(false);
     }
   }
+
+  const rangeStart = total === 0 ? 0 : page * PAGE_SIZE + 1;
+  const rangeEnd = Math.min((page + 1) * PAGE_SIZE, total);
 
   return (
     <div className="space-y-[9px]">
@@ -100,7 +115,7 @@ export function TenantsDirectory() {
       <ConsoleCard className="overflow-x-auto p-0">
         {tenants === null ? (
           <p className="p-4 secondary-text font-medium">Loading tenants...</p>
-        ) : filtered.length === 0 ? (
+        ) : tenants.length === 0 ? (
           <p className="p-4 secondary-text">No tenants match this search.</p>
         ) : (
           <table className="w-full min-w-[760px] border-collapse text-[13px]">
@@ -116,7 +131,7 @@ export function TenantsDirectory() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((tenant) => (
+              {tenants.map((tenant) => (
                 <tr key={tenant.id} onClick={() => router.push(`/console/tenants/${tenant.id}`)} className="cursor-pointer border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--bg-hover)]">
                   <td className="px-4 py-3 font-medium text-[var(--ink)]">{tenant.name}</td>
                   <td className="px-4 py-3">
@@ -135,6 +150,28 @@ export function TenantsDirectory() {
           </table>
         )}
       </ConsoleCard>
+
+      {total > PAGE_SIZE ? (
+        <div className="flex items-center justify-between px-1">
+          <p className="secondary-text">
+            {rangeStart}–{rangeEnd} of {total}
+          </p>
+          <div className="flex gap-2">
+            <button onClick={() => setPage((current) => Math.max(current - 1, 0))} disabled={page === 0} className="btn-secondary px-3 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-40">
+              <ChevronLeft size={13} strokeWidth={1.8} />
+              Previous
+            </button>
+            <button
+              onClick={() => setPage((current) => (rangeEnd < total ? current + 1 : current))}
+              disabled={rangeEnd >= total}
+              className="btn-secondary px-3 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Next
+              <ChevronRight size={13} strokeWidth={1.8} />
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {creating ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onClick={() => !submitting && setCreating(false)}>

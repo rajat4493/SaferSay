@@ -26,4 +26,20 @@ describe("employee CSV parser", () => {
     expect(preview.employees[0].name).toBe("Alex, Senior");
     expect(preview.employees[0].team).toBe("People Ops");
   });
+
+  it("accepts a valid manager_email and lowercases it", () => {
+    const preview = parseEmployeeCsv("email,manager_email\nalex@example.com,Boss@example.com");
+    expect(preview.errors).toEqual([]);
+    expect(preview.employees[0].managerEmail).toBe("boss@example.com");
+  });
+
+  it("rejects a malformed manager_email", () => {
+    const preview = parseEmployeeCsv("email,manager_email\nalex@example.com,not-an-email");
+    expect(preview.errors).toContain("Row 2: manager_email is not a valid email.");
+  });
+
+  it("rejects an employee listed as their own manager", () => {
+    const preview = parseEmployeeCsv("email,manager_email\nalex@example.com,alex@example.com");
+    expect(preview.errors).toContain("Row 2: manager_email cannot be the same as the employee's own email.");
+  });
 });

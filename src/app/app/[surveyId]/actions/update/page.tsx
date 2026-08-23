@@ -27,6 +27,8 @@ export default function DraftUpdatePage() {
   const surveyId = params.surveyId as string;
   const [cycleName, setCycleName] = useState<string | null>(null);
   const [accessChecked, setAccessChecked] = useState(false);
+  const [slackConnected, setSlackConnected] = useState(false);
+  const [postingToSlack, setPostingToSlack] = useState(false);
 
   useEffect(() => {
     fetch("/api/tenants/current")
@@ -62,18 +64,49 @@ export default function DraftUpdatePage() {
       .catch(() => undefined);
   }, [surveyId]);
 
+  useEffect(() => {
+    fetch("/api/tenants/settings")
+      .then((response) => response.json())
+      .then((data: { ok?: boolean; settings?: { slackConnected?: boolean } }) => {
+        if (data.ok) setSlackConnected(Boolean(data.settings?.slackConnected));
+      })
+      .catch(() => undefined);
+  }, []);
+
   if (!accessChecked) return null;
 
   const title = `You spoke, we heard: here's what we're changing about ${cycleName ?? "this survey"}`;
   const body = `Thank you to everyone who shared feedback in ${cycleName ? `"${cycleName}"` : "our recent survey"}. Your input helps us build a more transparent, focused team. Here's what we're doing:`;
 
+  function draftLines() {
+    return [title, "", body, "", ...commitments.map((line) => `- ${line}`), "", "We'll keep listening and keep you updated on our progress."];
+  }
+
   async function copyAsEmail() {
-    const lines = [title, "", body, "", ...commitments.map((line) => `- ${line}`), "", "We'll keep listening and keep you updated on our progress."];
     try {
-      await navigator.clipboard.writeText(lines.join("\n"));
+      await navigator.clipboard.writeText(draftLines().join("\n"));
       toast.show({ variant: "success", message: "Draft copied — paste it into your email client." });
     } catch {
       toast.show({ variant: "error", message: "Couldn't copy to your clipboard. Try selecting the text manually." });
+    }
+  }
+
+  async function shareToSlack() {
+    setPostingToSlack(true);
+    try {
+      const response = await fetch("/api/slack/post", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text: draftLines().join("\n") }),
+      });
+      const data = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (data.ok) {
+        toast.show({ variant: "success", message: "Posted to your Slack channel." });
+      } else {
+        toast.show({ variant: "error", message: data.error ?? "Couldn't post to Slack." });
+      }
+    } finally {
+      setPostingToSlack(false);
     }
   }
 
@@ -141,12 +174,13 @@ export default function DraftUpdatePage() {
               <p className="mt-1 secondary-text">Post to your team channel or copy as email.</p>
 
               <button
-                disabled
-                title="Slack isn't connected for this workspace yet"
-                className="btn-secondary mt-4 w-full cursor-not-allowed justify-center opacity-60"
+                onClick={shareToSlack}
+                disabled={!slackConnected || postingToSlack}
+                title={slackConnected ? undefined : "Connect Slack in workspace settings first"}
+                className="btn-secondary mt-4 w-full justify-center disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <BrandGridGlyph />
-                Share with Slack
+                {postingToSlack ? "Posting..." : "Share with Slack"}
               </button>
               <button onClick={copyAsEmail} className="btn-primary mt-2 w-full justify-center">
                 <Copy size={14} strokeWidth={1.8} />

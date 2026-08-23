@@ -19,4 +19,18 @@ describe("run-migrations.mjs", () => {
     expect(files.length).toBeGreaterThan(20);
     expect(source).toContain('.filter((name) => name.endsWith(".sql"))');
   });
+
+  it("tracks applied migrations in a schema_migrations table and skips already-recorded files", () => {
+    expect(source).toContain("create table if not exists schema_migrations");
+    expect(source).toContain("applied.has(file)");
+  });
+
+  it("treats already-exists errors as a legacy migration applied before tracking existed, not a fatal failure", () => {
+    expect(source).toContain("ALREADY_EXISTS_CODES");
+    expect(source).toContain("42P07");
+  });
+
+  it("skips quietly instead of failing the build when run with --if-configured and no DATABASE_URL", () => {
+    expect(source).toContain("--if-configured");
+  });
 });

@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from "crypto";
 import type { Queryable } from "@/lib/server/db/tenantPool";
 import { hashServerToken } from "@/lib/server/tokenHashing";
 import { decryptSecret, encryptSecret } from "@/lib/server/secretCrypto";
+import type { BrandTheme } from "@/lib/brand";
 import {
   AuditLogRecord,
   CycleAction,
@@ -89,6 +90,12 @@ export class IdentityRepository {
       `update identity.users set auth_provider = $2, provider_subject = $3 where id = $1`,
       [userId, authProvider, providerSubject],
     );
+  }
+
+  /** Self-service display name -- tenant_id scoped so a user can only ever rename their own row. */
+  async updateUserName(userId: string, tenantId: string, name: string): Promise<boolean> {
+    const result = await this.db.query(`update identity.users set name = $3 where id = $1 and tenant_id = $2`, [userId, tenantId, name]);
+    return (result.rowCount ?? 0) > 0;
   }
 
   async emitOnboardingEvent(tenantId: string, userId: string, eventKey: OnboardingEventKey) {
@@ -270,7 +277,21 @@ export class IdentityRepository {
     return result.rows;
   }
 
-  async listTenantsWithStats(): Promise<TenantDirectoryEntry[]> {
+  /**
+   * Paginated + optionally name-filtered -- the unpaginated version loaded
+   * every tenant with per-row subqueries and left the console to filter
+   * client-side, which doesn't hold up past a couple hundred tenants.
+   * `count(*) over()` gets the filtered total in the same round trip
+   * instead of a second query.
+   */
+  async listTenantsWithStats(params: { search?: string; limit?: number; offset?: number } = {}): Promise<{
+    tenants: TenantDirectoryEntry[];
+    total: number;
+  }> {
+    const limit = Math.min(Math.max(params.limit ?? 50, 1), 200);
+    const offset = Math.max(params.offset ?? 0, 0);
+    const search = params.search?.trim();
+
     const result = await this.db.query<{
       id: string;
       name: string;
@@ -281,6 +302,7 @@ export class IdentityRepository {
       latest_cycle_name: string | null;
       latest_cycle_status: string | null;
       last_activity_at: string | null;
+      total_count: string;
     }>(
       `select
          t.id,
@@ -294,22 +316,29 @@ export class IdentityRepository {
          greatest(
            t.updated_at,
            coalesce((select max(oe.occurred_at) from identity.onboarding_events oe where oe.tenant_id = t.id), t.updated_at)
-         )::text as last_activity_at
+         )::text as last_activity_at,
+         count(*) over()::text as total_count
        from identity.tenants t
        left join identity.tenant_settings ts on ts.tenant_id = t.id
-       order by last_activity_at desc nulls last`,
+       ${search ? "where t.name ilike $3" : ""}
+       order by last_activity_at desc nulls last
+       limit $1 offset $2`,
+      search ? [limit, offset, `%${search}%`] : [limit, offset],
     );
-    return result.rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      slug: row.slug,
-      createdAt: row.created_at,
-      planTier: row.plan_tier,
-      employeeCount: Number(row.employee_count),
-      latestCycleName: row.latest_cycle_name,
-      latestCycleStatus: row.latest_cycle_status,
-      lastActivityAt: row.last_activity_at,
-    }));
+    return {
+      tenants: result.rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        slug: row.slug,
+        createdAt: row.created_at,
+        planTier: row.plan_tier,
+        employeeCount: Number(row.employee_count),
+        latestCycleName: row.latest_cycle_name,
+        latestCycleStatus: row.latest_cycle_status,
+        lastActivityAt: row.last_activity_at,
+      })),
+      total: Number(result.rows[0]?.total_count ?? 0),
+    };
   }
 
   async getTenantDetail(tenantId: string): Promise<TenantDetail | null> {
@@ -522,6 +551,41 @@ export class IdentityRepository {
     );
   }
 
+  /** Returns null when the tenant has never saved a brand -- callers fall back to defaultBrand (see BrandProvider.tsx). */
+  async getBrand(tenantId: string): Promise<BrandTheme | null> {
+    const result = await this.db.query<{ brand: BrandTheme | null }>(`select brand from identity.tenant_settings where tenant_id = $1`, [tenantId]);
+    return result.rows[0]?.brand ?? null;
+  }
+
+  async setBrand(tenantId: string, brand: BrandTheme) {
+    await this.db.query(
+      `insert into identity.tenant_settings (tenant_id, brand)
+       values ($1, $2::jsonb)
+       on conflict (tenant_id) do update set brand = excluded.brand, updated_at = now()`,
+      [tenantId, JSON.stringify(brand)],
+    );
+  }
+
+  /** Returns null when no webhook is configured -- callers fall back to "not connected", matching getSmtpConfig's null convention. */
+  async getSlackWebhookUrl(tenantId: string): Promise<string | null> {
+    const result = await this.db.query<{ slack_webhook_url_encrypted: string | null }>(
+      `select slack_webhook_url_encrypted from identity.tenant_settings where tenant_id = $1`,
+      [tenantId],
+    );
+    const encrypted = result.rows[0]?.slack_webhook_url_encrypted;
+    return encrypted ? decryptSecret(encrypted) : null;
+  }
+
+  /** Pass null to disconnect Slack. */
+  async setSlackWebhookUrl(tenantId: string, url: string | null) {
+    await this.db.query(
+      `insert into identity.tenant_settings (tenant_id, slack_webhook_url_encrypted)
+       values ($1, $2)
+       on conflict (tenant_id) do update set slack_webhook_url_encrypted = excluded.slack_webhook_url_encrypted, updated_at = now()`,
+      [tenantId, url ? encryptSecret(url) : null],
+    );
+  }
+
   /**
    * The one deliberate, auditable, grep-able place identity is read for a
    * survey token outside the normal severed flow -- do NOT widen
@@ -705,6 +769,7 @@ export class IdentityRepository {
       safety_contact_email: string | null;
       smtp_host: string | null;
       smtp_from_email: string | null;
+      slack_webhook_url_encrypted: string | null;
     }>(
       `select
          coalesce(default_min_group_size, 5) as default_min_group_size,
@@ -713,7 +778,8 @@ export class IdentityRepository {
          coalesce(features, '{}'::jsonb) as features,
          safety_contact_email,
          smtp_host,
-         smtp_from_email
+         smtp_from_email,
+         slack_webhook_url_encrypted
        from identity.tenant_settings where tenant_id = $1`,
       [tenantId],
     );
@@ -728,6 +794,7 @@ export class IdentityRepository {
       // "configured" vs "not configured" without ever round-tripping the secret.
       smtpConfigured: Boolean(row?.smtp_host),
       smtpFromEmail: row?.smtp_from_email ?? null,
+      slackConnected: Boolean(row?.slack_webhook_url_encrypted),
     };
   }
 
@@ -852,16 +919,59 @@ export class IdentityRepository {
     for (const employee of employees) {
       const id = randomUUID();
       await this.db.query(
-        `insert into identity.employees (id, tenant_id, email, name, team, location, manager_email)
-         values ($1, $2, $3, $4, $5, $6, $7)
+        `insert into identity.employees (id, tenant_id, email, name, team, location, manager_email, external_id, source_system)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          on conflict (tenant_id, email)
-         do update set name = excluded.name, team = excluded.team, location = excluded.location, manager_email = excluded.manager_email
+         do update set
+           name = excluded.name, team = excluded.team, location = excluded.location, manager_email = excluded.manager_email,
+           -- coalesce, not overwrite: a plain CSV import never supplies
+           -- these, and must not blank out a value an earlier HRIS sync
+           -- already set for this employee.
+           external_id = coalesce(excluded.external_id, identity.employees.external_id),
+           source_system = coalesce(excluded.source_system, identity.employees.source_system)
          returning id, email, name, team, location, manager_email`,
-        [id, tenantId, employee.email, employee.name ?? null, normalizeTeamLabel(employee.team), employee.location ?? null, employee.managerEmail ?? null],
+        [
+          id,
+          tenantId,
+          employee.email,
+          employee.name ?? null,
+          normalizeTeamLabel(employee.team),
+          employee.location ?? null,
+          employee.managerEmail ?? null,
+          employee.externalId ?? null,
+          employee.sourceSystem ?? null,
+        ],
       );
       imported.push(employee);
     }
+
+    // manager_id resolution is a second pass, not inline with the upsert
+    // above: a manager can appear later in the same import batch than
+    // their report (no ordering requirement on the CSV/HRIS payload), so
+    // every row needs to exist with a real id first. Mirrors
+    // manager_email's own overwrite semantics above (not a coalesce) --
+    // an import that drops managerEmail for someone clears their
+    // manager_id too, same as it already clears their manager_email.
+    const roster = await this.db.query<{ id: string; email: string }>(`select id, email from identity.employees where tenant_id = $1`, [tenantId]);
+    const idByEmail = new Map(roster.rows.map((row) => [row.email, row.id]));
+    for (const employee of employees) {
+      const managerId = employee.managerEmail ? (idByEmail.get(employee.managerEmail) ?? null) : null;
+      await this.db.query(`update identity.employees set manager_id = $1 where tenant_id = $2 and email = $3`, [managerId, tenantId, employee.email]);
+    }
+
     return imported.length;
+  }
+
+  /**
+   * All employee emails for a tenant, unpaginated -- used only to validate
+   * that a CSV import's manager_email column references a real employee
+   * (see /api/employees/import) before treating it as verified enough to
+   * report on. Not for display: EmployeeRecord's fuller shape and
+   * pagination live in listEmployees below.
+   */
+  async listAllEmployeeEmails(tenantId: string): Promise<Set<string>> {
+    const result = await this.db.query<{ email: string }>(`select email from identity.employees where tenant_id = $1`, [tenantId]);
+    return new Set(result.rows.map((row) => row.email));
   }
 
   async listEmployees(
@@ -1014,30 +1124,99 @@ export class IdentityRepository {
     return Number(result.rows[0]?.count ?? 0);
   }
 
+  /**
+   * All team labels in a manager's reporting subtree (the manager's own
+   * team plus every descendant's team, deduped), via WITH RECURSIVE over
+   * manager_id (0035_manager_hierarchy.sql). Pure identity-side org-chart
+   * metadata, consumed by managerRollupService.ts to know which
+   * the response-side segment_team labels belong together -- this
+   * repository never reads responses.* itself; see that service for how
+   * the two sides are composed.
+   */
+  async getSubtreeTeamLabels(tenantId: string, rootManagerId: string): Promise<string[]> {
+    const result = await this.db.query<{ team: string | null }>(
+      `with recursive subtree as (
+         select id, team from identity.employees where tenant_id = $1 and id = $2
+         union all
+         select e.id, e.team from identity.employees e join subtree on e.manager_id = subtree.id
+       )
+       select distinct team from subtree where team is not null`,
+      [tenantId, rootManagerId],
+    );
+    return result.rows.map((row) => row.team!);
+  }
+
+  /**
+   * The single manager who owns a given team label -- "owns" meaning
+   * every employee carrying that team label reports to the same manager.
+   * Returns null when there's no clean single owner (the label is split
+   * across multiple managers, or every such employee has manager_id null
+   * -- a flat org, or the label predates any hierarchy data): both cases
+   * tell managerRollupService.ts to fall back to org-wide directly rather
+   * than guess an owner, since a wrong guess here would misattribute
+   * whose subtree a rollup covers.
+   */
+  async getTeamOwner(tenantId: string, team: string): Promise<string | null> {
+    const result = await this.db.query<{ manager_id: string | null }>(
+      `select distinct manager_id from identity.employees where tenant_id = $1 and team = $2 and manager_id is not null`,
+      [tenantId, team],
+    );
+    return result.rows.length === 1 ? result.rows[0].manager_id : null;
+  }
+
+  async getEmployeeManagerId(tenantId: string, employeeId: string): Promise<string | null> {
+    const result = await this.db.query<{ manager_id: string | null }>(`select manager_id from identity.employees where tenant_id = $1 and id = $2`, [
+      tenantId,
+      employeeId,
+    ]);
+    return result.rows[0]?.manager_id ?? null;
+  }
+
+  /** Every direct report of a manager (or, when parentManagerId is null, every root employee -- manager_id is null). Ids only; callers resolve each one's own subtree separately. */
+  async getSiblingManagerIds(tenantId: string, parentManagerId: string | null): Promise<string[]> {
+    const result = await this.db.query<{ id: string }>(
+      parentManagerId
+        ? `select id from identity.employees where tenant_id = $1 and manager_id = $2`
+        : `select id from identity.employees where tenant_id = $1 and manager_id is null`,
+      parentManagerId ? [tenantId, parentManagerId] : [tenantId],
+    );
+    return result.rows.map((row) => row.id);
+  }
+
+  /** Display label for a manager in rollup UI copy -- name, falling back to email. Never more identity than that (no employee list, no report count) leaves this repository via this method. */
+  async getEmployeeLabel(tenantId: string, employeeId: string): Promise<string> {
+    const result = await this.db.query<{ name: string | null; email: string }>(`select name, email from identity.employees where tenant_id = $1 and id = $2`, [
+      tenantId,
+      employeeId,
+    ]);
+    return result.rows[0]?.name || result.rows[0]?.email || "this manager";
+  }
+
   async issueTokens(tenantId: string, cycleId: string): Promise<IssuedParticipantToken[]> {
     const employees = await this.db.query<{
       id: string;
       email: string;
       name: string | null;
       team: string | null;
-    }>("select id, email, name, team from identity.employees where tenant_id = $1 and employment_status = 'active'", [
+      location: string | null;
+    }>("select id, email, name, team, location from identity.employees where tenant_id = $1 and employment_status = 'active'", [
       tenantId,
     ]);
 
     const issued: IssuedParticipantToken[] = [];
     for (const employee of employees.rows) {
       const rawToken = randomBytes(32).toString("base64url");
-      // team is already canonicalized by normalizeTeamLabel at import time
-      // -- snapshot it here so a later employee-record change (a re-import,
-      // a department rename) can't retroactively reshuffle this cycle's
-      // anonymity groups after invites already went out.
+      // team/location are snapshotted here so a later employee-record
+      // change (a re-import, a team/office rename) can't retroactively
+      // reshuffle this cycle's anonymity groups -- or which branch-gated
+      // questions someone sees -- after invites already went out.
       const result = await this.db.query<{ id: string }>(
         `insert into identity.survey_participants
-          (id, tenant_id, cycle_id, employee_id, token_hash, token_status, issued_at, team)
-         values ($1, $2, $3, $4, $5, 'issued', now(), $6)
+          (id, tenant_id, cycle_id, employee_id, token_hash, token_status, issued_at, team, location)
+         values ($1, $2, $3, $4, $5, 'issued', now(), $6, $7)
          on conflict (cycle_id, employee_id) do nothing
          returning id`,
-        [randomUUID(), tenantId, cycleId, employee.id, hashServerToken(rawToken), employee.team],
+        [randomUUID(), tenantId, cycleId, employee.id, hashServerToken(rawToken), employee.team, employee.location],
       );
       if (result.rowCount === 1) {
         issued.push({ employeeId: employee.id, email: employee.email, name: employee.name ?? undefined, rawToken });
@@ -1092,8 +1271,10 @@ export class IdentityRepository {
       tenant_id: string;
       cycle_id: string;
       token_status: "issued" | "spent" | "revoked";
+      team: string | null;
+      location: string | null;
     }>(
-      `select tenant_id, cycle_id, token_status
+      `select tenant_id, cycle_id, token_status, team, location
        from identity.survey_participants
        where token_hash = $1`,
       [tokenHash],
@@ -1110,7 +1291,7 @@ export class IdentityRepository {
        where token_hash = $1 and token_status = 'issued'`,
       [tokenHash],
     );
-    if (result.rowCount !== 1) throw new Error("Token is invalid or already spent.");
+    if (result.rowCount !== 1) throw new Error("You've already completed this survey.");
   }
 
   async getReminderTargets(cycleId: string) {

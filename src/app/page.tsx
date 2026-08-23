@@ -85,6 +85,23 @@ export default function Home() {
           <Value icon={Power} title="Easy to leave" text="Export and cancel are visible. No data hostage pattern." />
         </div>
       </section>
+
+      <footer className="border-t border-[var(--brand-border)] bg-[var(--brand-bg)] px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[13px] text-[var(--brand-muted)]">
+          <a href="/security" className="hover:text-[var(--brand-ink)]">
+            Security
+          </a>
+          <a href="/privacy" className="hover:text-[var(--brand-ink)]">
+            Privacy
+          </a>
+          <a href="/terms" className="hover:text-[var(--brand-ink)]">
+            Terms
+          </a>
+          <a href="/dpa" className="hover:text-[var(--brand-ink)]">
+            DPA
+          </a>
+        </div>
+      </footer>
     </main>
   );
 }

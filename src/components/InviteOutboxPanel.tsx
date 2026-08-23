@@ -129,6 +129,7 @@ export function InviteOutboxPanel({ cycleId }: { cycleId?: string } = {}) {
         <SendAction state={sendState} sending={sending} onSend={sendSmart} />
       </div>
 
+      {sendState?.cycleStatus === "closed" ? null : (
       <details className="mt-5 group">
         <summary className="cursor-pointer select-none text-[12px] font-medium text-[var(--ink-faint)] hover:text-[var(--ink-mid)]">Developer / test mode</summary>
 
@@ -210,6 +211,7 @@ export function InviteOutboxPanel({ cycleId }: { cycleId?: string } = {}) {
           </div>
         ) : null}
       </details>
+      )}
     </Card>
   );
 }

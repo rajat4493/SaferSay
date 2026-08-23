@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { devAuthCookieName, isDevAuthAllowed } from "@/lib/server/devAuth";
+import { checkRateLimit, getClientIp } from "@/lib/server/rateLimit";
 
 export async function GET() {
   if (!isDevAuthAllowed()) {
@@ -11,6 +12,11 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   if (!isDevAuthAllowed()) {
     return NextResponse.json({ ok: false, error: "Not found." }, { status: 404 });
+  }
+
+  const { allowed } = await checkRateLimit(`dev-login:${getClientIp(request)}`, 20, 600);
+  if (!allowed) {
+    return NextResponse.json({ ok: false, error: "Too many attempts. Try again in a few minutes." }, { status: 429 });
   }
 
   const body = (await request.json().catch(() => ({}))) as { email?: string };

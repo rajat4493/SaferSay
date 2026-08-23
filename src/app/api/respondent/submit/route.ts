@@ -6,11 +6,12 @@ import { IdentityRepository } from "@/lib/server/repositories/identityRepository
 import { submitServerResponse } from "@/lib/serverStore";
 import { hashServerToken } from "@/lib/server/tokenHashing";
 import { checkRateLimit, getClientIp } from "@/lib/server/rateLimit";
+import type { ResponseAnswerInput } from "@/lib/server/repositories/types";
 
 export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as {
     token: string;
-    answers: Array<{ questionId: string; numberValue?: number; textValue?: string }>;
+    answers: ResponseAnswerInput[];
   };
   if (!body.token || !Array.isArray(body.answers)) {
     return NextResponse.json({ ok: false, error: "Survey token and answers are required." }, { status: 400 });
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
 
       const tokenHash = hashServerToken(body.token);
       const participant = await new IdentityRepository(adminPool).findIssuedToken(tokenHash);
-      if (!participant) throw new Error("Token is invalid or already spent.");
+      if (!participant) throw new Error("This link isn't valid.");
 
       const submission = await withTenantContext(tenantPool, participant.tenant_id, (client) =>
         submitWithSeveredRepositories({ db: client, rawToken: body.token, answers: body.answers }),

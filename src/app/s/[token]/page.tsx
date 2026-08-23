@@ -7,39 +7,53 @@ import { useBrand } from "@/components/BrandProvider";
 import { useSurveyData } from "@/components/DataProvider";
 import { SosButton } from "@/components/SosButton";
 import { questionBank, submitTokenResponse } from "@/lib/localData";
+import { brandFontOptions, type BrandTheme } from "@/lib/brand";
+import { deriveAccentPalette } from "@/lib/brandTheme";
+
+type QuestionOption = { key: string; label: string };
 
 type SurveyQuestion = {
   id: string;
   position: number;
   text: string;
-  type: "likert_5" | "enps_0_10" | "open_text";
+  type: "likert_5" | "enps_0_10" | "open_text" | "multiple_choice" | "ranking" | "matrix";
   construct: string | null;
   optional: boolean;
+  options: QuestionOption[] | null;
+  matrixGroupId: string | null;
 };
 
 type SurveySession = {
   cycleName: string;
   templateName: string;
   questions: SurveyQuestion[];
+  // Only present on the real API-backed session (respondents never sign
+  // in, so this rides along on the session fetch -- see
+  // respondentSessionService.ts). The local-dev fallback session has none.
+  brand?: BrandTheme;
 };
 
 type Answer = {
   questionId: string;
   numberValue?: number;
   textValue?: string;
+  optionKeys?: string[];
+  ranked?: boolean;
 };
 
 export default function RespondentTokenPage() {
   const params = useParams<{ token: string }>();
   const token = params.token;
-  const { brand } = useBrand();
+  const { brand: defaultUiBrand } = useBrand();
   const { data, setData } = useSurveyData();
   const [step, setStep] = useState<"loading" | "intro" | "survey" | "done" | "invalid">("loading");
   const [session, setSession] = useState<SurveySession | null>(null);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [selectedValue, setSelectedValue] = useState<number | null>(null);
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [textValue, setTextValue] = useState("");
   const [error, setError] = useState("");
+  const [invalidReason, setInvalidReason] = useState<string | undefined>(undefined);
 
   const localParticipant = data.identity.participants.find((item) => item.token === token);
   const localQuestions = useMemo(
@@ -51,14 +65,23 @@ export default function RespondentTokenPage() {
         type: "likert_5" as const,
         construct: question.label,
         optional: false,
+        options: null,
+        matrixGroupId: null,
       })),
     [],
   );
   const questions = session?.questions ?? localQuestions;
+  const brand = session?.brand ?? defaultUiBrand;
+  const themeOverrides: React.CSSProperties = {
+    ...(brand.accentColor ? (deriveAccentPalette(brand.accentColor) as React.CSSProperties) : {}),
+    ...(brand.fontFamily ? ({ "--font-body": brandFontOptions.find((option) => option.value === brand.fontFamily)?.stack } as React.CSSProperties) : {}),
+  };
   const current = answers.length;
   const question = questions[current];
   const progressPercent = questions.length ? Math.round((current / questions.length) * 100) : 0;
-  const scaleOptions = question && question.type !== "open_text" ? scaleValues(question.type) : [];
+  const isScaleQuestion = question?.type === "likert_5" || question?.type === "enps_0_10";
+  const isOptionQuestion = question?.type === "multiple_choice" || question?.type === "ranking" || question?.type === "matrix";
+  const scaleOptions = isScaleQuestion ? scaleValues(question!.type) : [];
   // Digit keys 0-9 map directly to a same-valued option (no letter badges
   // needed since the circle already shows its number). eNPS's 10 has no
   // single-digit key -- a reasonable trade-off, click/tap still works.
@@ -68,7 +91,7 @@ export default function RespondentTokenPage() {
     let active = true;
     async function loadSession() {
       const response = await fetch(`/api/respondent/session?token=${encodeURIComponent(token)}`);
-      const result = (await response.json().catch(() => ({}))) as { ok?: boolean; session?: SurveySession; error?: string };
+      const result = (await response.json().catch(() => ({}))) as { ok?: boolean; session?: SurveySession; error?: string; reason?: string };
       if (!active) return;
 
       if (response.ok && result.session) {
@@ -83,7 +106,8 @@ export default function RespondentTokenPage() {
         return;
       }
 
-      setError(result.error ?? "This survey link is not active.");
+      setError(result.error ?? "This link isn't valid.");
+      setInvalidReason(result.reason);
       setStep("invalid");
     }
     loadSession();
@@ -104,11 +128,16 @@ export default function RespondentTokenPage() {
         const response = await fetch("/api/respondent/submit", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ token, answers: next.filter((item) => item.numberValue !== undefined || item.textValue) }),
+          body: JSON.stringify({
+            token,
+            answers: next.filter((item) => item.numberValue !== undefined || item.textValue || (item.optionKeys && item.optionKeys.length > 0)),
+          }),
         });
         if (!response.ok) {
           const result = (await response.json().catch(() => ({}))) as { error?: string };
-          setError(result.error ?? "Your response could not be submitted.");
+          const message = result.error ?? "Your response couldn't be submitted.";
+          setError(message);
+          setInvalidReason(message === "You've already completed this survey." ? "already_submitted" : undefined);
           setStep("invalid");
           return;
         }
@@ -128,6 +157,26 @@ export default function RespondentTokenPage() {
     await recordAnswer({ questionId: question.id, numberValue: value });
   }
 
+  async function commitOptions() {
+    if (!question || selectedKeys.length === 0) return;
+    const keys = selectedKeys;
+    setSelectedKeys([]);
+    await recordAnswer({ questionId: question.id, optionKeys: keys, ranked: question.type === "ranking" });
+  }
+
+  async function skipOptionQuestion() {
+    if (!question) return;
+    setSelectedKeys([]);
+    await recordAnswer({ questionId: question.id, optionKeys: [] });
+  }
+
+  // For ranking questions, tap order IS the rank order (first tap = rank
+  // 1); for multiple_choice/matrix, order doesn't matter. Same toggle
+  // either way: tapping an already-picked option removes it.
+  function toggleOption(key: string) {
+    setSelectedKeys((current) => (current.includes(key) ? current.filter((item) => item !== key) : [...current, key]));
+  }
+
   async function answerText() {
     if (!question) return;
     if (!textValue.trim() && !question.optional) return;
@@ -144,7 +193,12 @@ export default function RespondentTokenPage() {
   function downloadAnswers() {
     const lines = answers.map((answer, index) => {
       const q = questions[index];
-      const value = answer.textValue ?? answer.numberValue ?? "(skipped)";
+      const value =
+        answer.textValue ??
+        answer.numberValue ??
+        (answer.optionKeys && answer.optionKeys.length > 0
+          ? answer.optionKeys.map((key) => q?.options?.find((o) => o.key === key)?.label ?? key).join(", ")
+          : "(skipped)");
       return `${index + 1}. ${q?.text ?? answer.questionId}\n   Your answer: ${value}`;
     });
     const content = `${brand.name} — your survey answers\n\n${lines.join("\n\n")}\n`;
@@ -160,7 +214,7 @@ export default function RespondentTokenPage() {
   // Keyboard support: digit keys select the same-valued option, Enter
   // commits whichever option is currently selected.
   useEffect(() => {
-    if (step !== "survey" || !question || question.type === "open_text") return;
+    if (step !== "survey" || !question || !isScaleQuestion) return;
 
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Enter" && selectedValue !== null) {
@@ -179,10 +233,10 @@ export default function RespondentTokenPage() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, question, selectedValue, usesKeyboardSelect, scaleOptions.join(",")]);
+  }, [step, question, selectedValue, usesKeyboardSelect, scaleOptions.join(","), isScaleQuestion]);
 
   return (
-    <main className="taker-surface flex min-h-screen items-center justify-center p-4 sm:p-8">
+    <main className="taker-surface flex min-h-screen items-center justify-center p-4 sm:p-8" style={themeOverrides}>
       <div className="w-full max-w-xl">
         <div className="taker-chrome mb-6 flex items-center justify-between">
           <span className="text-[14px] font-semibold tracking-[-0.15px] text-[var(--ink)]">{brand.name}</span>
@@ -204,15 +258,26 @@ export default function RespondentTokenPage() {
         ) : null}
 
         {step === "survey" ? (
-          <div className="taker-progress-track mb-6">
+          <div
+            className="taker-progress-track mb-6"
+            role="progressbar"
+            aria-label="Survey progress"
+            aria-valuemin={0}
+            aria-valuemax={questions.length}
+            aria-valuenow={current}
+            aria-valuetext={`Question ${current + 1} of ${questions.length}`}
+          >
             <div className="taker-progress-fill" style={{ width: `${(current / questions.length) * 100}%` }} />
           </div>
         ) : null}
+        <div aria-live="polite" className="sr-only">
+          {step === "survey" && question ? `Question ${current + 1} of ${questions.length}` : step === "done" ? "Survey complete" : ""}
+        </div>
 
         {step === "loading" ? (
           <Panel title="Checking your link" text="This takes a moment." />
         ) : step === "invalid" ? (
-          <Panel title="This link is not active" text={error || "The token is missing, already submitted, or no longer valid."} />
+          <Panel {...invalidLinkCopy(invalidReason, error)} />
         ) : step === "intro" ? (
           <div className="rounded-[var(--radius-shell)] border border-[var(--border)] bg-white p-8 shadow-[var(--shadow-elevated)]">
             <div className="taker-icon-circle mb-5">
@@ -275,7 +340,13 @@ export default function RespondentTokenPage() {
             <p className="text-[11px] font-medium uppercase tracking-[0.04em] text-[var(--ink-soft)]">{question.construct ?? session?.templateName ?? "Survey"}</p>
             <h2 className="mt-2 font-[family-name:var(--font-display)] text-[34px] font-normal leading-[1.18] tracking-[-0.01em] text-[var(--ink)] sm:text-[38px]">{question.text}</h2>
             <p className="mt-2 text-[13.5px] leading-[1.5] text-[var(--ink-mid)]">
-              {question.type === "open_text" ? "No wrong answers — honest is the only answer that helps." : "How true is this for you?"}
+              {question.type === "open_text"
+                ? "No wrong answers — honest is the only answer that helps."
+                : question.type === "multiple_choice" || question.type === "matrix"
+                  ? "Choose everything that applies."
+                  : question.type === "ranking"
+                    ? "Tap options in order, most important first. Tap again to remove one."
+                    : "How true is this for you?"}
             </p>
 
             {question.type === "open_text" ? (
@@ -294,13 +365,58 @@ export default function RespondentTokenPage() {
                   </button>
                 ) : null}
               </div>
+            ) : isOptionQuestion ? (
+              <div className="mt-6 grid gap-3">
+                <div className="grid gap-2" role="group" aria-label={question.text}>
+                  {(question.options ?? []).map((option) => {
+                    const rankIndex = selectedKeys.indexOf(option.key);
+                    const picked = rankIndex !== -1;
+                    return (
+                      <button
+                        key={option.key}
+                        onClick={() => toggleOption(option.key)}
+                        data-selected={picked}
+                        className="flex items-center gap-3 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--bg)] p-3.5 text-left text-[14px] text-[var(--ink)] transition-colors data-[selected=true]:border-[var(--green)] data-[selected=true]:bg-[var(--green-bg)]"
+                      >
+                        {question.type === "ranking" ? (
+                          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full border border-[var(--border)] text-[11px] font-semibold text-[var(--ink-mid)] data-[selected=true]:border-[var(--green)] data-[selected=true]:bg-[var(--green)] data-[selected=true]:text-white" data-selected={picked}>
+                            {picked ? rankIndex + 1 : ""}
+                          </span>
+                        ) : (
+                          <span className="grid h-5 w-5 shrink-0 place-items-center rounded-[4px] border border-[var(--border)] data-[selected=true]:border-[var(--green)] data-[selected=true]:bg-[var(--green)] data-[selected=true]:text-white" data-selected={picked}>
+                            {picked ? <Check size={12} strokeWidth={2.5} /> : null}
+                          </span>
+                        )}
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <button disabled={selectedKeys.length === 0} onClick={commitOptions} className="btn-primary justify-center py-3">
+                  Next question
+                  <ArrowRight size={14} strokeWidth={1.8} />
+                </button>
+                {question.optional ? (
+                  <button onClick={skipOptionQuestion} className="text-[13px] font-medium text-[var(--ink-mid)] hover:text-[var(--ink)]">
+                    Skip
+                  </button>
+                ) : null}
+              </div>
             ) : (
               <div className="mt-7 grid gap-2.5">
-                <div className="taker-scale">
+                <div className="taker-scale" role="radiogroup" aria-label={question.text}>
                   {scaleOptions.map((value) => {
                     const selected = selectedValue === value;
                     return (
-                      <button key={value} onClick={() => setSelectedValue(value)} className="taker-circle" data-selected={selected} aria-label={`${value} ${scaleLabel(question.type, value)}`}>
+                      <button
+                        key={value}
+                        onClick={() => setSelectedValue(value)}
+                        className="taker-circle"
+                        data-selected={selected}
+                        role="radio"
+                        aria-checked={selected}
+                        aria-label={`${value} ${scaleLabel(question.type, value)}`}
+                      >
                         {value}
                       </button>
                     );
@@ -326,6 +442,7 @@ export default function RespondentTokenPage() {
                 disabled={current === 0}
                 onClick={() => {
                   setSelectedValue(null);
+                  setSelectedKeys([]);
                   setAnswers(answers.slice(0, -1));
                 }}
                 className="inline-flex items-center gap-2 text-[13px] font-medium text-[var(--ink-mid)] disabled:opacity-30"
@@ -377,6 +494,23 @@ function ConfidentialityRow({ tone, heading, description }: { tone: "green" | "r
       </div>
     </div>
   );
+}
+
+// A dead link isn't one thing -- "you already answered this" and "this
+// link doesn't exist" call for different words, not one generic message.
+// `reason` comes from the API when it knows which; falls back to the
+// server's own error text, then a plain default, when it doesn't.
+function invalidLinkCopy(reason: string | undefined, error: string): { title: string; text: string } {
+  if (reason === "already_submitted") {
+    return { title: "You've already taken this survey", text: "Thanks again for sharing your answers — there's nothing more to do here." };
+  }
+  if (reason === "revoked") {
+    return { title: "This invite is no longer active", text: "Your workplace turned this link off. If that seems wrong, check with whoever sent it to you." };
+  }
+  return {
+    title: "This link isn't working",
+    text: error || "It may be mistyped, or the survey it points to no longer exists. Ask whoever sent it for a fresh link.",
+  };
 }
 
 function Panel({ title, text }: { title: string; text: string }) {

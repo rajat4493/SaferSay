@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/internal/retention-purge",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/internal/cycle-scheduler",
+      "schedule": "0 4 * * *"
+    }
+  ]
+}

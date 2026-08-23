@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Download, EyeOff, RefreshCw, Share2 } from "lucide-react";
+import { Download, EyeOff, FileText, RefreshCw, Share2 } from "lucide-react";
 import { Card } from "@/components/AppShell";
 import { AiSynthesisCard } from "@/components/AiSynthesisCard";
 import { ConfidentialitySeal } from "@/components/ConfidentialitySeal";
@@ -20,6 +20,11 @@ type ReportResponse = {
     protected: boolean;
     n: number;
     rows: Array<{ questionId: string; label?: string; n: number; average: number | null }>;
+    // Only set when a requested department was itself below the
+    // confidentiality threshold and this report widened to a manager's
+    // reporting subtree (or the whole company) to clear it -- see
+    // managerRollupService.ts. Absent/null means no widening happened.
+    rolledUpTo?: { label: string; teamsIncluded: string[] } | null;
   };
   textAnswers?: {
     protected: boolean;
@@ -53,6 +58,7 @@ export function ProtectedReportPanel({
   const [actionDraft, setActionDraft] = useState("");
   const [savingAction, setSavingAction] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const toast = useToast();
   const ShellCard = mode === "viewer" ? ViewerCard : Card;
 
@@ -96,6 +102,31 @@ export function ProtectedReportPanel({
     link.download = `${result?.cycle?.name ?? "safersay-report"}.csv`;
     link.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function exportPdf() {
+    if (!report || report.protected) return;
+    setDownloadingPdf(true);
+    try {
+      const params = new URLSearchParams({ format: "pdf" });
+      if (result?.cycle?.id) params.set("cycleId", result.cycle.id);
+      const response = await fetch(`/api/report/export?${params.toString()}`);
+      if (!response.ok) {
+        toast.show({ variant: "error", message: "Couldn't generate the PDF. Try again." });
+        return;
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${result?.cycle?.name ?? "safersay-report"}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.show({ variant: "error", message: "Couldn't generate the PDF. Try again." });
+    } finally {
+      setDownloadingPdf(false);
+    }
   }
 
   async function submitAction() {
@@ -186,6 +217,10 @@ export function ProtectedReportPanel({
                   <Download size={13} strokeWidth={1.8} />
                   Export CSV
                 </button>
+                <button onClick={exportPdf} disabled={downloadingPdf} className="btn-secondary">
+                  <FileText size={13} strokeWidth={1.8} />
+                  {downloadingPdf ? "Generating..." : "Export PDF"}
+                </button>
                 <button onClick={shareScore} className="btn-primary">
                   <Share2 size={13} strokeWidth={1.8} />
                   {shareCopied ? "Copied" : "Share score"}
@@ -217,6 +252,15 @@ export function ProtectedReportPanel({
           </div>
         ) : (
           <div className="space-y-4">
+            {report.rolledUpTo ? (
+              <div className="flex items-start gap-2 rounded-[var(--radius-input)] border border-[var(--border)] bg-[var(--bg)] p-3 text-[13px] text-[var(--ink-mid)]">
+                <EyeOff size={15} strokeWidth={1.8} className="mt-0.5 shrink-0 text-[var(--ink-faint)]" />
+                <span>
+                  {department} alone didn&apos;t have enough responses to show on its own. This view widens to{" "}
+                  <strong className="text-[var(--ink)]">{report.rolledUpTo.label}</strong> to protect everyone&apos;s confidentiality.
+                </span>
+              </div>
+            ) : null}
             {report.rows.map((row) => {
               const value = row.average ?? 0;
               const width = `${Math.min(100, Math.max(0, (value / 5) * 100))}%`;

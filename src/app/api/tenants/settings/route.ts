@@ -5,6 +5,15 @@ import { IdentityRepository } from "@/lib/server/repositories/identityRepository
 import { canModifySettings } from "@/lib/permissions";
 import { logThresholdChanged } from "@/lib/server/auditLog";
 
+function isSlackWebhookUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" && parsed.hostname === "hooks.slack.com";
+  } catch {
+    return false;
+  }
+}
+
 export async function GET() {
   const session = await getSessionContext();
   if (!session) return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
@@ -32,10 +41,16 @@ export async function PATCH(request: NextRequest) {
     smtpPassword?: string;
     smtpFromEmail?: string;
     smtpClear?: boolean;
+    slackWebhookUrl?: string;
+    slackClear?: boolean;
   };
 
   if (typeof body.safetyContactEmail === "string" && body.safetyContactEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.safetyContactEmail.trim())) {
     return NextResponse.json({ ok: false, error: "Safety contact must be a valid email address." }, { status: 400 });
+  }
+
+  if (typeof body.slackWebhookUrl === "string" && body.slackWebhookUrl.trim() && !isSlackWebhookUrl(body.slackWebhookUrl.trim())) {
+    return NextResponse.json({ ok: false, error: "That doesn't look like a Slack incoming-webhook URL (https://hooks.slack.com/services/...)." }, { status: 400 });
   }
 
   // SMTP is set-together, not field-by-field: the admin resends the full
@@ -71,6 +86,11 @@ export async function PATCH(request: NextRequest) {
         password: body.smtpPassword!,
         fromEmail: body.smtpFromEmail!.trim(),
       });
+    }
+    if (body.slackClear) {
+      await repo.setSlackWebhookUrl(session.tenant.id, null);
+    } else if (typeof body.slackWebhookUrl === "string" && body.slackWebhookUrl.trim()) {
+      await repo.setSlackWebhookUrl(session.tenant.id, body.slackWebhookUrl.trim());
     }
     return repo.getTenantSelfSettings(session.tenant.id);
   });

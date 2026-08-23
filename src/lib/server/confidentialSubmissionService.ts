@@ -19,9 +19,12 @@ export async function submitWithSeveredRepositories(params: {
   const responseRepository = new ResponseRepository(params.db);
   const participant = await identityRepository.findIssuedToken(tokenHash);
 
-  if (!participant || participant.token_status !== "issued") {
-    throw new Error("Token is invalid or already spent.");
-  }
+  // Distinct, plain-language reasons -- "you already answered this" and
+  // "this link doesn't work" are different situations for a respondent,
+  // not the same generic failure.
+  if (!participant) throw new Error("This link isn't valid.");
+  if (participant.token_status === "spent") throw new Error("You've already completed this survey.");
+  if (participant.token_status !== "issued") throw new Error("This invite is no longer active.");
 
   const submission = await responseRepository.submitAnswers({
     tenantId: participant.tenant_id,

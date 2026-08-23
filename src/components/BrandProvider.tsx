@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { BrandTheme, defaultBrand } from "@/lib/brand";
 
 type BrandContextValue = {
@@ -12,11 +12,29 @@ type BrandContextValue = {
 const BrandContext = createContext<BrandContextValue | null>(null);
 
 export function BrandProvider({ children }: { children: React.ReactNode }) {
+  // Source of truth is now the server (identity.tenant_settings.brand,
+  // see /api/tenants/brand) so a tenant's brand is shared across every
+  // team member's device, not stuck in whoever last set it locally.
+  // localStorage is read here purely to paint the previously-fetched
+  // value instantly on load instead of a default->real flash; it's a
+  // cache, not the record of truth -- setBrand always PATCHes the server.
   const [brand, setBrandState] = useState<BrandTheme>(() => {
     if (typeof window === "undefined") return defaultBrand;
     const saved = window.localStorage.getItem("safersay-brand");
     return saved ? { ...defaultBrand, ...JSON.parse(saved) } : defaultBrand;
   });
+
+  useEffect(() => {
+    fetch("/api/tenants/brand")
+      .then((response) => response.json())
+      .then((data: { ok?: boolean; brand?: BrandTheme }) => {
+        if (data.ok && data.brand) {
+          setBrandState(data.brand);
+          window.localStorage.setItem("safersay-brand", JSON.stringify(data.brand));
+        }
+      })
+      .catch(() => undefined);
+  }, []);
 
   const value = useMemo<BrandContextValue>(
     () => ({
@@ -24,10 +42,20 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
       setBrand: (nextBrand) => {
         setBrandState(nextBrand);
         window.localStorage.setItem("safersay-brand", JSON.stringify(nextBrand));
+        fetch("/api/tenants/brand", {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(nextBrand),
+        }).catch(() => undefined);
       },
       resetBrand: () => {
         setBrandState(defaultBrand);
         window.localStorage.removeItem("safersay-brand");
+        fetch("/api/tenants/brand", {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(defaultBrand),
+        }).catch(() => undefined);
       },
     }),
     [brand],

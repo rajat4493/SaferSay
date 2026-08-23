@@ -154,6 +154,9 @@ export type TenantSelfSettings = {
   // reminder email falls back to the global Resend sender.
   smtpConfigured: boolean;
   smtpFromEmail: string | null;
+  // Never the webhook URL itself -- just enough for the settings UI to
+  // show "connected" vs "not connected", same convention as smtpConfigured.
+  slackConnected: boolean;
 };
 
 export type CycleAction = {
@@ -181,6 +184,12 @@ export type EmployeeImportRecord = {
   // the org chart, no separate builder needed. See
   // docs/strategy/SAFERSAY_FINAL_ARCHITECTURE.md §5.
   managerEmail?: string;
+  // Only ever set by the HRIS sync webhook (/api/employees/sync), never
+  // CSV import -- matching still keys on email either way (see
+  // 0031_employee_sync.sql); these ride along for a future vendor
+  // connector to reconcile against without a schema change then.
+  externalId?: string;
+  sourceSystem?: string;
 };
 
 export type IssuedParticipantToken = {
@@ -226,19 +235,49 @@ export type PilotIdentitySummary = {
   sentInvites: number;
 };
 
+export type QuestionType = "likert_5" | "enps_0_10" | "open_text" | "multiple_choice" | "ranking" | "matrix";
+
 export type ResponseAnswerInput = {
   questionId: string;
   numberValue?: number;
   textValue?: string;
+  // multiple_choice/matrix: the selected option keys, no rank. ranking:
+  // every ranked option key, in the respondent's chosen order -- set
+  // `ranked: true` so the repository stores each key's array position as
+  // its rank; other types must leave `ranked` unset.
+  optionKeys?: string[];
+  ranked?: boolean;
+};
+
+/** A multiple_choice/ranking option, or one column of a matrix row. */
+export type QuestionOption = { key: string; label: string };
+
+/**
+ * Structural-only skip-logic condition (Option B -- see plan history).
+ * `attribute` is deliberately restricted to the two respondent facts
+ * identity.employees actually carries and responses.submissions already
+ * snapshots at invite time (segment_team/segment_location) -- there is no
+ * role or tenure column in this schema. Never a prior answer -- enforced
+ * in the /api/cycles/[id]/questions PATCH validation, not just this type.
+ */
+export type ShowIfCondition = {
+  attribute: "team" | "location";
+  op: "eq" | "neq";
+  value: string;
 };
 
 export type RespondentSurveyQuestion = {
   id: string;
   position: number;
   text: string;
-  type: "likert_5" | "enps_0_10" | "open_text";
+  type: QuestionType;
   construct: string | null;
   optional: boolean;
+  options: QuestionOption[] | null;
+  // Only set for matrix-row questions; rows sharing a matrix_group_id
+  // render as one grid on the taker surface.
+  matrixGroupId: string | null;
+  showIf: ShowIfCondition | null;
 };
 
 export type RespondentSurveySession = {
@@ -255,11 +294,18 @@ export type RespondentSurveySession = {
  * §4). The parameter exists now so adding those scopes later is a query
  * change, not a reporting-layer rewrite.
  */
+export type QuestionBankQuestionType = "scale" | "open_text" | "multiple_choice" | "ranking" | "matrix";
+
 export type QuestionBankItem = {
   id: string;
   construct: string | null;
   text: string;
-  questionType: "scale" | "open_text";
+  questionType: QuestionBankQuestionType;
+  // Only meaningful for multiple_choice/ranking/matrix -- null otherwise.
+  // No show_if here: a branching condition is cycle-specific (gates one
+  // question instance against that cycle's respondents), not a property
+  // of a reusable question definition -- see plan history.
+  options: QuestionOption[] | null;
 };
 
 export type ReportScope =
@@ -273,6 +319,14 @@ export type ProtectedReport =
       protected: false;
       n: number;
       rows: Array<{ questionId: string; label?: string; construct?: string | null; n: number; average: number | null }>;
+      // Only set by getManagerRollupReport: non-null means the requested
+      // team was itself below the confidentiality threshold and this
+      // report widened to a manager's reporting subtree (or, at the
+      // limit, the whole company) to clear it. `teamsIncluded` is every
+      // team-label folded into the merged count -- shown to the client
+      // so it's honest about what "n" actually covers, not silently wider
+      // than the picker implied.
+      rolledUpTo?: { label: string; teamsIncluded: string[] } | null;
     };
 
 /**
@@ -316,3 +370,24 @@ export type CycleTrendQuestion = {
   questionText: string;
   points: CycleTrendPoint[];
 };
+
+/**
+ * Per-option tallies for multiple_choice/ranking/matrix questions. Each
+ * option's pick-count is suppressed independently (see
+ * responses.report_option_tallies, 0030) -- a rare option is as
+ * identifying as a numeric outlier -- so `options` only ever contains
+ * options that individually cleared the threshold, never the full set
+ * with some counts zeroed out (that would still leak "someone picked the
+ * missing one"). `avgRank` is only meaningful for ranking questions.
+ */
+export type ProtectedOptionReport =
+  | { protected: true; n: number; rows: [] }
+  | {
+      protected: false;
+      n: number;
+      rows: Array<{
+        questionId: string;
+        label?: string;
+        options: Array<{ optionKey: string; n: number; avgRank: number | null }>;
+      }>;
+    };

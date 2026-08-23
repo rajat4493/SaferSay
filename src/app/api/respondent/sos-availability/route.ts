@@ -3,6 +3,7 @@ import { getDatabasePool } from "@/lib/server/db/pool";
 import { getTenantPool, withTenantContext } from "@/lib/server/db/tenantPool";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import { hashServerToken } from "@/lib/server/tokenHashing";
+import { checkRateLimit, getClientIp } from "@/lib/server/rateLimit";
 
 /**
  * Tells the respondent UI whether to render the SOS button at all. This is
@@ -15,6 +16,11 @@ export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
   if (!token) {
     return NextResponse.json({ ok: false, error: "Token is required." }, { status: 400 });
+  }
+
+  const { allowed } = await checkRateLimit(`sos-availability:${getClientIp(request)}`, 30, 60);
+  if (!allowed) {
+    return NextResponse.json({ ok: false, error: "Too many attempts. Try again in a minute." }, { status: 429 });
   }
 
   const adminPool = getDatabasePool();

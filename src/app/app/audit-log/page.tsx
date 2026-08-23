@@ -17,6 +17,7 @@ type AuditLogRow = {
 
 const actionLabels: Record<string, string> = {
   survey_created: "Created a survey",
+  survey_questions_updated: "Edited a survey's questions",
   survey_closed: "Closed a survey",
   survey_deleted: "Deleted a survey",
   invites_sent: "Sent invites",
@@ -24,11 +25,13 @@ const actionLabels: Record<string, string> = {
   employee_list_imported: "Imported employee list",
   employee_added: "Added an employee",
   employee_removed: "Removed an employee",
-  report_exported: "Exported a report",
+  report_exported: "Exported a report (CSV/JSON/PDF)",
   threshold_changed: "Changed the minimum group size",
   settings_updated: "Updated workspace settings",
   team_invite_sent: "Invited a teammate",
   team_member_removed: "Removed a teammate",
+  data_retention_purged: "Automatic data retention purge ran",
+  deletion_requested: "Requested account/workspace deletion",
 };
 
 const roleLabels: Record<string, string> = {

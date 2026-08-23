@@ -17,6 +17,11 @@ describe("real protected report flow", () => {
     expect(repo).not.toContain("identity.survey_participants");
   });
 
+  it("routes a department-scoped request through the manager-hierarchy rollup, not the plain org report", () => {
+    const route = readFileSync("src/app/api/report/route.ts", "utf8");
+    expect(route).toContain("getManagerRollupReport(db, tenantId, cycle.id, cycle.minGroupSize, department)");
+  });
+
   it("uses the shared real report panel in admin and viewer pages", () => {
     // Reports moved from the standalone /app/reports route into the
     // per-survey Results stage (docs/strategy/CLAUDE_CODE_ADMIN_REFACTOR.md
