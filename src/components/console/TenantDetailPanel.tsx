@@ -227,13 +227,8 @@ export function TenantDetailPanel({ tenantId }: { tenantId: string }) {
           <div className="mt-3 space-y-3">
             <label className="block text-[13px] font-medium text-[var(--ink)]">
               Survey credits
-              <input
-                type="number"
-                min={0}
-                value={tenant.billingTerms.surveyCredits}
-                onChange={(event) => updateBillingTerms({ surveyCredits: Number(event.target.value) })}
-                className="admin-input mt-1 h-9 w-full"
-              />
+              <p className="admin-input mt-1 flex h-9 items-center bg-[var(--bg-hover)] px-3 text-[var(--ink-mid)]">{tenant.billingTerms.surveyCredits}</p>
+              <span className="mt-1 block text-xs font-normal text-[var(--ink-faint)]">Ledger-derived. Credit adjustments require an audited support workflow.</span>
             </label>
             <label className="block text-[13px] font-medium text-[var(--ink)]">
               Report retention

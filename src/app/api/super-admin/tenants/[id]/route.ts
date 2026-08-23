@@ -46,7 +46,13 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
     const planTier = body.planTier && validPlanTiers.includes(body.planTier as TenantPlanTier)
       ? (body.planTier as TenantPlanTier)
       : existing.planTier;
-    await gate.repo.updateTenantPlan(id, planTier, body.features ?? existing.features, body.billingTerms ?? existing.billingTerms);
+    // The credit ledger is authoritative. This general tenant-settings
+    // endpoint must never manufacture a display-only balance that cannot be
+    // spent (or conceal the actual balance); a future manual adjustment needs
+    // its own audited ledger event.
+    const availableCredits = await gate.repo.listAvailableSurveyCredits(id);
+    const billingTerms = { ...(body.billingTerms ?? existing.billingTerms), surveyCredits: availableCredits.length };
+    await gate.repo.updateTenantPlan(id, planTier, body.features ?? existing.features, billingTerms);
   }
 
   if (typeof body.minGroupSize === "number") {
