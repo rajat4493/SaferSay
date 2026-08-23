@@ -54,11 +54,21 @@ export async function POST(request: NextRequest) {
     for (const id of delivery.sentIds) await repo.markOutboxSent(id);
     for (const id of delivery.failedIds) await repo.markOutboxFailed(id);
 
-    if (deliveryType === "invite" && delivery.sent > 0) {
+    if (deliveryType === "invite" && queued > 0) {
       await repo.markFirstRunCompleted(tenant.id);
       // Real founder-facing "the survey is live" transition -- see
       // ResponseRepository.openCycle. A reminder implies the cycle is
       // already open, so this only fires for the initial invite send.
+      //
+      // Gated on invites actually being queued (the admin genuinely sent),
+      // not on email delivery succeeding (delivery.sent > 0) -- a
+      // respondent's link works independently of whether the notification
+      // email reached them (an admin can always share it another way).
+      // Coupling "live" to email success meant a single flaky/misconfigured
+      // mail provider -- or, as found in live testing, an email provider's
+      // sandbox mode rejecting every recipient -- could permanently strand
+      // an entire survey in draft with valid, working invite links that
+      // nobody could use, because nothing ever flips the cycle open.
       await new ResponseRepository(db).openCycle(tenant.id, cycleId);
     }
 
