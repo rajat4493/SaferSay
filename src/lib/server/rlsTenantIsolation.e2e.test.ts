@@ -103,4 +103,26 @@ describeIfDb("RLS tenant isolation (restricted role)", () => {
   it("never grants direct read access to raw response content", async () => {
     await expect(appPool.query("select * from responses.answers limit 1")).rejects.toThrow(/permission denied/);
   });
+
+  // Regression test for a real bug found in live testing: the restricted
+  // role was only ever granted select+insert on responses.survey_cycles
+  // (0011_rls_tenant_isolation.sql), so openCycle()/closeCycle() -- both
+  // UPDATE statements -- failed with "permission denied for table
+  // survey_cycles" the moment a real deployment used this role for a
+  // send/close action. Fixed in 0038_fix_missing_update_grants.sql, which
+  // also granted identity.users (needed by the self-profile name-edit
+  // route, PATCH /api/account, found via the same audit).
+  it("can update survey_cycles -- the operation openCycle()/closeCycle() need", async () => {
+    const tenant = await seedTenantWithEmployees("RLS Isolation Tenant F", 1);
+    await withTenantContext(appPool, tenant.id, (client) =>
+      client.query("update responses.survey_cycles set status = 'open' where tenant_id = $1", [tenant.id]),
+    );
+  });
+
+  it("can update identity.users -- the operation the self-profile name edit needs", async () => {
+    const tenant = await seedTenantWithEmployees("RLS Isolation Tenant G", 1);
+    await withTenantContext(appPool, tenant.id, (client) =>
+      client.query("update identity.users set name = 'Test' where tenant_id = $1", [tenant.id]),
+    );
+  });
 });

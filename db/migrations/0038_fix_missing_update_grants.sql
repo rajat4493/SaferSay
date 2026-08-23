@@ -1,0 +1,22 @@
+-- Corrective migration for a real bug found in live testing: the
+-- restricted safersay_app role (used by withTenantScopedDb for every
+-- RLS-enforced tenant-scoped query, once DATABASE_URL_APP is configured)
+-- was only ever granted select+insert on responses.survey_cycles
+-- (0011_rls_tenant_isolation.sql), never update -- even though
+-- ResponseRepository.openCycle()/closeCycle() have always needed to
+-- update it. This surfaced as "permission denied for table survey_cycles"
+-- the moment a real deployment actually used the restricted role for a
+-- send/close action.
+--
+-- Auditing every other UPDATE statement in the codebase against its
+-- matching GRANT found one more real (if not yet reported) gap of the
+-- same class: identity.users was only ever granted select, but
+-- IdentityRepository.updateUserName() -- the self-service display-name
+-- edit at PATCH /api/account -- updates it through the same restricted,
+-- tenant-scoped path and would hit the identical error.
+--
+-- GRANT is idempotent (re-granting an already-held privilege is a safe
+-- no-op), so this is safe to run on every database regardless of which
+-- ones actually hit the bug.
+grant update on responses.survey_cycles to safersay_app;
+grant update on identity.users to safersay_app;
