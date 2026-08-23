@@ -944,6 +944,21 @@ export class IdentityRepository {
       );
       imported.push(employee);
     }
+
+    // manager_id resolution is a second pass, not inline with the upsert
+    // above: a manager can appear later in the same import batch than
+    // their report (no ordering requirement on the CSV/HRIS payload), so
+    // every row needs to exist with a real id first. Mirrors
+    // manager_email's own overwrite semantics above (not a coalesce) --
+    // an import that drops managerEmail for someone clears their
+    // manager_id too, same as it already clears their manager_email.
+    const roster = await this.db.query<{ id: string; email: string }>(`select id, email from identity.employees where tenant_id = $1`, [tenantId]);
+    const idByEmail = new Map(roster.rows.map((row) => [row.email, row.id]));
+    for (const employee of employees) {
+      const managerId = employee.managerEmail ? (idByEmail.get(employee.managerEmail) ?? null) : null;
+      await this.db.query(`update identity.employees set manager_id = $1 where tenant_id = $2 and email = $3`, [managerId, tenantId, employee.email]);
+    }
+
     return imported.length;
   }
 
