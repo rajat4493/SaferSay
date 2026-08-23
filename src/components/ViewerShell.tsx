@@ -26,7 +26,7 @@ export function ViewerShell({ children, title, subtitle }: { children: React.Rea
         <Link href="/" className="flex items-center gap-2.5">
           <BrandMark />
           <div>
-            <span className="text-[16px] font-semibold leading-none text-[var(--ink)]">{brand.name}</span>
+            <span className="text-[14px] font-semibold leading-none text-[var(--ink)]">{brand.name}</span>
             <p className="mt-0.5 text-[11px] text-[var(--ink-faint)]">Viewer portal</p>
           </div>
         </Link>
@@ -42,8 +42,8 @@ export function ViewerShell({ children, title, subtitle }: { children: React.Rea
               key={item.href}
               href={item.href}
               onClick={() => setMobileNavOpen(false)}
-              className={`flex items-center gap-2.5 rounded-[var(--radius-pill)] px-2.5 py-[7px] text-[13px] transition ${
-                active ? "bg-[var(--bg-active)] font-medium text-[var(--green)]" : "font-normal text-[var(--ink-mid)] hover:bg-[var(--bg-hover)] hover:text-[var(--ink)]"
+              className={`flex items-center gap-2.5 rounded-[var(--radius-input)] px-2.5 py-[7px] text-[13px] transition ${
+                active ? "bg-[var(--bg-active)] font-medium text-[var(--ink)]" : "font-normal text-[var(--ink-mid)] hover:bg-[var(--bg-hover)] hover:text-[var(--ink)]"
               }`}
             >
               <item.icon size={15} strokeWidth={1.8} />

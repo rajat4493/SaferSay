@@ -2,15 +2,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getSessionContext } from "@/lib/server/authSession";
 import { withTenantScopedDb } from "@/lib/server/db/tenantPool";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
-import { canAccessPeople, canImportEmployees } from "@/lib/permissions";
 
 export async function GET(request: NextRequest) {
   const session = await getSessionContext();
   if (!session) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
-  }
-  if (!canAccessPeople(session.role)) {
-    return NextResponse.json({ ok: false, error: "You don't have permission to view employees." }, { status: 403 });
   }
 
   const search = request.nextUrl.searchParams.get("search") ?? undefined;
@@ -34,9 +30,6 @@ export async function POST(request: NextRequest) {
   const session = await getSessionContext();
   if (!session) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
-  }
-  if (!canImportEmployees(session.role)) {
-    return NextResponse.json({ ok: false, error: "You don't have permission to add employees." }, { status: 403 });
   }
 
   const body = (await request.json().catch(() => ({}))) as {

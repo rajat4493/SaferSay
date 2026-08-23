@@ -134,6 +134,47 @@ async function sendViaTenantSmtp({
   return { sent: sentIds.length, failed: failedIds.length, errors, sentIds, failedIds };
 }
 
+/** Sends the owner-authored follow-through update to active employees. The
+ * message deliberately contains no scores, segmentation, participation, or
+ * response content. */
+export async function sendPublicCommitmentUpdate({
+  tenant,
+  recipients,
+  statement,
+  targetDate,
+}: {
+  tenant: TenantRecord;
+  recipients: Array<{ email: string; name: string | null }>;
+  statement: string;
+  targetDate: string;
+}): Promise<DeliveryResult> {
+  const config = getResendConfig();
+  if (!config.apiKey) return { sent: 0, failed: recipients.length, errors: ["RESEND_API_KEY is not configured."] };
+  if (getRuntimeMode() === "production" && config.fromEmail.includes("resend.dev")) {
+    return { sent: 0, failed: recipients.length, errors: ["RESEND_FROM_EMAIL must be a verified production domain."] };
+  }
+  const resend = new Resend(config.apiKey);
+  let sent = 0;
+  const errors: string[] = [];
+  for (const recipient of recipients) {
+    const greeting = recipient.name ? `Hi ${recipient.name},` : "Hi,";
+    try {
+      const result = await resend.emails.send({
+        from: config.fromEmail,
+        to: recipient.email,
+        subject: `${tenant.name}: what we will do next`,
+        text: `${greeting}\n\nYou said that honest feedback matters. Here is the commitment your company has published:\n\n${statement}\n\nTarget date: ${targetDate}\n\nThis update does not identify anyone or share individual survey answers.`,
+        html: `<div style="font-family:Inter,Arial,sans-serif;color:#1d1b19;line-height:1.55;max-width:560px"><p>${escapeHtml(greeting)}</p><p>You said that honest feedback matters. Here is the commitment your company has published:</p><p><strong>${escapeHtml(statement)}</strong></p><p>Target date: ${escapeHtml(targetDate)}</p><p style="color:#746f68;font-size:13px">This update does not identify anyone or share individual survey answers.</p></div>`,
+      });
+      if (result.error) errors.push(`${recipient.email}: ${result.error.message}`);
+      else sent += 1;
+    } catch {
+      errors.push(`${recipient.email}: delivery could not be completed.`);
+    }
+  }
+  return { sent, failed: recipients.length - sent, errors };
+}
+
 function buildInviteMessage({ tenant, delivery, appUrl }: { tenant: TenantRecord; delivery: QueuedInviteDelivery; appUrl: string }) {
   const greeting = delivery.name ? `Hi ${delivery.name},` : "Hi,";
   const action = delivery.deliveryType === "reminder" ? "reminder" : "invitation";

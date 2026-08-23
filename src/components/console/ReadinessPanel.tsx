@@ -10,6 +10,13 @@ import { getRuntimeMode, runtimeChecks } from "@/lib/runtimeConfig";
 export function ReadinessPanel() {
   const checks = runtimeChecks();
   const missing = checks.filter((check) => check.requiredForProduction && !check.configured);
+  const nextActions = [
+    "Set Vercel runtime to Node 22 and add production/staging env vars.",
+    "Verify Supabase Google and Microsoft OAuth, then set SUPABASE_OAUTH_PROVIDERS_CONFIRMED=true.",
+    "Verify a Resend sending domain; do not use onboarding@resend.dev for real pilots.",
+    "Create the Stripe webhook for /api/stripe/webhook and add its whsec value.",
+    "Configure PRIVACY_CONTACT_EMAIL and review /privacy plus /dpa before customer use.",
+  ];
 
   return (
     <div className="space-y-[9px]">
@@ -24,6 +31,20 @@ export function ReadinessPanel() {
           <p className={`data-number mt-2 ${missing.length === 0 ? "text-[var(--green)]" : "text-[var(--red)]"}`}>{missing.length === 0 ? "Ready" : "Blocked"}</p>
         </ConsoleCard>
       </div>
+
+      {missing.length > 0 ? (
+        <ConsoleCard>
+          <h2 className="meta-label">Next actions</h2>
+          <ul className="mt-3 space-y-1.5 text-[13px] text-[var(--ink-mid)]">
+            {nextActions.map((action) => (
+              <li key={action} className="flex gap-2">
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-[var(--ink)]" />
+                <span>{action}</span>
+              </li>
+            ))}
+          </ul>
+        </ConsoleCard>
+      ) : null}
 
       <div className="grid gap-2">
         {checks.map((check) => (

@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 import { AlertTriangle } from "lucide-react";
-import * as Sentry from "@sentry/nextjs";
 
 /**
  * Root error boundary -- catches render/data errors in any segment that
@@ -14,7 +13,6 @@ import * as Sentry from "@sentry/nextjs";
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error("Unhandled application error:", error);
-    Sentry.captureException(error);
   }, [error]);
 
   return (

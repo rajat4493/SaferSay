@@ -1,169 +1,142 @@
-# Production Deployment Checklist
+# SaferSay Deployment Readiness
 
-**Deployment Date:** 2026-08-06  
-**Version:** Admin Refactor v1 (Three-zone nav, four-role model, audit logging)
+Last updated: 2026-08-09
 
-## Pre-Production Steps ✅
+## Current Status
 
-- [x] Code reviewed and merged to main
-- [x] All tests passing (npm run build)
-- [x] TypeScript types verified
-- [x] Audit logging guards tested (11 test cases)
-- [x] Permission model validated
-- [x] Design system applied (Ink & Cream)
-- [x] Vercel deployment created
+The codebase is ready for a Vercel staging deployment after the required production environment values are added in Vercel.
 
-## Production Deployment Steps
+Validated locally:
 
-### 1. Database Migration (REQUIRED)
+- Node `22`
+- Next.js `16.3.0`
+- `npm run lint`
+- `npm test`
+- `npm run build`
+- `npm audit --audit-level=moderate` returns `0 vulnerabilities`
 
-Run the following migration on the production database (`ijofizuruoynqxyjcdrt`):
+Do not use this as a real customer production launch until the legal/privacy actions below are complete.
 
-```sql
--- Migration 0014: Role model and audit logging (identity schema)
--- Applied: 2026-08-06
--- See: db/migrations/0014_role_model_and_audit_logs.sql
+## Local Owner Login
 
-create table if not exists identity.audit_logs (
-  id uuid primary key default gen_random_uuid(),
-  tenant_id uuid not null references identity.tenants(id),
-  actor_role text not null,
-  actor_id text not null,
-  action text not null,
-  target_type text,
-  target_id uuid,
-  safe_counts jsonb,
-  created_at timestamptz not null default now()
-);
+Local development uses a non-production dev login panel.
 
-alter table identity.audit_logs enable row level security;
+1. Start the app.
+2. Open `http://localhost:3000/login`.
+3. Use `dev@localhost`.
+4. Go to `/console` for the SaferSay owner console.
 
-create index if not exists audit_logs_tenant_created_idx
-  on identity.audit_logs (tenant_id, created_at desc);
+This works only when `SAFERSAY_RUNTIME_MODE` is not `production`. It is intentionally disabled on production deployments.
 
-create index if not exists audit_logs_actor_idx
-  on identity.audit_logs (tenant_id, actor_id, created_at desc);
+## Vercel Runtime
 
-create policy audit_logs_auditor_read on identity.audit_logs
-  for select
-  using (true);
+Set the Vercel project to Node `22.x`.
+
+If Vercel asks for an install/build command, use:
+
+- Install: `npm install`
+- Build: `npm run build`
+- Output: Next.js default
+
+## Required Vercel Environment Variables
+
+Set these in Vercel before staging:
+
+```text
+SAFERSAY_RUNTIME_MODE=production
+NEXT_PUBLIC_APP_URL=https://<your-vercel-domain>
+
+NEXT_PUBLIC_SUPABASE_URL=<supabase project url>
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<supabase publishable anon key>
+DATABASE_URL=<supabase pooled postgres url>
+
+SUPER_ADMIN_EMAILS=<your owner email>
+SUPABASE_OAUTH_PROVIDERS_CONFIRMED=true
+
+TOKEN_SECRET=<long random secret, at least 32 chars>
+HEALTHCHECK_SECRET=<long random secret>
+
+STRIPE_SECRET_KEY=<test or live key for that deployment>
+STRIPE_WEBHOOK_SECRET=<webhook signing secret for the Vercel endpoint>
+STRIPE_PUBLISHABLE_KEY=<matching publishable key>
+STRIPE_CURRENCY=usd
+STRIPE_PRICE_CREDIT_1=<stripe price id>
+STRIPE_PRICE_CREDIT_3=<stripe price id>
+STRIPE_PRICE_CREDIT_6=<stripe price id>
+STRIPE_PRICE_RETENTION_REPORT=<stripe price id>
+STRIPE_PRICE_RETENTION_COMPLIANCE=<stripe price id>
+
+RESEND_API_KEY=<resend key>
+RESEND_FROM_EMAIL=SaferSay <survey@your-verified-domain>
+
+AI_PROVIDER=anthropic
+AI_MODEL=claude-sonnet-4-6
+ANTHROPIC_API_KEY=<anthropic api key, when AI_PROVIDER=anthropic>
+OPENAI_API_KEY=<openai api key, when AI_PROVIDER=openai>
+AI_API_KEY=<provider api key, when AI_PROVIDER=openai-compatible>
+AI_API_BASE_URL=<openai-compatible base url, when AI_PROVIDER=openai-compatible>
+
+LEGAL_ENTITY_NAME=MindscopeAI LLP
+PRIVACY_CONTACT_EMAIL=<privacy contact email>
+DATA_RESIDENCY_REGION=EU
+DEFAULT_DATA_RETENTION_MONTHS=24
 ```
 
-**Status:** [ ] Completed (run in Supabase SQL Editor)
+## Stripe Webhook
 
-### 2. Verify Deployment
+For Vercel, create a Stripe webhook endpoint:
 
-- [ ] Vercel deployment successful (check dashboard)
-- [ ] Database connection active (no errors in logs)
-- [ ] Navigation displays three zones: Surveys | People | Workspace
-- [ ] Permission gating works (non-admins see only Surveys)
-- [ ] Audit logging functional (survey creation logs to audit_logs table)
-
-### 3. Smoke Tests
-
-**As customer_admin:**
-- [ ] Can access all three zones (Surveys, People, Workspace)
-- [ ] Can create a new survey
-- [ ] Can import employees
-- [ ] Can access Workspace settings/billing/go-live/security
-
-**As survey_creator (if exposed):**
-- [ ] Can access Surveys and People zones
-- [ ] Cannot access Workspace zone (redirected to /app)
-
-**As employee:**
-- [ ] Cannot access People or Workspace zones
-- [ ] Can only receive surveys via token link
-
-**Audit Logging:**
-- [ ] Survey creation creates entry in audit_logs (action: "survey_created")
-- [ ] Employee import creates entry in audit_logs (action: "employee_list_imported")
-- [ ] Entries contain only aggregate counts (no email addresses or PII)
-
-### 4. Rollback Plan
-
-If issues occur, revert to the previous stable version:
-
-```bash
-git revert 78817ab
-git push origin main
-# Vercel will auto-deploy the reverted version
+```text
+https://<your-vercel-domain>/api/stripe/webhook
 ```
 
-**Previous stable state:** Commit b895c58 (Three-zone nav, before audit logging)
+Subscribe at minimum to:
 
-### 5. Post-Deployment Monitoring
+- `checkout.session.completed`
+- `customer.subscription.deleted`
 
-Monitor these metrics for 24 hours:
+Copy the generated `whsec_...` signing secret into `STRIPE_WEBHOOK_SECRET`.
 
-- [ ] Application error rate (Vercel dashboard)
-- [ ] Database connection pool usage (Supabase dashboard)
-- [ ] Audit log entries being written (check audit_logs table)
-- [ ] Performance metrics (Lighthouse scores)
-- [ ] User feedback (Slack #engineering)
+## Supabase Actions
 
----
+Required before production:
 
-## v1 Ship Status: PRODUCTION READY ✅
+- Enable Google OAuth.
+- Enable Microsoft OAuth.
+- Test sign-in with each provider.
+- Set `SUPABASE_OAUTH_PROVIDERS_CONFIRMED=true` only after both work.
+- Confirm database migrations are applied in the target project.
+- Confirm production uses the pooled Postgres connection string for `DATABASE_URL`.
 
-**Shipping:**
-- ✅ Three-zone navigation (Surveys, People, Workspace)
-- ✅ Four-role permission model (customer_admin, survey_creator, auditor, employee)
-- ✅ Survey Build → Send → Results workflow
-- ✅ Audit logging for operator actions with de-anonymization guard
-- ✅ Confidentiality seal on home and results
-- ✅ Ink & Cream design system applied
+## Smoke Test After Staging Deploy
 
-**Not shipping (v1.1+):**
-- survey_creator role exposure (code ready, hidden until customer requests)
-- auditor role exposure (code ready, behind feature flag)
-- Audit log viewer UI (infrastructure ready, behind flag)
+1. Open `/api/readiness`.
+2. Confirm `productionReady` is `true`.
+3. Sign in with the email listed in `SUPER_ADMIN_EMAILS`.
+4. Confirm `/console` opens.
+5. Create or enter a tenant workspace.
+6. Create a survey.
+7. Add/import people.
+8. Launch/send survey.
+9. Submit at least `k` responses.
+10. Confirm results unlock.
+11. Confirm no names/emails/raw responses appear in reports.
+12. Buy a credit pack through Stripe test Checkout.
+13. Confirm the webhook updates tenant credits.
+14. Start a retention plan.
+15. Confirm the webhook updates tenant retention.
+16. Expand AI insights only after report unlock.
+17. Confirm AI insights use group scores only.
+18. Close and lock the survey.
+19. Confirm reminders/notes/actions are blocked after lock.
 
----
+## Not Yet Production-Customer Ready
 
-## Environment Variables
+These are business/legal/compliance actions, not build blockers:
 
-**Production (Vercel):**
-- `NEXT_PUBLIC_SUPABASE_URL` → ijofizuruoynqxyjcdrt.supabase.co
-- `DATABASE_URL` → Production Postgres pool
-- `RESEND_API_KEY` → Email service
-- All other env vars inherited from GitHub secrets
-
-**No new env vars required for this deployment.**
-
----
-
-## Deployment Timeline
-
-| Step | Status | Notes |
-|------|--------|-------|
-| Code merged to main | ✅ | 6 commits, all tested |
-| Vercel build triggered | ✅ | Auto-deployed from main |
-| Database migration ready | ⏳ | Run SQL in Supabase before promoting to prod |
-| Smoke tests passed | ⏳ | Run after migration and deployment |
-| Monitoring active | ⏳ | 24-hour watch period |
-
----
-
-## Support & Handoff
-
-**On-call engineer:** Check Slack #engineering for questions  
-**Rollback contact:** Can be done by any eng with git/Vercel access  
-**Database support:** Supabase dashboard for monitoring
-
----
-
-## Key Design Points (for support)
-
-1. **Audit logs are operator-only** — they track what admins do (create survey, import people), never respondent data
-2. **Three zones are visibility-controlled** — same app for all roles, but People and Workspace hidden by permission checks
-3. **Role model is extensible** — survey_creator and auditor roles exist in code, just not surfaced in UI yet
-4. **De-anonymization guard is strict** — any log entry that could identify a respondent is rejected at insert time
-
----
-
-## Cleanup (Post-Deployment)
-
-- [ ] Delete old `/app/participants`, `/app/templates`, `/app/integrations`, `/app/reports` routes (or add redirects) — these are now inside survey detail pages
-- [ ] Update documentation to reflect new three-zone structure
-- [ ] Notify users of navigation change in release notes
+- Final privacy policy review.
+- DPA review.
+- Confirm data retention/deletion process.
+- Confirm incident/breach response process.
+- Confirm who can access Supabase production data.
+- Rotate any test secrets that were pasted into local tooling.

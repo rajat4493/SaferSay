@@ -13,7 +13,7 @@ export function BrandMark({ size = 40 }: { size?: number }) {
         src={brand.logoDataUrl}
         alt={brand.name}
         style={{ width: size, height: size }}
-        className="rounded-full object-cover"
+        className="rounded-[0.9rem] object-cover"
       />
     );
   }
@@ -25,7 +25,7 @@ export function BrandMark({ size = 40 }: { size?: number }) {
       width={size}
       height={size}
       priority
-      className="rounded-full"
+      className="rounded-[0.9rem]"
     />
   );
 }

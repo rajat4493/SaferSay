@@ -24,6 +24,7 @@ export async function createTenantSurveyCycle(params: {
   const identity = new IdentityRepository(params.db);
   const employeeCount = await identity.countActiveEmployees(params.tenantId);
   if (employeeCount < 1) throw new Error("Upload employees before creating a survey cycle.");
+  if (employeeCount > 100) throw new Error("Survey credits currently cover up to 100 active employees. Contact SaferSay for a larger workspace.");
 
   const cycleId = randomUUID();
   const templateId =
@@ -34,7 +35,7 @@ export async function createTenantSurveyCycle(params: {
   await params.db.query(
     `insert into responses.survey_cycles
       (id, tenant_id, template_id, name, status, payment_status, min_group_size)
-     values ($1, $2, $3, $4, 'draft', 'free_preview', $5)`,
+     values ($1, $2, $3, $4, 'draft', 'unpaid', $5)`,
     [cycleId, params.tenantId, templateId, params.cycleName?.trim() || `${params.tenantName} ${template.name}`, minGroupSize],
   );
 

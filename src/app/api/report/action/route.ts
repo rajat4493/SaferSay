@@ -3,14 +3,13 @@ import { getSessionContext, isPlatformOwnerImpersonating } from "@/lib/server/au
 import { withTenantScopedDb } from "@/lib/server/db/tenantPool";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import { ResponseRepository } from "@/lib/server/repositories/responseRepository";
-import { canRunSurvey, canViewSurveyResults } from "@/lib/permissions";
+import { canRunSurvey } from "@/lib/permissions";
 
 export async function GET(request: NextRequest) {
   const session = await getSessionContext();
   if (!session) return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
-  if (!canViewSurveyResults(session.role)) {
-    return NextResponse.json({ ok: false, error: "You don't have permission to view this." }, { status: 403 });
-  }
+
+  if (!canRunSurvey(session.role)) return NextResponse.json({ ok: false, error: "You do not have permission to add survey notes." }, { status: 403 });
 
   const cycleId = request.nextUrl.searchParams.get("cycleId");
   if (!cycleId) return NextResponse.json({ ok: false, error: "cycleId is required." }, { status: 400 });
@@ -24,9 +23,6 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const session = await getSessionContext();
   if (!session) return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
-  if (!canRunSurvey(session.role)) {
-    return NextResponse.json({ ok: false, error: "You don't have permission to commit to an action." }, { status: 403 });
-  }
 
   if (isPlatformOwnerImpersonating(session)) {
     return NextResponse.json({ ok: false, error: "Platform owners cannot act on tenant reports." }, { status: 403 });
@@ -40,17 +36,24 @@ export async function POST(request: NextRequest) {
   const cycleId = body.cycleId;
 
   const result = await withTenantScopedDb(session.tenant.id, async (db) => {
+    const responseRepo = new ResponseRepository(db);
+    const cycle = await responseRepo.getCycleForTenant(session.tenant.id, cycleId);
+    if (!cycle) return { error: "not-found" as const };
+    if (cycle.status === "closed") return { error: "closed" as const };
+
     // Only let the admin commit to an action once the report has actually
     // unlocked for this cycle -- committing to "one change" before there's
     // anything to act on isn't the feature the spec describes.
-    const { report } = await new ResponseRepository(db).getLatestProtectedReportForTenant(session.tenant.id);
-    if (report.protected) return null;
+    const reportResult = await responseRepo.getProtectedReportForTenant(session.tenant.id, cycleId, cycle.minGroupSize);
+    if (reportResult.protected) return { error: "protected" as const };
 
     const repo = new IdentityRepository(db);
     await repo.addCycleAction(session.tenant.id, cycleId, session.email, actionText);
-    return repo.listCycleActions(session.tenant.id, cycleId);
+    return { actions: await repo.listCycleActions(session.tenant.id, cycleId) };
   });
 
-  if (!result) return NextResponse.json({ ok: false, error: "The report hasn't unlocked yet for this cycle." }, { status: 400 });
-  return NextResponse.json({ ok: true, actions: result });
+  if (result.error === "not-found") return NextResponse.json({ ok: false, error: "Survey not found." }, { status: 404 });
+  if (result.error === "closed") return NextResponse.json({ ok: false, error: "Survey is closed and locked." }, { status: 423 });
+  if (result.error === "protected") return NextResponse.json({ ok: false, error: "The report hasn't unlocked yet for this cycle." }, { status: 400 });
+  return NextResponse.json({ ok: true, actions: result.actions });
 }

@@ -81,7 +81,7 @@ export function OverviewDashboard() {
         <StatTile label="Active tenants" value={overview.activeTenantCount} />
         <StatTile label="Live surveys" value={overview.liveSurveyCount} />
         <StatTile label="Employees under management" value={overview.totalEmployeeCount} />
-        <StatTile label="Inactive 30+ days" value={overview.inactiveTenantCount} hint="No billing yet — MRR/trials appear once Stripe lands." />
+        <StatTile label="Inactive 30+ days" value={overview.inactiveTenantCount} hint="Operational activity only; revenue analytics live in Billing later." />
       </div>
 
       <div className="grid gap-2.5 lg:grid-cols-2">

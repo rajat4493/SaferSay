@@ -1,0 +1,488 @@
+<title>SaferSay — Product Status Report</title>
+<style>
+  :root {
+    --paper: #FAF7F1;
+    --paper-raised: #FFFFFF;
+    --ink: #221E19;
+    --ink-soft: #4A433B;
+    --muted: #766B5D;
+    --line: #E4DCCC;
+    --line-strong: #D2C6AE;
+
+    --ok-fg: #2B6B47;
+    --ok-bg: #E4F0E6;
+    --ok-line: #BFDAC5;
+
+    --warn-fg: #8A5A16;
+    --warn-bg: #F7ECD9;
+    --warn-line: #E3CE9D;
+
+    --bad-fg: #9B3A2C;
+    --bad-bg: #F6E4E0;
+    --bad-line: #E4BEB4;
+
+    --neutral-fg: #766B5D;
+    --neutral-bg: #EFE9DD;
+    --neutral-line: #DCD2BC;
+
+    --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #17140F;
+      --paper-raised: #1E1A14;
+      --ink: #EDE7DB;
+      --ink-soft: #C9C0B0;
+      --muted: #A79C88;
+      --line: #332D22;
+      --line-strong: #453D2C;
+
+      --ok-fg: #86CE9C;
+      --ok-bg: #1C2A20;
+      --ok-line: #33503C;
+
+      --warn-fg: #E3B45C;
+      --warn-bg: #2B2314;
+      --warn-line: #4A3B1E;
+
+      --bad-fg: #E28A78;
+      --bad-bg: #2C1D18;
+      --bad-line: #4A2E24;
+
+      --neutral-fg: #A79C88;
+      --neutral-bg: #221E17;
+      --neutral-line: #3A3325;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper: #17140F;
+    --paper-raised: #1E1A14;
+    --ink: #EDE7DB;
+    --ink-soft: #C9C0B0;
+    --muted: #A79C88;
+    --line: #332D22;
+    --line-strong: #453D2C;
+
+    --ok-fg: #86CE9C;
+    --ok-bg: #1C2A20;
+    --ok-line: #33503C;
+
+    --warn-fg: #E3B45C;
+    --warn-bg: #2B2314;
+    --warn-line: #4A3B1E;
+
+    --bad-fg: #E28A78;
+    --bad-bg: #2C1D18;
+    --bad-line: #4A2E24;
+
+    --neutral-fg: #A79C88;
+    --neutral-bg: #221E17;
+    --neutral-line: #3A3325;
+  }
+
+  :root[data-theme="light"] {
+    --paper: #FAF7F1;
+    --paper-raised: #FFFFFF;
+    --ink: #221E19;
+    --ink-soft: #4A433B;
+    --muted: #766B5D;
+    --line: #E4DCCC;
+    --line-strong: #D2C6AE;
+
+    --ok-fg: #2B6B47;
+    --ok-bg: #E4F0E6;
+    --ok-line: #BFDAC5;
+
+    --warn-fg: #8A5A16;
+    --warn-bg: #F7ECD9;
+    --warn-line: #E3CE9D;
+
+    --bad-fg: #9B3A2C;
+    --bad-bg: #F6E4E0;
+    --bad-line: #E4BEB4;
+
+    --neutral-fg: #766B5D;
+    --neutral-bg: #EFE9DD;
+    --neutral-line: #DCD2BC;
+  }
+
+  * { box-sizing: border-box; }
+
+  body, .report-root {
+    background: var(--paper);
+    color: var(--ink);
+  }
+
+  .report-root {
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.55;
+    max-width: 740px;
+    margin: 0 auto;
+    padding: 56px 28px 88px;
+  }
+
+  a { color: inherit; }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    padding-bottom: 28px;
+    border-bottom: 2px solid var(--ink);
+    margin-bottom: 30px;
+  }
+
+  .masthead .mark {
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .masthead h1 {
+    font-family: var(--font-serif);
+    font-weight: 400;
+    font-size: 34px;
+    line-height: 1.15;
+    margin: 8px 0 6px;
+    text-wrap: balance;
+    letter-spacing: -0.01em;
+  }
+
+  .masthead .meta {
+    font-size: 13px;
+    color: var(--muted);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    margin-bottom: 14px;
+  }
+
+  .masthead .strap {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 16.5px;
+    color: var(--ink-soft);
+    line-height: 1.5;
+    max-width: 62ch;
+  }
+
+  /* ---------- bottom line callout ---------- */
+
+  .bottom-line {
+    background: var(--paper-raised);
+    border: 1px solid var(--line-strong);
+    border-left: 3px solid var(--ink);
+    border-radius: 6px;
+    padding: 20px 22px;
+    margin-bottom: 42px;
+  }
+
+  .bottom-line .eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .bottom-line p {
+    margin: 0;
+    font-size: 15.5px;
+    line-height: 1.6;
+  }
+
+  /* ---------- sections ---------- */
+
+  section.block {
+    margin-bottom: 40px;
+  }
+
+  .block-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 10px;
+    margin-bottom: 16px;
+  }
+
+  .block-head .num {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .block-head h2 {
+    font-family: var(--font-serif);
+    font-weight: 400;
+    font-size: 21px;
+    margin: 0;
+    letter-spacing: -0.005em;
+  }
+
+  .block-note {
+    font-size: 13.5px;
+    color: var(--muted);
+    margin: -6px 0 16px;
+    max-width: 60ch;
+  }
+
+  /* ---------- item rows ---------- */
+
+  ul.rows {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  ul.rows li {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  ul.rows li:last-child { border-bottom: none; }
+
+  ul.rows .txt {
+    flex: 1;
+    font-size: 14.5px;
+    line-height: 1.55;
+  }
+
+  ul.rows .txt b { font-weight: 600; }
+
+  .subgroup-label {
+    font-family: var(--font-sans);
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 22px 0 8px;
+  }
+
+  .subgroup-label:first-child { margin-top: 0; }
+
+  /* ---------- chips ---------- */
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    gap: 4px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-family: var(--font-sans);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    border: 1px solid;
+    white-space: nowrap;
+    margin-top: 1px;
+  }
+
+  .chip.ok    { color: var(--ok-fg);   background: var(--ok-bg);   border-color: var(--ok-line); }
+  .chip.warn  { color: var(--warn-fg); background: var(--warn-bg); border-color: var(--warn-line); }
+  .chip.bad   { color: var(--bad-fg);  background: var(--bad-bg);  border-color: var(--bad-line); }
+  .chip.neutral { color: var(--neutral-fg); background: var(--neutral-bg); border-color: var(--neutral-line); }
+
+  /* ---------- readiness ledger ---------- */
+
+  .ledger {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+    margin-top: 4px;
+  }
+
+  .ledger-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+  }
+
+  .ledger th, .ledger td {
+    text-align: left;
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .ledger thead th {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--paper-raised);
+  }
+
+  .ledger tbody tr:last-child td { border-bottom: none; }
+  .ledger tbody tr:nth-child(odd) td { background: color-mix(in srgb, var(--paper-raised) 55%, transparent); }
+
+  .ledger .purpose { color: var(--muted); font-size: 12.5px; }
+
+  .ledger-caption {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 8px;
+    font-family: var(--font-mono);
+  }
+
+  /* ---------- closing ---------- */
+
+  .closing {
+    margin-top: 48px;
+    padding-top: 22px;
+    border-top: 2px solid var(--ink);
+  }
+
+  .closing p {
+    font-family: var(--font-serif);
+    font-size: 17px;
+    line-height: 1.6;
+    color: var(--ink-soft);
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .closing .sign {
+    margin-top: 18px;
+    font-family: var(--font-sans);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  @media (max-width: 520px) {
+    .report-root { padding: 36px 18px 64px; }
+    .masthead h1 { font-size: 27px; }
+  }
+</style>
+
+<div class="report-root">
+
+  <header class="masthead">
+    <div class="mark">SaferSay</div>
+    <h1>Product Status Report</h1>
+    <div class="meta">
+      <span>Prepared for the CEO and Product Owner</span>
+      <span>·</span>
+      <span>8 August 2026</span>
+    </div>
+    <p class="strap">"Culture Amp's trust guarantee, Officevibe's price and simplicity — built for the 10–60 person company neither is built for."</p>
+  </header>
+
+  <div class="bottom-line">
+    <div class="eyebrow">Bottom line</div>
+    <p>The confidential-survey product works end to end today: a company can sign up, upload employees, launch a survey, and get a suppressed report once five people have answered — and the guarantee that promise depends on, that identity and answers can never be joined, even by us, is real and passes its own test suite on every run. What it can't do yet is take anyone's money or send a real invite email to anyone but its own developer. Closing those two gaps, plus a short list of production-hardening items below, is what stands between "works in a walkthrough" and "safe to sell."</p>
+  </div>
+
+  <section class="block">
+    <div class="block-head"><span class="num">01</span><h2>What's complete against the vision</h2></div>
+    <ul class="rows">
+      <li><span class="chip ok">Done</span><span class="txt">Confidentiality architecture: identity and response data live in separate database schemas with no foreign key or join path between them. This is tested automatically on every check, not just documented.</span></li>
+      <li><span class="chip ok">Done</span><span class="txt">Minimum group size floor — reports can never unlock below 3 respondents, enforced on the server regardless of what any screen tries to send.</span></li>
+      <li><span class="chip ok">Done</span><span class="txt">Real multi-tenant sign-in via Google and Microsoft, with a workspace created automatically on first login. No password to manage.</span></li>
+      <li><span class="chip ok">Done</span><span class="txt">Four working roles, all reachable through the product itself as of this build — HR Admin, Survey Creator, Viewer, and Employee. A workspace owner can now invite a teammate by email and role directly; that path didn't exist before this build, and every account used to become an HR Admin regardless of who signed up.</span></li>
+      <li><span class="chip ok">Done</span><span class="txt">The full survey lifecycle — build from a template, customize questions, send invites, watch results unlock — works as one continuous flow, plus a single smart "send" action that replaced a confusing seven-button panel.</span></li>
+      <li><span class="chip ok">Done</span><span class="txt">CSV employee import with row-level validation.</span></li>
+      <li><span class="chip ok">Done</span><span class="txt">A separate Owner console — every tenant's plan, health, team, and support history in one place, walled off from any tenant's actual survey content.</span></li>
+      <li><span class="chip ok">Done</span><span class="txt">A guided first-run experience — a new workspace now sees one clear next step at a time (load people → create a survey → send it) instead of an empty page.</span></li>
+      <li><span class="chip ok">Done</span><span class="txt">Deployed and live, on a push-to-deploy pipeline exercised repeatedly and reliably this build.</span></li>
+    </ul>
+  </section>
+
+  <section class="block">
+    <div class="block-head"><span class="num">02</span><h2>What's working right now</h2></div>
+    <p class="block-note">Verified against the live database this build, not just shipped and assumed.</p>
+    <ul class="rows">
+      <li><span class="chip ok">Verified</span><span class="txt">The complete real-world path: new workspace → CSV import → survey created → tokens issued → invite queued → Owner entering and leaving a tenant's workspace → a teammate invited, accepting, and landing with exactly the access their role allows.</span></li>
+      <li><span class="chip ok">Verified</span><span class="txt">The confidentiality test suite passes on every run — the one guarantee that must never have an exception, and doesn't.</span></li>
+      <li><span class="chip ok">Verified</span><span class="txt">The Owner layer's block on reading any tenant's response content is real and explicit in code — entering a tenant's workspace gives operational visibility only (plan, headcount, activity), never survey answers, confirmed by reading the guard directly.</span></li>
+    </ul>
+  </section>
+
+  <section class="block">
+    <div class="block-head"><span class="num">03</span><h2>What's not working</h2></div>
+    <ul class="rows">
+      <li><span class="chip bad">Blocked</span><span class="txt"><b>Real invite emails.</b> Resend is connected, but the sending address is still the free shared sandbox address, which the product's own safeguard correctly refuses to use in production. Every invite sent today can only reach one inbox — the developer's own. A verified company sending domain (a DNS task measured in days, not an engineering task) is required before any real pilot can send a single invite.</span></li>
+      <li><span class="chip bad">Not connected</span><span class="txt"><b>Taking payment.</b> There's no Stripe integration yet — no checkout, no webhook. The billing screens that exist are honest placeholders, not broken features pretending to work.</span></li>
+      <li><span class="chip warn">Not configured</span><span class="txt"><b>Privacy contact address.</b> The privacy notice and DPA pages don't have a live contact wired in — a small fix, but it's on the product's own list of things required before it calls itself production-ready.</span></li>
+      <li><span class="chip warn">Operational risk</span><span class="txt">Local development this build ran against the same database real customers' data will live in — there's no separate staging environment. Several test accounts had to be created and then deleted as a direct result. Not a customer-facing bug, but a real risk every time anyone tests locally.</span></li>
+      <li><span class="chip neutral">Minor</span><span class="txt">Two small rough edges inherited from before this build: an occasional harmless duplicate-login error in local dev-mode sign-in only (self-recovers, doesn't touch real customer sign-in), and an unconfirmed bug in the analytics event that records whether an invite batch was actually queued.</span></li>
+    </ul>
+
+    <div class="subgroup-label">Live production self-check, read directly from the running system</div>
+    <div class="ledger-wrap">
+      <table class="ledger">
+        <thead><tr><th>Check</th><th>Status</th><th>Why it matters</th></tr></thead>
+        <tbody>
+          <tr><td>Supabase Postgres</td><td><span class="chip ok">Configured</span></td><td class="purpose">Durable, severed identity/response storage</td></tr>
+          <tr><td>Supabase app client</td><td><span class="chip ok">Configured</span></td><td class="purpose">Session handling for admin and taker login</td></tr>
+          <tr><td>Google + Microsoft sign-in</td><td><span class="chip ok">Configured</span></td><td class="purpose">Confirmed working, not just present</td></tr>
+          <tr><td>Token signing secret</td><td><span class="chip ok">Configured</span></td><td class="purpose">Respondent token security</td></tr>
+          <tr><td>Stripe</td><td><span class="chip bad">Missing</span></td><td class="purpose">Paid survey checkout and billing</td></tr>
+          <tr><td>Resend (verified domain)</td><td><span class="chip bad">Missing</span></td><td class="purpose">Invite and reminder delivery to real recipients</td></tr>
+          <tr><td>Privacy contact</td><td><span class="chip bad">Missing</span></td><td class="purpose">GDPR privacy notice and DPA contact</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="ledger-caption">source: safer-say.vercel.app/api/readiness, queried 8 Aug 2026 — the product's own go-live check, publicly readable by design</p>
+  </section>
+
+  <section class="block">
+    <div class="block-head"><span class="num">04</span><h2>What's missing, in build order</h2></div>
+
+    <div class="subgroup-label">Closest — needed before the first paying, non-hand-held customer</div>
+    <ul class="rows">
+      <li><span class="chip bad">P0</span><span class="txt">A verified email-sending domain for Resend (days, not sprints).</span></li>
+      <li><span class="chip bad">P0</span><span class="txt">Stripe checkout, webhook handling, and persisted billing state.</span></li>
+      <li><span class="chip bad">P0</span><span class="txt">A live privacy contact address.</span></li>
+      <li><span class="chip warn">P0</span><span class="txt">Proof that tenant isolation holds under the database's own enforcement, not just application code. The restricted database role is already configured in production — but the automated tests that prove it actually blocks cross-tenant access don't run anywhere yet; there's no CI, and they're skipped by default locally. This should be run for real before the first paying customer, not assumed.</span></li>
+    </ul>
+
+    <div class="subgroup-label">Next — needed before opening the product to self-serve signups</div>
+    <ul class="rows">
+      <li><span class="chip warn">P1</span><span class="txt">Automated checks on every change — lint, tests, build, migration safety. Every one of those checks this build ran by hand.</span></li>
+      <li><span class="chip warn">P1</span><span class="txt">Basic error monitoring. Right now, if something breaks for a real customer, nobody finds out unless the customer says so.</span></li>
+      <li><span class="chip warn">P1</span><span class="txt">A security hardening pass — rate limiting, response headers, secret rotation, and a known timing-comparison issue in the sign-in middleware.</span></li>
+      <li><span class="chip warn">P1</span><span class="txt">Something for the Viewer role to actually do. It can now be invited and correctly sees only what it should — but there's still no audit-log screen for it to look at, which is the entire point of a read-only Viewer.</span></li>
+      <li><span class="chip warn">P1</span><span class="txt">Choosing which employees receive a given survey. Today every survey goes to everyone active; there's no "select recipients" step.</span></li>
+      <li><span class="chip warn">P1</span><span class="txt">A real PDF export of results — today it's CSV only.</span></li>
+    </ul>
+
+    <div class="subgroup-label">Not urgent yet — and the roadmap already agrees</div>
+    <ul class="rows">
+      <li><span class="chip neutral">P2</span><span class="txt">Importing an org chart directly from Google or Microsoft — today it's sign-in only, not a directory sync.</span></li>
+      <li><span class="chip neutral">P2</span><span class="txt">Automated data retention and deletion — today it's an export button and an email link to a human.</span></li>
+      <li><span class="chip neutral">P2</span><span class="txt">The confidential-disclosure / grievance channel — designed, not built.</span></li>
+      <li><span class="chip neutral">P3</span><span class="txt">AI-generated interpretation of results — deliberately gated until we know people will pay for the core product first.</span></li>
+    </ul>
+  </section>
+
+  <section class="block">
+    <div class="block-head"><span class="num">05</span><h2>Deliberately not built — don't mistake these for gaps</h2></div>
+    <ul class="rows">
+      <li><span class="chip neutral">By design</span><span class="txt">Department- and manager-scoped report views. The plan always called for these after the org-level version, not instead of it.</span></li>
+      <li><span class="chip neutral">By design</span><span class="txt">A "this is not anonymous" survey mode, designed to be architecturally impossible to build carelessly, on purpose. When it ships, it will be a clearly separate mode — never a toggle on the confidential one.</span></li>
+      <li><span class="chip neutral">By design</span><span class="txt">Any enterprise-style permission matrix beyond the four roles above. Not asked for yet.</span></li>
+    </ul>
+  </section>
+
+  <div class="closing">
+    <p>Three small things — a verified sending domain, a Stripe integration, and proof the database's own isolation guarantee actually holds — separate a real working product from one that's safe to put a paying customer's name on.</p>
+    <div class="sign">Compiled from the live production system, the codebase, and this build's own verification work.</div>
+  </div>
+
+</div>

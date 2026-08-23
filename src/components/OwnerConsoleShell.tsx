@@ -57,8 +57,8 @@ export function OwnerConsoleShell({ children }: { children: React.ReactNode }) {
       <div className="flex items-center justify-between px-4 pt-4 pb-3">
         <div className="flex items-center gap-2.5">
           {/* Always the platform's own mark, never a tenant's Brand Studio logo -- this console is not white-labeled. */}
-          <Image src="/safersay-mark.svg" alt="SaferSay" width={22} height={22} className="rounded-full" />
-          <span className="text-[16px] font-semibold leading-none text-[var(--ink)]">Console</span>
+          <Image src="/safersay-mark.svg" alt="SaferSay" width={22} height={22} className="rounded-[6px]" />
+          <span className="text-[14px] font-semibold leading-none text-[var(--ink)]">Console</span>
         </div>
         <button onClick={() => setMobileNavOpen(false)} aria-label="Close menu" className="text-[var(--ink-mid)] lg:hidden">
           <X size={18} strokeWidth={1.8} />
@@ -72,8 +72,8 @@ export function OwnerConsoleShell({ children }: { children: React.ReactNode }) {
               key={item.href}
               href={item.href}
               onClick={() => setMobileNavOpen(false)}
-              className={`flex items-center gap-2.5 rounded-[var(--radius-pill)] px-2.5 py-[7px] text-[13px] transition ${
-                active ? "bg-[var(--bg-active)] font-medium text-[var(--green)]" : "font-normal text-[var(--ink-mid)] hover:bg-[var(--bg-hover)] hover:text-[var(--ink)]"
+              className={`flex items-center gap-2.5 rounded-[var(--radius-input)] px-2.5 py-[7px] text-[13px] transition ${
+                active ? "bg-[var(--bg-active)] font-medium text-[var(--ink)]" : "font-normal text-[var(--ink-mid)] hover:bg-[var(--bg-hover)] hover:text-[var(--ink)]"
               }`}
             >
               <item.icon size={15} strokeWidth={1.8} />

@@ -1,10 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { LogOut } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 
-export function SignOutButton({ fullWidth = false }: { fullWidth?: boolean }) {
+export function SignOutButton() {
   const router = useRouter();
 
   async function signOut() {
@@ -14,12 +13,7 @@ export function SignOutButton({ fullWidth = false }: { fullWidth?: boolean }) {
   }
 
   return (
-    <button
-      type="button"
-      onClick={signOut}
-      className={`btn-secondary btn-pill ${fullWidth ? "w-full justify-center" : ""}`}
-    >
-      <LogOut size={13} strokeWidth={1.8} />
+    <button type="button" onClick={signOut} className="btn-secondary btn-pill">
       Sign out
     </button>
   );

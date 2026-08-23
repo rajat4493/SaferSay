@@ -9,14 +9,10 @@ export function CopyLinkButton({ label = "Copy shareable link" }: { label?: stri
   const toast = useToast();
 
   async function copy() {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      setCopied(true);
-      toast.show({ variant: "success", message: "Link copied." });
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast.show({ variant: "error", message: "Couldn't copy the link — copy it from the address bar instead." });
-    }
+    await navigator.clipboard.writeText(window.location.href);
+    setCopied(true);
+    toast.show({ variant: "success", message: "Link copied." });
+    setTimeout(() => setCopied(false), 2000);
   }
 
   return (

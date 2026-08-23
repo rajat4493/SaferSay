@@ -3,7 +3,6 @@ import { getSessionContext } from "@/lib/server/authSession";
 import { withTenantScopedDb } from "@/lib/server/db/tenantPool";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import { canManageTeam } from "@/lib/permissions";
-import { logTeamInviteSent } from "@/lib/server/auditLog";
 import type { TeamRole } from "@/lib/server/repositories/types";
 
 const teamRoles: TeamRole[] = ["customer_admin", "survey_creator", "auditor"];
@@ -40,6 +39,5 @@ export async function POST(request: NextRequest) {
   if (result.error === "already-member") {
     return NextResponse.json({ ok: false, error: "That email already belongs to a SaferSay account." }, { status: 400 });
   }
-  await logTeamInviteSent(session.tenant.id, session.role, session.email, role);
   return NextResponse.json({ ok: true, ...result });
 }

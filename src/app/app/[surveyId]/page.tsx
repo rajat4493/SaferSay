@@ -205,7 +205,7 @@ function SurveyBuildContent({ surveyId }: { surveyId: string }) {
         {notFound ? (
           <div className="card text-center">
             <p className="secondary-text">This survey doesn&apos;t exist or you don&apos;t have access to it.</p>
-            <button onClick={() => router.push("/app/surveys")} className="btn-secondary mt-4">
+            <button onClick={() => router.push("/app")} className="btn-secondary mt-4">
               <ArrowLeft size={14} strokeWidth={1.8} />
               Back to surveys
             </button>
@@ -367,7 +367,7 @@ function SurveyBuildContent({ surveyId }: { surveyId: string }) {
             </div>
 
             <div className="flex justify-between">
-              <button onClick={() => router.push("/app/surveys")} className="btn-secondary">
+              <button onClick={() => router.push("/app")} className="btn-secondary">
                 <ArrowLeft size={14} strokeWidth={1.8} />
                 Back to surveys
               </button>

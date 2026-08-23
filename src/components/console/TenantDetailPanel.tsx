@@ -15,6 +15,13 @@ type TenantDetail = {
   dataResidencyRegion: string;
   planTier: "standard" | "growth" | "enterprise";
   features: Record<string, boolean>;
+  billingTerms: {
+    surveyCredits: number;
+    retentionPlan: "none" | "monthly";
+    aiInsightsIncluded: boolean;
+    creditExpiryMonths: number;
+    contractNote: string;
+  };
   minGroupSize: number;
   employeeCount: number;
   latestCycle: {
@@ -46,6 +53,12 @@ const featureKeys: Array<{ key: string; label: string }> = [
   { key: "customQuestions", label: "Custom question editing" },
   { key: "csvManagerHierarchy", label: "Manager hierarchy import" },
   { key: "brandStudio", label: "Custom workspace branding" },
+  { key: "aiInsights", label: "AI insights" },
+];
+
+const retentionPlanOptions: Array<{ value: TenantDetail["billingTerms"]["retentionPlan"]; label: string }> = [
+  { value: "none", label: "Release after export" },
+  { value: "monthly", label: "Monthly report retention ($19/mo)" },
 ];
 
 export function TenantDetailPanel({ tenantId }: { tenantId: string }) {
@@ -56,29 +69,16 @@ export function TenantDetailPanel({ tenantId }: { tenantId: string }) {
   const [noteDraft, setNoteDraft] = useState("");
   const [addingNote, setAddingNote] = useState(false);
   const [entering, setEntering] = useState(false);
-  const [enterError, setEnterError] = useState("");
 
   async function enterWorkspace() {
     setEntering(true);
-    setEnterError("");
-    try {
-      const response = await fetch("/api/super-admin/switch", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ tenantId }),
-      });
-      const data = (await response.json().catch(() => ({ ok: false }))) as { ok?: boolean; error?: string };
-      if (!data.ok) {
-        setEnterError(data.error ?? "Couldn't enter that workspace.");
-        setEntering(false);
-        return;
-      }
-      router.push("/app");
-      router.refresh();
-    } catch {
-      setEnterError("Couldn't enter that workspace — check your connection and try again.");
-      setEntering(false);
-    }
+    await fetch("/api/super-admin/switch", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ tenantId }),
+    });
+    router.push("/app");
+    router.refresh();
   }
 
   function load() {
@@ -103,6 +103,13 @@ export function TenantDetailPanel({ tenantId }: { tenantId: string }) {
   async function updatePlan(planTier: "standard" | "growth" | "enterprise") {
     setSavingPlan(true);
     await patch({ planTier });
+    setSavingPlan(false);
+  }
+
+  async function updateBillingTerms(next: Partial<TenantDetail["billingTerms"]>) {
+    if (!tenant) return;
+    setSavingPlan(true);
+    await patch({ billingTerms: { ...tenant.billingTerms, ...next } });
     setSavingPlan(false);
   }
 
@@ -146,14 +153,11 @@ export function TenantDetailPanel({ tenantId }: { tenantId: string }) {
           <h1 className="page-title">{tenant.name}</h1>
           <p className="secondary-text">/{tenant.slug}</p>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1.5">
-          <div className="flex items-center gap-2.5">
-            <PlanBadge tier={tenant.planTier} />
-            <button onClick={enterWorkspace} disabled={entering} className="btn-secondary">
-              {entering ? "Entering..." : "Enter workspace →"}
-            </button>
-          </div>
-          {enterError ? <p className="text-xs font-medium text-[var(--red)]">{enterError}</p> : null}
+        <div className="flex shrink-0 items-center gap-2.5">
+          <PlanBadge tier={tenant.planTier} />
+          <button onClick={enterWorkspace} disabled={entering} className="btn-secondary">
+            {entering ? "Entering..." : "Enter workspace →"}
+          </button>
         </div>
       </div>
 
@@ -211,16 +215,66 @@ export function TenantDetailPanel({ tenantId }: { tenantId: string }) {
           <div className="mt-4 border-t border-[var(--border)] pt-4">
             <label className="text-[13px] font-medium text-[var(--ink)]">Confidentiality threshold (min group size)</label>
             <div className="mt-2 flex items-center gap-3">
-              <input type="range" min={3} max={10} value={tenant.minGroupSize} disabled={savingMinGroup} onChange={(event) => updateMinGroup(Number(event.target.value))} className="flex-1" />
+              <input type="range" min={5} max={10} value={tenant.minGroupSize} disabled={savingMinGroup} onChange={(event) => updateMinGroup(Number(event.target.value))} className="flex-1" />
               <span className="data-number w-8 text-[14px]">{tenant.minGroupSize}</span>
             </div>
-            <p className="mt-1 text-xs text-[var(--ink-faint)]">Floor of 3 enforced. Never disableable.</p>
+            <p className="mt-1 text-xs text-[var(--ink-faint)]">Floor of 5 enforced. Smaller segments are never shown or rolled up.</p>
           </div>
         </ConsoleCard>
 
         <ConsoleCard>
           <h2 className="meta-label">Billing</h2>
-          <p className="mt-3 secondary-text">Stripe isn&apos;t connected yet — subscription status will appear here once billing is live.</p>
+          <div className="mt-3 space-y-3">
+            <label className="block text-[13px] font-medium text-[var(--ink)]">
+              Survey credits
+              <input
+                type="number"
+                min={0}
+                value={tenant.billingTerms.surveyCredits}
+                onChange={(event) => updateBillingTerms({ surveyCredits: Number(event.target.value) })}
+                className="admin-input mt-1 h-9 w-full"
+              />
+            </label>
+            <label className="block text-[13px] font-medium text-[var(--ink)]">
+              Report retention
+              <select
+                value={tenant.billingTerms.retentionPlan}
+                onChange={(event) => updateBillingTerms({ retentionPlan: event.target.value as TenantDetail["billingTerms"]["retentionPlan"] })}
+                className="admin-input mt-1 h-9 w-full"
+              >
+                {retentionPlanOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-[13px] font-medium text-[var(--ink)]">
+              Credit expiry window
+              <input
+                type="number"
+                min={1}
+                value={tenant.billingTerms.creditExpiryMonths}
+                onChange={(event) => updateBillingTerms({ creditExpiryMonths: Number(event.target.value) })}
+                className="admin-input mt-1 h-9 w-full"
+              />
+            </label>
+            <label className="flex items-center gap-2 text-[13px] font-medium text-[var(--ink)]">
+              <input
+                type="checkbox"
+                checked={tenant.billingTerms.aiInsightsIncluded}
+                onChange={(event) => updateBillingTerms({ aiInsightsIncluded: event.target.checked })}
+              />
+              AI included with paid credits
+            </label>
+            <label className="block text-[13px] font-medium text-[var(--ink)]">
+              Contract note
+              <textarea
+                value={tenant.billingTerms.contractNote}
+                onChange={(event) => updateBillingTerms({ contractNote: event.target.value })}
+                className="admin-input mt-1 min-h-20 w-full py-2"
+              />
+            </label>
+          </div>
+          <p className="mt-3 secondary-text">Stripe credit purchases enable AI automatically; SaferSay can still override this here for pilots and contracts.</p>
         </ConsoleCard>
       </div>
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import * as Sentry from "@sentry/nextjs";
 
 /**
  * Catches errors thrown by the root layout itself (BrandProvider,
@@ -13,7 +12,6 @@ import * as Sentry from "@sentry/nextjs";
 export default function RootError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error("Unhandled root layout error:", error);
-    Sentry.captureException(error);
   }, [error]);
 
   return (

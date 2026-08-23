@@ -1,34 +1,21 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { AppShell, Card } from "@/components/AppShell";
 import { CreateSurveyCycle } from "@/components/CreateSurveyCycle";
 import { PageGuide } from "@/components/PageGuide";
 import { surveyTemplates } from "@/lib/templates";
-import { canCreateSurvey } from "@/lib/permissions";
-import type { UserRole } from "@/lib/server/repositories/types";
 
 export default function NewSurveyPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const requestedTemplate = searchParams.get("template");
-  const [selected, setSelected] = useState(
-    (requestedTemplate && surveyTemplates.some((item) => item.slug === requestedTemplate) ? requestedTemplate : surveyTemplates[0].slug),
-  );
+  const [selected, setSelected] = useState(surveyTemplates[0].slug);
   const template = surveyTemplates.find((item) => item.slug === selected) ?? surveyTemplates[0];
   const [, startTransition] = useTransition();
   const [accessChecked, setAccessChecked] = useState(false);
 
   useEffect(() => {
-    async function checkAccess() {
-      const sessionResponse = await fetch("/api/tenants/current");
-      const sessionData = (await sessionResponse.json().catch(() => ({ ok: false }))) as { ok?: boolean; role?: UserRole };
-      if (sessionData.ok && !canCreateSurvey(sessionData.role as UserRole)) {
-        router.replace("/app");
-        return;
-      }
-
+    async function checkEmployees() {
       const response = await fetch("/api/employees?limit=1");
       const data = (await response.json().catch(() => ({ ok: false }))) as { ok?: boolean; total?: number };
       if (data.ok && data.total === 0) {
@@ -38,7 +25,7 @@ export default function NewSurveyPage() {
       setAccessChecked(true);
     }
     startTransition(() => {
-      void checkAccess();
+      void checkEmployees();
     });
   }, [router, startTransition]);
 

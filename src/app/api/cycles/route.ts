@@ -2,15 +2,11 @@ import { NextResponse } from "next/server";
 import { getSessionContext } from "@/lib/server/authSession";
 import { withTenantScopedDb } from "@/lib/server/db/tenantPool";
 import { ResponseRepository } from "@/lib/server/repositories/responseRepository";
-import { canViewSurveyResults } from "@/lib/permissions";
 
 export async function GET() {
   const session = await getSessionContext();
   if (!session) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
-  }
-  if (!canViewSurveyResults(session.role)) {
-    return NextResponse.json({ ok: false, error: "You don't have permission to view surveys." }, { status: 403 });
   }
 
   const cycles = await withTenantScopedDb(session.tenant.id, (db) =>

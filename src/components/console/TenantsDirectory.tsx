@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
 import { ConsoleCard, HealthBadge, PlanBadge, formatDate } from "@/components/console/ConsoleUI";
+import { hasAIInsightsEntitlement, type BillingTerms } from "@/lib/billingCatalog";
 
 type TenantEntry = {
   id: string;
@@ -14,6 +15,8 @@ type TenantEntry = {
   latestCycleStatus: string | null;
   lastActivityAt: string | null;
   planTier: string;
+  billingTerms: BillingTerms;
+  features: Record<string, boolean>;
   createdAt: string;
 };
 
@@ -27,6 +30,11 @@ function deriveHealth(tenant: TenantEntry): "ok" | "attention" | "at_risk" {
   if (daysSinceActivity > 30) return "at_risk";
   if (tenant.latestCycleStatus === "draft" || daysSinceActivity > 7) return "attention";
   return "ok";
+}
+
+function retentionLabel(value: BillingTerms["retentionPlan"]) {
+  if (value === "none") return "No retention";
+  return "Monthly retention";
 }
 
 export function TenantsDirectory() {
@@ -118,11 +126,12 @@ export function TenantsDirectory() {
         ) : tenants.length === 0 ? (
           <p className="p-4 secondary-text">No tenants match this search.</p>
         ) : (
-          <table className="w-full min-w-[760px] border-collapse text-[13px]">
+          <table className="w-full min-w-[920px] border-collapse text-[13px]">
             <thead>
               <tr className="border-b border-[var(--border)] text-left">
                 <th className="meta-label px-4 py-3">Client</th>
                 <th className="meta-label px-4 py-3">Plan</th>
+                <th className="meta-label px-4 py-3">Commercial</th>
                 <th className="meta-label px-4 py-3">Employees</th>
                 <th className="meta-label px-4 py-3">Survey status</th>
                 <th className="meta-label px-4 py-3">Health</th>
@@ -136,6 +145,10 @@ export function TenantsDirectory() {
                   <td className="px-4 py-3 font-medium text-[var(--ink)]">{tenant.name}</td>
                   <td className="px-4 py-3">
                     <PlanBadge tier={tenant.planTier} />
+                  </td>
+                  <td className="px-4 py-3 text-[var(--ink-mid)]">
+                    {tenant.billingTerms.surveyCredits} credits · {retentionLabel(tenant.billingTerms.retentionPlan)}
+                    {hasAIInsightsEntitlement(tenant.features, tenant.billingTerms) ? " · AI" : ""}
                   </td>
                   <td className="px-4 py-3 text-[var(--ink-mid)]">{tenant.employeeCount}</td>
                   <td className="px-4 py-3 text-[var(--ink-mid)]">{tenant.latestCycleName ? `${tenant.latestCycleStatus} · ${tenant.latestCycleName}` : "No survey yet"}</td>

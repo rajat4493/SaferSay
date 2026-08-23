@@ -6,7 +6,7 @@ import { ShieldCheck } from "lucide-react";
  * directive). Appears on the Surveys home page and above every report,
  * nowhere else. Exact copy is approved product voice -- don't reword it.
  */
-export function ConfidentialitySeal({ verifyHref = "/security" }: { verifyHref?: string }) {
+export function ConfidentialitySeal({ verifyHref = "/app/workspace/security" }: { verifyHref?: string }) {
   return (
     <div className="seal-strip mb-[9px]">
       <div className="flex items-center gap-3">

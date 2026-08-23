@@ -6,7 +6,7 @@ import { Card } from "@/components/AppShell";
 
 type PilotState = {
   ok?: boolean;
-  cycle?: { id: string; name: string } | null;
+  cycle?: { id: string } | null;
   identity?: { employees: number; sentInvites: number };
 };
 
@@ -49,16 +49,10 @@ export function FirstRunGuide() {
     );
   }
 
-  const cycleName = state.cycle?.name;
   const steps: Step[] = [
     { label: "Load the people who should receive surveys", body: "Import a CSV of your employees so SaferSay knows who to invite.", href: "/app/people", action: "Upload employees" },
     { label: "Create your first survey", body: "Pick a template — SaferSay issues a secure invite link for each active employee.", href: "/app/surveys/new", action: "Create survey" },
-    {
-      label: `Send “${cycleName ?? "your survey"}”`,
-      body: `Send the confidential invite links for ${cycleName ? `"${cycleName}"` : "this survey"} so people can start responding.`,
-      href: hasCycle ? `/app/${state.cycle!.id}/send` : "/app/surveys/new",
-      action: "Send invites",
-    },
+    { label: "Send it", body: "Send confidential invite links. During pilots, you can also copy secure links manually if email delivery is not verified yet.", href: hasCycle ? `/app/${state.cycle!.id}/send` : "/app/surveys/new", action: "Open send step" },
   ];
   const step = steps[stepIndex];
 

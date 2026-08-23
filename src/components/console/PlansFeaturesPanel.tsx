@@ -8,19 +8,19 @@ const tiers = [
     value: "standard",
     label: "Standard",
     description: "Default tier for every new tenant.",
-    includes: ["Fixed template library", "k>=5 default confidentiality threshold", "CSV employee import"],
+    includes: ["Fixed template library", "k>=5 default confidentiality threshold", "CSV employee import", "Survey credits purchased as needed", "AI insights included after paid credit purchase"],
   },
   {
     value: "growth",
     label: "Growth",
     description: "For teams customizing their survey program.",
-    includes: ["Custom question editing", "Manager hierarchy import", "Configurable confidentiality threshold (3-10)"],
+    includes: ["Everything in Standard", "Custom question editing", "Manager hierarchy import", "Configurable confidentiality threshold (5-10)", "Optional report retention for trend lines"],
   },
   {
     value: "enterprise",
     label: "Enterprise",
     description: "For larger, white-labeled deployments.",
-    includes: ["Everything in Growth", "Custom workspace branding", "Priority support"],
+    includes: ["Everything in Growth", "Custom workspace branding", "Priority support", "Optional customer-owned AI provider/model"],
   },
 ] as const;
 

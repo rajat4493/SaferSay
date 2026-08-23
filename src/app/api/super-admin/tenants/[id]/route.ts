@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSessionContext } from "@/lib/server/authSession";
 import { getDatabasePool } from "@/lib/server/db/pool";
+import type { BillingTerms } from "@/lib/billingCatalog";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import type { TenantPlanTier } from "@/lib/server/repositories/types";
 
@@ -33,6 +34,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
   const body = (await request.json().catch(() => ({}))) as {
     planTier?: string;
     features?: Record<string, boolean>;
+    billingTerms?: BillingTerms;
     minGroupSize?: number;
     note?: string;
   };
@@ -40,11 +42,11 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
   const existing = await gate.repo.getTenantDetail(id);
   if (!existing) return NextResponse.json({ ok: false, error: "Tenant not found." }, { status: 404 });
 
-  if (body.planTier !== undefined || body.features !== undefined) {
+  if (body.planTier !== undefined || body.features !== undefined || body.billingTerms !== undefined) {
     const planTier = body.planTier && validPlanTiers.includes(body.planTier as TenantPlanTier)
       ? (body.planTier as TenantPlanTier)
       : existing.planTier;
-    await gate.repo.updateTenantPlan(id, planTier, body.features ?? existing.features);
+    await gate.repo.updateTenantPlan(id, planTier, body.features ?? existing.features, body.billingTerms ?? existing.billingTerms);
   }
 
   if (typeof body.minGroupSize === "number") {

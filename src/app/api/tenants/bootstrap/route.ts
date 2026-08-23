@@ -1,16 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getDatabasePool } from "@/lib/server/db/pool";
-import { isDevAuthAllowed } from "@/lib/server/devAuth";
 import { IdentityRepository, toTenantSlug } from "@/lib/server/repositories/identityRepository";
 
 export async function POST(request: NextRequest) {
-  // Dev/demo seeding utility, not part of the real signup path
-  // (resolveUserRecord() provisions real tenants on first OAuth sign-in).
-  // Unauthenticated tenant creation has no place in production.
-  if (!isDevAuthAllowed()) {
-    return NextResponse.json({ ok: false, error: "Not found." }, { status: 404 });
-  }
-
   const db = getDatabasePool();
   if (!db) {
     return NextResponse.json({ ok: false, error: "DATABASE_URL is required for tenant bootstrap." }, { status: 503 });

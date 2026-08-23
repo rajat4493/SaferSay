@@ -12,7 +12,7 @@ export async function getPilotState(params: { db: Queryable; tenantId: string; t
   // instead of the old standalone routes -- those pages moved inside the
   // survey object (docs/strategy/CLAUDE_CODE_ADMIN_REFACTOR.md §1).
   const sendHref = report.cycle ? `/app/${report.cycle.id}/send` : "/app/surveys/new";
-  const resultsHref = report.cycle ? `/app/${report.cycle.id}/results` : "/app/surveys";
+  const resultsHref = report.cycle ? `/app/${report.cycle.id}/results` : "/app";
 
   const steps = [
     {

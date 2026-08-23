@@ -13,6 +13,8 @@ describe("real protected report flow", () => {
     const repo = readFileSync("src/lib/server/repositories/responseRepository.ts", "utf8");
     expect(repo).toContain("getLatestProtectedReportForTenant");
     expect(repo).toContain("responses.report_question_scores");
+    expect(repo).toContain("q.question_type");
+    expect(repo).toContain("scaleMaxForQuestionType");
     expect(repo).not.toContain("identity.employees");
     expect(repo).not.toContain("identity.survey_participants");
   });
@@ -30,5 +32,23 @@ describe("real protected report flow", () => {
     const viewerPage = readFileSync("src/app/viewer/page.tsx", "utf8");
     expect(adminPage).toContain("ProtectedReportPanel");
     expect(viewerPage).toContain("ProtectedReportPanel");
+  });
+
+  it("locks report notes once a survey is closed", () => {
+    const route = readFileSync("src/app/api/report/action/route.ts", "utf8");
+    const page = readFileSync("src/app/app/[surveyId]/results/page.tsx", "utf8");
+    expect(route).toContain('cycle.status === "closed"');
+    expect(route).toContain("Survey is closed and locked.");
+    expect(page).toContain("no reminders, notes, or other communication can be sent");
+  });
+
+  it("does not keep a survey visually stuck in draft after launch or manual responses", () => {
+    const inviteRoute = readFileSync("src/app/api/invites/send/route.ts", "utf8");
+    const identityRepo = readFileSync("src/lib/server/repositories/identityRepository.ts", "utf8");
+    const responseRepo = readFileSync("src/lib/server/repositories/responseRepository.ts", "utf8");
+    expect(identityRepo).toContain("markCycleOpen");
+    expect(inviteRoute).toContain("openCycleWithSurveyCredit");
+    expect(responseRepo).toContain("c.status = 'draft' and coalesce(s.n, 0) > 0");
+    expect(responseRepo).toContain("c.status = 'draft' and exists");
   });
 });
