@@ -319,6 +319,14 @@ export type ProtectedReport =
       protected: false;
       n: number;
       rows: Array<{ questionId: string; label?: string; construct?: string | null; n: number; average: number | null }>;
+      // Only set by getManagerRollupReport: non-null means the requested
+      // team was itself below the confidentiality threshold and this
+      // report widened to a manager's reporting subtree (or, at the
+      // limit, the whole company) to clear it. `teamsIncluded` is every
+      // team-label folded into the merged count -- shown to the client
+      // so it's honest about what "n" actually covers, not silently wider
+      // than the picker implied.
+      rolledUpTo?: { label: string; teamsIncluded: string[] } | null;
     };
 
 /**

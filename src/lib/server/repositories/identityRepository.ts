@@ -1124,6 +1124,74 @@ export class IdentityRepository {
     return Number(result.rows[0]?.count ?? 0);
   }
 
+  /**
+   * All team labels in a manager's reporting subtree (the manager's own
+   * team plus every descendant's team, deduped), via WITH RECURSIVE over
+   * manager_id (0035_manager_hierarchy.sql). Pure identity-side org-chart
+   * metadata, consumed by managerRollupService.ts to know which
+   * the response-side segment_team labels belong together -- this
+   * repository never reads responses.* itself; see that service for how
+   * the two sides are composed.
+   */
+  async getSubtreeTeamLabels(tenantId: string, rootManagerId: string): Promise<string[]> {
+    const result = await this.db.query<{ team: string | null }>(
+      `with recursive subtree as (
+         select id, team from identity.employees where tenant_id = $1 and id = $2
+         union all
+         select e.id, e.team from identity.employees e join subtree on e.manager_id = subtree.id
+       )
+       select distinct team from subtree where team is not null`,
+      [tenantId, rootManagerId],
+    );
+    return result.rows.map((row) => row.team!);
+  }
+
+  /**
+   * The single manager who owns a given team label -- "owns" meaning
+   * every employee carrying that team label reports to the same manager.
+   * Returns null when there's no clean single owner (the label is split
+   * across multiple managers, or every such employee has manager_id null
+   * -- a flat org, or the label predates any hierarchy data): both cases
+   * tell managerRollupService.ts to fall back to org-wide directly rather
+   * than guess an owner, since a wrong guess here would misattribute
+   * whose subtree a rollup covers.
+   */
+  async getTeamOwner(tenantId: string, team: string): Promise<string | null> {
+    const result = await this.db.query<{ manager_id: string | null }>(
+      `select distinct manager_id from identity.employees where tenant_id = $1 and team = $2 and manager_id is not null`,
+      [tenantId, team],
+    );
+    return result.rows.length === 1 ? result.rows[0].manager_id : null;
+  }
+
+  async getEmployeeManagerId(tenantId: string, employeeId: string): Promise<string | null> {
+    const result = await this.db.query<{ manager_id: string | null }>(`select manager_id from identity.employees where tenant_id = $1 and id = $2`, [
+      tenantId,
+      employeeId,
+    ]);
+    return result.rows[0]?.manager_id ?? null;
+  }
+
+  /** Every direct report of a manager (or, when parentManagerId is null, every root employee -- manager_id is null). Ids only; callers resolve each one's own subtree separately. */
+  async getSiblingManagerIds(tenantId: string, parentManagerId: string | null): Promise<string[]> {
+    const result = await this.db.query<{ id: string }>(
+      parentManagerId
+        ? `select id from identity.employees where tenant_id = $1 and manager_id = $2`
+        : `select id from identity.employees where tenant_id = $1 and manager_id is null`,
+      parentManagerId ? [tenantId, parentManagerId] : [tenantId],
+    );
+    return result.rows.map((row) => row.id);
+  }
+
+  /** Display label for a manager in rollup UI copy -- name, falling back to email. Never more identity than that (no employee list, no report count) leaves this repository via this method. */
+  async getEmployeeLabel(tenantId: string, employeeId: string): Promise<string> {
+    const result = await this.db.query<{ name: string | null; email: string }>(`select name, email from identity.employees where tenant_id = $1 and id = $2`, [
+      tenantId,
+      employeeId,
+    ]);
+    return result.rows[0]?.name || result.rows[0]?.email || "this manager";
+  }
+
   async issueTokens(tenantId: string, cycleId: string): Promise<IssuedParticipantToken[]> {
     const employees = await this.db.query<{
       id: string;

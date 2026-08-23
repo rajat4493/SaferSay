@@ -357,7 +357,7 @@ export class ResponseRepository {
    * request against the cycle's current department membership, not cached
    * -- membership can change as team values get imported.
    */
-  private async getDepartmentReleasability(
+  async getDepartmentReleasability(
     tenantId: string,
     cycleId: string,
     minGroupSize: number,
@@ -420,6 +420,59 @@ export class ResponseRepository {
     return {
       protected: false,
       n: entry.n,
+      rows: result.rows.map((row) => ({
+        questionId: row.question_id,
+        label: row.question_text,
+        construct: row.construct,
+        n: row.n,
+        average: row.average === null ? null : Number(row.average),
+      })),
+    };
+  }
+
+  /**
+   * Raw per-team respondent counts for a cycle -- the same query
+   * getDepartmentReleasability groups internally, exposed standalone so
+   * the manager-rollup orchestration (managerRollupService.ts) can reuse
+   * it against multiple candidate team-sets without a repeated query per
+   * candidate. Deliberately still only touches responses.submissions --
+   * team-label strings, not individual identity.
+   */
+  async getTeamCounts(tenantId: string, cycleId: string): Promise<Map<string, number>> {
+    const result = await this.db.query<{ segment_team: string; n: string }>(
+      `select segment_team, count(*)::text as n
+       from responses.submissions
+       where tenant_id = $1 and cycle_id = $2 and segment_team is not null
+       group by segment_team`,
+      [tenantId, cycleId],
+    );
+    return new Map(result.rows.map((row) => [row.segment_team, Number(row.n)]));
+  }
+
+  /**
+   * Same shape as getDepartmentProtectedReport, generalized to a SET of
+   * team labels merged into one count (a manager's reporting subtree, or
+   * the whole company) -- used by the manager-rollup orchestration once
+   * it has already decided, using identity-side org-chart data, which
+   * team labels belong together and that the merged n clears threshold.
+   * This method only ever receives team labels and a pre-computed n; it
+   * never resolves who's whose manager itself -- see
+   * managerRollupService.ts, not here, for the org-chart walk.
+   */
+  async getMultiTeamProtectedReport(tenantId: string, cycleId: string, minGroupSize: number, teams: string[], n: number): Promise<ProtectedReport> {
+    const result = await this.db.query<{ question_id: string; question_text: string; construct: string | null; n: number; average: string | null }>(
+      `select r.question_id, q.question_text, q.construct, r.n, r.average
+       from responses.report_question_scores_by_departments($1, $2, $3) r
+       join responses.survey_cycles c on c.id = $1
+       join responses.template_questions q on q.id = r.question_id
+       where c.tenant_id = $4
+         and r.protected = false`,
+      [cycleId, teams, minGroupSize, tenantId],
+    );
+
+    return {
+      protected: false,
+      n,
       rows: result.rows.map((row) => ({
         questionId: row.question_id,
         label: row.question_text,
