@@ -7,8 +7,8 @@ import { AppShell } from "@/components/AppShell";
 import { SkeletonCard, SkeletonText } from "@/components/Skeleton";
 import { SurveyStageTabs } from "@/components/SurveyStageTabs";
 import { useToast } from "@/components/ToastProvider";
+import { QuestionOptionsEditor, type QuestionOption } from "@/components/QuestionOptionsEditor";
 
-type QuestionOption = { key: string; label: string };
 type ShowIf = { attribute: "team" | "location"; op: "eq" | "neq"; value: string } | null;
 type QuestionType = "likert_5" | "enps_0_10" | "open_text" | "multiple_choice" | "ranking" | "matrix";
 
@@ -41,6 +41,14 @@ const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
 };
 const OPTION_TYPES: QuestionType[] = ["multiple_choice", "ranking", "matrix"];
 
+// question_bank's type vocabulary is narrower than the cycle-question one
+// ("scale" instead of a specific likert_5/enps_0_10) since a reusable bank
+// question doesn't commit to a scale range until it's actually added to a
+// cycle -- mapped to likert_5 on insert below, same as the type always
+// meant when it was the only rating option.
+type BankQuestionType = "scale" | "open_text" | "multiple_choice" | "ranking" | "matrix";
+type BankQuestion = { id: string; construct: string | null; text: string; questionType: BankQuestionType; options: QuestionOption[] | null };
+
 export default function SurveyBuildPage() {
   const params = useParams();
   const surveyId = params.surveyId as string;
@@ -59,6 +67,8 @@ function SurveyBuildContent({ surveyId }: { surveyId: string }) {
   const [editing, setEditing] = useState(false);
   const [draftQuestions, setDraftQuestions] = useState<DraftQuestion[]>([]);
   const [saving, setSaving] = useState(false);
+  const [bankQuestions, setBankQuestions] = useState<BankQuestion[]>([]);
+  const [bankPickerValue, setBankPickerValue] = useState("");
 
   useEffect(() => {
     fetch(`/api/cycles/${surveyId}`)
@@ -77,6 +87,24 @@ function SurveyBuildContent({ surveyId }: { surveyId: string }) {
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [surveyId]);
+
+  useEffect(() => {
+    fetch("/api/question-bank")
+      .then((response) => response.json())
+      .then((data: { ok?: boolean; questions?: BankQuestion[] }) => setBankQuestions(data.ok ? (data.questions ?? []) : []))
+      .catch(() => undefined);
+  }, []);
+
+  function addFromBank() {
+    const bankQuestion = bankQuestions.find((question) => question.id === bankPickerValue);
+    if (!bankQuestion) return;
+    const type: QuestionType = bankQuestion.questionType === "scale" ? "likert_5" : bankQuestion.questionType;
+    setDraftQuestions((current) => [
+      ...current,
+      { text: bankQuestion.text, type, construct: bankQuestion.construct, optional: false, options: bankQuestion.options ?? [], showIf: null },
+    ]);
+    setBankPickerValue("");
+  }
 
   function startEditing() {
     if (!detail) return;
@@ -120,24 +148,8 @@ function SurveyBuildContent({ surveyId }: { surveyId: string }) {
     setDraftQuestions((current) => current.map((question, i) => (i === index ? { ...question, showIf } : question)));
   }
 
-  function addDraftOption(index: number) {
-    setDraftQuestions((current) =>
-      current.map((question, i) => (i === index ? { ...question, options: [...question.options, { key: randomKey(), label: "" }] } : question)),
-    );
-  }
-
-  function editDraftOptionLabel(index: number, optionIndex: number, label: string) {
-    setDraftQuestions((current) =>
-      current.map((question, i) =>
-        i === index ? { ...question, options: question.options.map((option, j) => (j === optionIndex ? { ...option, label } : option)) } : question,
-      ),
-    );
-  }
-
-  function removeDraftOption(index: number, optionIndex: number) {
-    setDraftQuestions((current) =>
-      current.map((question, i) => (i === index ? { ...question, options: question.options.filter((_, j) => j !== optionIndex) } : question)),
-    );
+  function setDraftOptions(index: number, options: QuestionOption[]) {
+    setDraftQuestions((current) => current.map((question, i) => (i === index ? { ...question, options } : question)));
   }
 
   function removeDraft(index: number) {
@@ -292,40 +304,33 @@ function SurveyBuildContent({ surveyId }: { surveyId: string }) {
                         </div>
 
                         {OPTION_TYPES.includes(question.type) ? (
-                          <div className="mt-2 space-y-1.5 pl-1">
-                            {question.options.map((option, optionIndex) => (
-                              <div key={option.key} className="flex items-center gap-2">
-                                <input
-                                  value={option.label}
-                                  onChange={(event) => editDraftOptionLabel(index, optionIndex, event.target.value)}
-                                  placeholder={`Option ${optionIndex + 1}`}
-                                  aria-label={`Question ${index + 1} option ${optionIndex + 1}`}
-                                  className="admin-input h-8 flex-1 text-xs"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => removeDraftOption(index, optionIndex)}
-                                  className="rounded-[var(--radius-input)] border border-[var(--border)] p-1 text-[var(--red)] hover:bg-[var(--red-bg)]"
-                                  aria-label={`Remove option ${optionIndex + 1}`}
-                                >
-                                  <Trash2 size={12} strokeWidth={1.8} />
-                                </button>
-                              </div>
-                            ))}
-                            <button type="button" onClick={() => addDraftOption(index)} className="btn-secondary px-2.5 py-1 text-xs">
-                              <Plus size={12} strokeWidth={1.8} />
-                              Add option
-                            </button>
-                          </div>
+                          <QuestionOptionsEditor options={question.options} onChange={(options) => setDraftOptions(index, options)} idPrefix={`Question ${index + 1}`} />
                         ) : null}
                       </div>
                     ))}
                   </div>
 
-                  <button onClick={addDraft} className="btn-secondary mt-3 px-3 py-1.5 text-xs">
-                    <Plus size={13} strokeWidth={1.8} />
-                    Add question
-                  </button>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <button onClick={addDraft} className="btn-secondary px-3 py-1.5 text-xs">
+                      <Plus size={13} strokeWidth={1.8} />
+                      Add question
+                    </button>
+                    {bankQuestions.length > 0 ? (
+                      <>
+                        <select value={bankPickerValue} onChange={(e) => setBankPickerValue(e.target.value)} aria-label="Add from question bank" className="admin-input h-8 w-auto text-xs">
+                          <option value="">Add from bank...</option>
+                          {bankQuestions.map((question) => (
+                            <option key={question.id} value={question.id}>
+                              {question.text}
+                            </option>
+                          ))}
+                        </select>
+                        <button onClick={addFromBank} disabled={!bankPickerValue} className="btn-secondary px-3 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-40">
+                          Add
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
 
                   <div className="mt-4 flex items-center gap-2">
                     <button onClick={saveQuestions} disabled={saving} className="btn-primary px-4 py-2 text-sm">
@@ -376,10 +381,6 @@ function SurveyBuildContent({ surveyId }: { surveyId: string }) {
       </div>
     </AppShell>
   );
-}
-
-function randomKey() {
-  return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2);
 }
 
 /**

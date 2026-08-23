@@ -6,6 +6,8 @@ import {
   ProtectedTextReport,
   ProtectedOptionReport,
   QuestionBankItem,
+  QuestionBankQuestionType,
+  QuestionOption,
   QuestionType,
   ShowIfCondition,
   ReportScope,
@@ -430,29 +432,41 @@ export class ResponseRepository {
 
   /** Reusable, tenant-private survey questions -- see 0024_question_bank.sql. Archived items are excluded, not deleted, so past cycles that used them keep their own snapshot untouched. */
   async listQuestionBank(tenantId: string): Promise<QuestionBankItem[]> {
-    const result = await this.db.query<{ id: string; construct: string | null; text: string; question_type: "scale" | "open_text" }>(
-      `select id, construct, text, question_type
+    const result = await this.db.query<{
+      id: string;
+      construct: string | null;
+      text: string;
+      question_type: QuestionBankQuestionType;
+      options: QuestionOption[] | null;
+    }>(
+      `select id, construct, text, question_type, options
        from responses.question_bank
        where tenant_id = $1 and archived_at is null
        order by created_at desc`,
       [tenantId],
     );
-    return result.rows.map((row) => ({ id: row.id, construct: row.construct, text: row.text, questionType: row.question_type }));
+    return result.rows.map((row) => ({ id: row.id, construct: row.construct, text: row.text, questionType: row.question_type, options: row.options }));
   }
 
   async addQuestionToBank(
     tenantId: string,
-    input: { construct?: string | null; text: string; questionType: "scale" | "open_text" },
+    input: { construct?: string | null; text: string; questionType: QuestionBankQuestionType; options?: QuestionOption[] | null },
   ): Promise<QuestionBankItem> {
     const id = randomUUID();
-    const result = await this.db.query<{ id: string; construct: string | null; text: string; question_type: "scale" | "open_text" }>(
-      `insert into responses.question_bank (id, tenant_id, construct, text, question_type)
-       values ($1, $2, $3, $4, $5)
-       returning id, construct, text, question_type`,
-      [id, tenantId, input.construct ?? null, input.text, input.questionType],
+    const result = await this.db.query<{
+      id: string;
+      construct: string | null;
+      text: string;
+      question_type: QuestionBankQuestionType;
+      options: QuestionOption[] | null;
+    }>(
+      `insert into responses.question_bank (id, tenant_id, construct, text, question_type, options)
+       values ($1, $2, $3, $4, $5, $6::jsonb)
+       returning id, construct, text, question_type, options`,
+      [id, tenantId, input.construct ?? null, input.text, input.questionType, input.options ? JSON.stringify(input.options) : null],
     );
     const row = result.rows[0];
-    return { id: row.id, construct: row.construct, text: row.text, questionType: row.question_type };
+    return { id: row.id, construct: row.construct, text: row.text, questionType: row.question_type, options: row.options };
   }
 
   async archiveQuestionFromBank(tenantId: string, questionId: string): Promise<void> {

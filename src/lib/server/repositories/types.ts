@@ -294,11 +294,18 @@ export type RespondentSurveySession = {
  * §4). The parameter exists now so adding those scopes later is a query
  * change, not a reporting-layer rewrite.
  */
+export type QuestionBankQuestionType = "scale" | "open_text" | "multiple_choice" | "ranking" | "matrix";
+
 export type QuestionBankItem = {
   id: string;
   construct: string | null;
   text: string;
-  questionType: "scale" | "open_text";
+  questionType: QuestionBankQuestionType;
+  // Only meaningful for multiple_choice/ranking/matrix -- null otherwise.
+  // No show_if here: a branching condition is cycle-specific (gates one
+  // question instance against that cycle's respondents), not a property
+  // of a reusable question definition -- see plan history.
+  options: QuestionOption[] | null;
 };
 
 export type ReportScope =

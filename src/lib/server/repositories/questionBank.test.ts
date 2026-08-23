@@ -9,10 +9,10 @@ function fakeDb(): { db: Queryable; queries: Array<{ sql: string; params: unknow
     query: (async (sql: string, params: unknown[] = []) => {
       queries.push({ sql, params });
       if (sql.includes("select id, construct, text, question_type")) {
-        return { rows: [{ id: "q1", construct: "Recognition", text: "I feel recognized for my work.", question_type: "scale" }] };
+        return { rows: [{ id: "q1", construct: "Recognition", text: "I feel recognized for my work.", question_type: "scale", options: null }] };
       }
       if (sql.includes("insert into responses.question_bank")) {
-        return { rows: [{ id: "q2", construct: params[2], text: params[3], question_type: params[4] }] };
+        return { rows: [{ id: "q2", construct: params[2], text: params[3], question_type: params[4], options: params[5] ? JSON.parse(params[5] as string) : null }] };
       }
       return { rows: [], rowCount: 1 };
     }) as Queryable["query"],
@@ -25,7 +25,7 @@ describe("question bank repository", () => {
     const { db, queries } = fakeDb();
     const result = await new ResponseRepository(db).listQuestionBank("tenant-1");
     expect(queries[0].sql).toContain("archived_at is null");
-    expect(result).toEqual([{ id: "q1", construct: "Recognition", text: "I feel recognized for my work.", questionType: "scale" }]);
+    expect(result).toEqual([{ id: "q1", construct: "Recognition", text: "I feel recognized for my work.", questionType: "scale", options: null }]);
   });
 
   it("addQuestionToBank scopes the insert to the tenant and returns the created row", async () => {
@@ -33,6 +33,16 @@ describe("question bank repository", () => {
     const result = await new ResponseRepository(db).addQuestionToBank("tenant-1", { construct: "Trust", text: "I trust leadership.", questionType: "scale" });
     expect(result.id).toBe("q2");
     expect(result.text).toBe("I trust leadership.");
+    expect(result.options).toBeNull();
+  });
+
+  it("addQuestionToBank round-trips options for multiple_choice/ranking/matrix types", async () => {
+    const { db, queries } = fakeDb();
+    const options = [{ key: "a", label: "Option A" }, { key: "b", label: "Option B" }];
+    const result = await new ResponseRepository(db).addQuestionToBank("tenant-1", { text: "Pick one", questionType: "multiple_choice", options });
+    expect(queries[0].params[5]).toBe(JSON.stringify(options));
+    expect(result.options).toEqual(options);
+    expect(result.questionType).toBe("multiple_choice");
   });
 
   it("archiveQuestionFromBank sets archived_at rather than deleting the row", async () => {

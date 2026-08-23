@@ -6,6 +6,7 @@ import {
   ClipboardList,
   CreditCard,
   Home,
+  Library,
   Lock,
   LockKeyhole,
   Menu,
@@ -25,7 +26,7 @@ import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import { RoleTag } from "@/components/RoleTag";
 import { SignOutButton } from "@/components/SignOutButton";
 import { useTenantSession } from "@/lib/useTenantSession";
-import { canAccessAuditLog, canAccessPeople, canAccessSecurityProof, canAccessWorkspace, canViewSurveyResults } from "@/lib/permissions";
+import { canAccessAuditLog, canAccessPeople, canAccessSecurityProof, canAccessWorkspace, canCreateSurvey, canViewSurveyResults } from "@/lib/permissions";
 import type { UserRole } from "@/lib/server/repositories/types";
 import { brandFontOptions } from "@/lib/brand";
 import { deriveAccentPalette } from "@/lib/brandTheme";
@@ -49,6 +50,7 @@ const primaryNavItems: NavItemConfig[] = [
 ];
 
 const foldedMenuItems: NavItemConfig[] = [
+  { href: "/app/questions", label: "Question bank", icon: Library, hideForPureOwner: true, visible: canCreateSurvey },
   { href: "/app/workspace/settings", label: "Settings", icon: Settings, hideForPureOwner: true, visible: canAccessWorkspace },
   { href: "/app/workspace/billing", label: "Billing", icon: CreditCard, hideForPureOwner: true, visible: canAccessWorkspace },
   { href: "/app/workspace/team", label: "Team", icon: UserPlus, hideForPureOwner: true, visible: canAccessWorkspace },
