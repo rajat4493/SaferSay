@@ -14,7 +14,7 @@ describe("pay-when-you-listen commercial and privacy contract", () => {
 
   it("opens a cycle only through the atomic credit-consuming repository method", () => {
     const repo = readFileSync("src/lib/server/repositories/identityRepository.ts", "utf8");
-    const migration = readFileSync("db/migrations/0019_credits_and_public_commitments.sql", "utf8");
+    const migration = readFileSync("db/migrations/0039_credits_and_public_commitments.sql", "utf8");
     expect(repo).toContain("openCycleWithSurveyCredit");
     expect(repo).toContain("for update skip locked");
     expect(repo).toContain("consumed_at = now()");
@@ -25,7 +25,7 @@ describe("pay-when-you-listen commercial and privacy contract", () => {
 
   it("enforces the k=5 launch floor in code and migrations", () => {
     const repo = readFileSync("src/lib/server/repositories/identityRepository.ts", "utf8");
-    const migration = readFileSync("db/migrations/0020_enforce_k5_confidentiality_floor.sql", "utf8");
+    const migration = readFileSync("db/migrations/0040_enforce_k5_confidentiality_floor.sql", "utf8");
     expect(repo).toContain("Math.max(5, configured)");
     expect(repo).toContain("Math.max(5, Math.round(value))");
     expect(migration).toContain("check (default_min_group_size >= 5)");
@@ -44,7 +44,7 @@ describe("pay-when-you-listen commercial and privacy contract", () => {
 
   it("keeps commitments owner-only and out of the response schema", () => {
     const route = readFileSync("src/app/api/report/commitment/route.ts", "utf8");
-    const migration = readFileSync("db/migrations/0019_credits_and_public_commitments.sql", "utf8");
+    const migration = readFileSync("db/migrations/0039_credits_and_public_commitments.sql", "utf8");
     expect(route).toContain('session.role !== "customer_admin"');
     expect(route).toContain("getProtectedReportForTenant");
     expect(route).toContain("listCycleCommitmentRecipients");

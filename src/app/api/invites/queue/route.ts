@@ -40,6 +40,10 @@ export async function POST(request: NextRequest) {
 
       const queued = await repo.markOutboxQueued(tenant.id, cycleId, deliveryType);
       if (queued > 0 && deliveryType === "invite") {
+        const opened = await repo.openCycleWithSurveyCredit(tenant.id, cycleId);
+        if (!opened.opened && opened.reason === "no_credit") throw new Error("Buy a survey credit before sending this survey. Drafts stay free until the cycle opens.");
+        if (!opened.opened && opened.reason === "employee_limit") throw new Error("This launch includes more than 100 active employees. This credit covers up to 100; contact SaferSay for the right plan.");
+        if (opened.opened) await repo.syncSurveyCreditBalance(tenant.id);
         await repo.emitOnboardingEvent(tenant.id, userId, "queue");
       }
 
@@ -52,7 +56,6 @@ export async function POST(request: NextRequest) {
         // environments where real email delivery is restricted, e.g. an
         // unverified Resend sandbox domain) could queue and even dispatch
         // every invite and still leave the survey stuck in Draft forever.
-        if (queued > 0 && deliveryType === "invite") await response.openCycle(tenant.id, cycleId);
         return { ok: true, cycleId, deliveryType, queued, ...(await repo.getInviteOutbox(tenant.id, cycleId)) };
       }
 
@@ -67,7 +70,6 @@ export async function POST(request: NextRequest) {
 
       if (deliveryType === "invite" && queued > 0) {
         await repo.markFirstRunCompleted(tenant.id);
-        await response.openCycle(tenant.id, cycleId);
       }
 
       return {

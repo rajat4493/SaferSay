@@ -58,7 +58,8 @@ export default function PrivacyPage() {
               "Every time someone at a Customer views or exports a report, that access is logged in an audit trail the Customer's admins can review.",
             ]}
           />
-          <P>A fuller technical explanation is published at /security.</P>
+           <P>A fuller technical explanation is published at /security.</P>
+           <P>AI insights are generated only from the same k-enforced aggregate report; raw answers, comments, identity data, invite tokens, and participation status are never sent to an AI provider.</P>
         </Section>
 
         <Section title="3. What we collect">

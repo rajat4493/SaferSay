@@ -1,3 +1,5 @@
+import type { BillingTerms } from "@/lib/billingCatalog";
+
 export type TenantRecord = {
   id: string;
   name: string;
@@ -70,6 +72,8 @@ export type TenantDirectoryEntry = {
   latestCycleStatus: string | null;
   lastActivityAt: string | null;
   planTier: TenantPlanTier;
+  billingTerms: BillingTerms;
+  features: Record<string, boolean>;
   createdAt: string;
 };
 
@@ -97,6 +101,7 @@ export type TenantDetail = {
   dataResidencyRegion: string;
   planTier: TenantPlanTier;
   features: Record<string, boolean>;
+  billingTerms: BillingTerms;
   minGroupSize: number;
   employeeCount: number;
   latestCycle: {
@@ -146,6 +151,7 @@ export type TenantSelfSettings = {
   dataResidencyRegion: string;
   planTier: TenantPlanTier;
   features: Record<string, boolean>;
+  billingTerms: BillingTerms;
   // null = SOS button does not render for respondents. No default/fallback
   // (e.g. to the customer_admin contact) -- see 0023_sos_reports.sql.
   safetyContactEmail: string | null;
@@ -165,6 +171,19 @@ export type CycleAction = {
   actionText: string;
   createdAt: string;
 };
+
+export type CycleCommitment = {
+  id: string;
+  cycleId: string;
+  statement: string;
+  targetDate: string;
+  status: "published" | "in_progress" | "completed";
+  progressUpdate: string | null;
+  publishedAt: string;
+  updatedAt: string;
+};
+
+export type AvailableSurveyCredit = { id: string; expiresAt: string };
 
 export type PlatformUsageHealth = {
   totalSurveysCreated: number;
@@ -318,7 +337,7 @@ export type ProtectedReport =
   | {
       protected: false;
       n: number;
-      rows: Array<{ questionId: string; label?: string; construct?: string | null; n: number; average: number | null }>;
+      rows: Array<{ questionId: string; label?: string; construct?: string | null; n: number; average: number | null; scaleMax?: 5 | 10 }>;
       // Only set by getManagerRollupReport: non-null means the requested
       // team was itself below the confidentiality threshold and this
       // report widened to a manager's reporting subtree (or, at the

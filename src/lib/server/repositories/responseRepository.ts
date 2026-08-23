@@ -23,6 +23,10 @@ function normalizeQuestionText(text: string): string {
   return text.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+function scaleMaxForQuestionType(type: QuestionType): 5 | 10 {
+  return type === "enps_0_10" ? 10 : 5;
+}
+
 const orgScope: ReportScope = { type: "org" };
 
 /**
@@ -211,8 +215,8 @@ export class ResponseRepository {
     const n = Number(countResult.rows[0]?.n ?? 0);
     if (n < minGroupSize) return { protected: true, n, rows: [] };
 
-    const result = await this.db.query<{ question_id: string; question_text: string; construct: string | null; n: number; average: string | null }>(
-      `select r.question_id, q.question_text, q.construct, r.n, r.average
+    const result = await this.db.query<{ question_id: string; question_text: string; question_type: QuestionType; construct: string | null; n: number; average: string | null }>(
+      `select r.question_id, q.question_text, q.question_type, q.construct, r.n, r.average
        from responses.report_question_scores($1, $2) r
        join responses.survey_cycles c on c.id = $1
        join responses.template_questions q on q.id = r.question_id
@@ -229,6 +233,7 @@ export class ResponseRepository {
         construct: row.construct,
         n: row.n,
         average: row.average === null ? null : Number(row.average),
+        scaleMax: scaleMaxForQuestionType(row.question_type),
       })),
     };
   }
@@ -862,8 +867,8 @@ export class ResponseRepository {
 /** Anchors to "now" at creation/run time, not calendar boundaries -- a monthly recurrence created on the 15th fires on the 15th of each following month, not the 1st. */
 export function nextRunAtFrom(from: Date, interval: "weekly" | "monthly" | "quarterly"): Date {
   const next = new Date(from);
-  if (interval === "weekly") next.setDate(next.getDate() + 7);
-  else if (interval === "monthly") next.setMonth(next.getMonth() + 1);
-  else next.setMonth(next.getMonth() + 3);
+  if (interval === "weekly") next.setUTCDate(next.getUTCDate() + 7);
+  else if (interval === "monthly") next.setUTCMonth(next.getUTCMonth() + 1);
+  else next.setUTCMonth(next.getUTCMonth() + 3);
   return next;
 }

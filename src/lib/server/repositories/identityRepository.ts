@@ -1,4 +1,5 @@
 import { randomBytes, randomUUID } from "crypto";
+import { normalizeBillingTerms, type BillingTerms } from "@/lib/billingCatalog";
 import type { Queryable } from "@/lib/server/db/tenantPool";
 import { hashServerToken } from "@/lib/server/tokenHashing";
 import { decryptSecret, encryptSecret } from "@/lib/server/secretCrypto";
@@ -6,6 +7,8 @@ import type { BrandTheme } from "@/lib/brand";
 import {
   AuditLogRecord,
   CycleAction,
+  CycleCommitment,
+  AvailableSurveyCredit,
   EmployeeImportRecord,
   EmployeeRecord,
   InviteOutboxRow,
@@ -120,7 +123,7 @@ export class IdentityRepository {
       [tenantId],
     );
     const configured = result.rows[0]?.default_min_group_size ?? 5;
-    return Math.min(10, Math.max(3, configured));
+    return Math.min(10, Math.max(5, configured));
   }
 
   /** Operator-action audit trail for this tenant only -- never respondent data (see auditLog.ts's hard rule). */
@@ -298,6 +301,7 @@ export class IdentityRepository {
       slug: string;
       created_at: string;
       plan_tier: TenantPlanTier;
+      features: Record<string, unknown>;
       employee_count: string;
       latest_cycle_name: string | null;
       latest_cycle_status: string | null;
@@ -310,6 +314,7 @@ export class IdentityRepository {
          t.slug,
          t.created_at::text as created_at,
          coalesce(ts.plan_tier, 'standard') as plan_tier,
+         coalesce(ts.features, '{}'::jsonb) as features,
          (select count(*) from identity.employees e where e.tenant_id = t.id and e.employment_status = 'active')::text as employee_count,
          (select c.name from responses.survey_cycles c where c.tenant_id = t.id order by c.created_at desc limit 1) as latest_cycle_name,
          (select c.status from responses.survey_cycles c where c.tenant_id = t.id order by c.created_at desc limit 1) as latest_cycle_status,
@@ -332,6 +337,8 @@ export class IdentityRepository {
         slug: row.slug,
         createdAt: row.created_at,
         planTier: row.plan_tier,
+        features: extractBooleanFeatures(row.features),
+        billingTerms: normalizeBillingTerms(row.features?.billingTerms),
         employeeCount: Number(row.employee_count),
         latestCycleName: row.latest_cycle_name,
         latestCycleStatus: row.latest_cycle_status,
@@ -349,7 +356,7 @@ export class IdentityRepository {
       created_at: string;
       data_residency_region: string;
       plan_tier: TenantPlanTier;
-      features: Record<string, boolean>;
+      features: Record<string, unknown>;
       min_group_size: number;
     }>(
       `select
@@ -431,7 +438,8 @@ export class IdentityRepository {
       primaryContactEmail: contactResult.rows[0]?.email ?? null,
       dataResidencyRegion: tenant.data_residency_region,
       planTier: tenant.plan_tier,
-      features: tenant.features ?? {},
+      features: extractBooleanFeatures(tenant.features),
+      billingTerms: normalizeBillingTerms(tenant.features?.billingTerms),
       minGroupSize: tenant.min_group_size,
       employeeCount,
       latestCycle,
@@ -445,17 +453,22 @@ export class IdentityRepository {
     };
   }
 
-  async updateTenantPlan(tenantId: string, planTier: TenantPlanTier, features: Record<string, boolean>) {
+  async updateTenantPlan(tenantId: string, planTier: TenantPlanTier, features: Record<string, boolean>, billingTerms?: BillingTerms) {
+    const current = await this.getTenantSelfSettings(tenantId);
+    const mergedFeatures = {
+      ...features,
+      billingTerms: billingTerms ? normalizeBillingTerms(billingTerms) : current.billingTerms,
+    };
     await this.db.query(
       `insert into identity.tenant_settings (tenant_id, plan_tier, features)
        values ($1, $2, $3::jsonb)
        on conflict (tenant_id) do update set plan_tier = excluded.plan_tier, features = excluded.features, updated_at = now()`,
-      [tenantId, planTier, JSON.stringify(features)],
+      [tenantId, planTier, JSON.stringify(mergedFeatures)],
     );
   }
 
   async setMinGroupSize(tenantId: string, value: number) {
-    const clamped = Math.min(10, Math.max(3, Math.round(value)));
+    const clamped = Math.min(10, Math.max(5, Math.round(value)));
     await this.db.query(
       `insert into identity.tenant_settings (tenant_id, default_min_group_size)
        values ($1, $2)
@@ -765,7 +778,7 @@ export class IdentityRepository {
       default_min_group_size: number;
       data_residency_region: string;
       plan_tier: TenantPlanTier;
-      features: Record<string, boolean>;
+      features: Record<string, unknown>;
       safety_contact_email: string | null;
       smtp_host: string | null;
       smtp_from_email: string | null;
@@ -788,7 +801,8 @@ export class IdentityRepository {
       minGroupSize: row?.default_min_group_size ?? 5,
       dataResidencyRegion: row?.data_residency_region ?? "EU",
       planTier: row?.plan_tier ?? "standard",
-      features: row?.features ?? {},
+      features: extractBooleanFeatures(row?.features),
+      billingTerms: normalizeBillingTerms(row?.features?.billingTerms),
       safetyContactEmail: row?.safety_contact_email ?? null,
       // Never the password -- just enough for the settings UI to show
       // "configured" vs "not configured" without ever round-tripping the secret.
@@ -821,6 +835,118 @@ export class IdentityRepository {
       actionText: row.action_text,
       createdAt: row.created_at,
     }));
+  }
+
+  async listCycleCommitments(tenantId: string, cycleId: string): Promise<CycleCommitment[]> {
+    const result = await this.db.query<{
+      id: string; cycle_id: string; statement: string; target_date: string;
+      status: CycleCommitment["status"]; progress_update: string | null;
+      published_at: string; updated_at: string;
+    }>(
+      `select id, cycle_id, statement, target_date::text as target_date, status, progress_update,
+              published_at::text as published_at, updated_at::text as updated_at
+       from identity.cycle_commitments where tenant_id = $1 and cycle_id = $2`,
+      [tenantId, cycleId],
+    );
+    return result.rows.map((row) => ({
+      id: row.id, cycleId: row.cycle_id, statement: row.statement, targetDate: row.target_date,
+      status: row.status, progressUpdate: row.progress_update, publishedAt: row.published_at, updatedAt: row.updated_at,
+    }));
+  }
+
+  async publishCycleCommitment(tenantId: string, cycleId: string, statement: string, targetDate: string): Promise<CycleCommitment> {
+    const result = await this.db.query<{
+      id: string; cycle_id: string; statement: string; target_date: string;
+      status: CycleCommitment["status"]; progress_update: string | null;
+      published_at: string; updated_at: string;
+    }>(
+      `insert into identity.cycle_commitments
+         (id, tenant_id, cycle_id, statement, target_date, status, published_at, updated_at)
+       values ($1, $2, $3, $4, $5::date, 'published', now(), now())
+       on conflict (tenant_id, cycle_id) do update
+         set statement = excluded.statement, target_date = excluded.target_date, status = 'published',
+             progress_update = null, published_at = now(), updated_at = now()
+       returning id, cycle_id, statement, target_date::text as target_date, status, progress_update,
+                 published_at::text as published_at, updated_at::text as updated_at`,
+      [randomUUID(), tenantId, cycleId, statement, targetDate],
+    );
+    const row = result.rows[0];
+    return { id: row.id, cycleId: row.cycle_id, statement: row.statement, targetDate: row.target_date,
+      status: row.status, progressUpdate: row.progress_update, publishedAt: row.published_at, updatedAt: row.updated_at };
+  }
+
+  async updateCycleCommitment(tenantId: string, cycleId: string, status: Exclude<CycleCommitment["status"], "published">, progressUpdate: string): Promise<CycleCommitment | null> {
+    const result = await this.db.query<{
+      id: string; cycle_id: string; statement: string; target_date: string;
+      status: CycleCommitment["status"]; progress_update: string | null;
+      published_at: string; updated_at: string;
+    }>(
+      `update identity.cycle_commitments set status = $3, progress_update = $4, updated_at = now()
+       where tenant_id = $1 and cycle_id = $2
+       returning id, cycle_id, statement, target_date::text as target_date, status, progress_update,
+                 published_at::text as published_at, updated_at::text as updated_at`,
+      [tenantId, cycleId, status, progressUpdate || null],
+    );
+    const row = result.rows[0];
+    return row ? { id: row.id, cycleId: row.cycle_id, statement: row.statement, targetDate: row.target_date,
+      status: row.status, progressUpdate: row.progress_update, publishedAt: row.published_at, updatedAt: row.updated_at } : null;
+  }
+
+  async grantSurveyCredits(tenantId: string, count: number, sourceReference: string): Promise<number> {
+    const expiresAt = new Date();
+    expiresAt.setUTCMonth(expiresAt.getUTCMonth() + 24);
+    let granted = 0;
+    for (let index = 0; index < count; index += 1) {
+      const result = await this.db.query(
+        `insert into identity.survey_credits (id, tenant_id, source_reference, source_position, employee_band, expires_at)
+         values ($1, $2, $3, $4, 'up_to_100', $5)
+         on conflict (source_reference, source_position) do nothing`,
+        [randomUUID(), tenantId, sourceReference, index, expiresAt.toISOString()],
+      );
+      granted += result.rowCount ?? 0;
+    }
+    return granted;
+  }
+
+  async listAvailableSurveyCredits(tenantId: string): Promise<AvailableSurveyCredit[]> {
+    const result = await this.db.query<{ id: string; expires_at: string }>(
+      `select id, expires_at::text as expires_at from identity.survey_credits
+       where tenant_id = $1 and consumed_at is null and expires_at > now()
+       order by expires_at asc, created_at asc`, [tenantId],
+    );
+    return result.rows.map((row) => ({ id: row.id, expiresAt: row.expires_at }));
+  }
+
+  async syncSurveyCreditBalance(tenantId: string): Promise<number> {
+    const settings = await this.getTenantSelfSettings(tenantId);
+    const credits = await this.listAvailableSurveyCredits(tenantId);
+    await this.updateTenantPlan(tenantId, settings.planTier, settings.features, { ...settings.billingTerms, surveyCredits: credits.length });
+    return credits.length;
+  }
+
+  async openCycleWithSurveyCredit(tenantId: string, cycleId: string): Promise<{ opened: boolean; reason?: "no_credit" | "employee_limit" | "not_draft" }> {
+    const result = await this.db.query<{ cycle_id: string | null; credit_id: string | null }>(
+      `with selected_credit as (
+         select id from identity.survey_credits where tenant_id = $1 and consumed_at is null and expires_at > now()
+         order by expires_at asc, created_at asc for update skip locked limit 1
+       ), employee_band_ok as (
+         select count(*) <= 100 as allowed from identity.employees where tenant_id = $1 and employment_status = 'active'
+       ), opened as (
+         update responses.survey_cycles c set status = 'open', payment_status = 'paid'
+         where c.tenant_id = $1 and c.id = $2 and c.status = 'draft'
+           and exists (select 1 from selected_credit) and exists (select 1 from employee_band_ok where allowed)
+         returning c.id
+       ), consumed as (
+         update identity.survey_credits sc set consumed_at = now(), cycle_id = (select id from opened)
+         where sc.id = (select id from selected_credit) and exists (select 1 from opened) returning sc.id
+       ) select (select id from opened)::text as cycle_id, (select id from consumed)::text as credit_id`,
+      [tenantId, cycleId],
+    );
+    if (result.rows[0]?.cycle_id && result.rows[0]?.credit_id) return { opened: true };
+    const cycle = await this.db.query<{ status: string }>(`select status from responses.survey_cycles where tenant_id = $1 and id = $2`, [tenantId, cycleId]);
+    const employeeCount = await this.db.query<{ count: string }>(`select count(*)::text as count from identity.employees where tenant_id = $1 and employment_status = 'active'`, [tenantId]);
+    if (cycle.rows[0]?.status === "draft" && Number(employeeCount.rows[0]?.count ?? 0) > 100) return { opened: false, reason: "employee_limit" };
+    return { opened: false, reason: cycle.rows[0]?.status === "draft" ? "no_credit" : "not_draft" };
   }
 
   async listAllSupportNotes(limit = 30): Promise<Array<TenantSupportNote & { tenantId: string; tenantName: string }>> {
@@ -1309,6 +1435,20 @@ export class IdentityRepository {
     return result.rows;
   }
 
+  /** Identity-side invite list only. It is intentionally never joined to
+   * answers or returned from a report endpoint. */
+  async listCycleCommitmentRecipients(tenantId: string, cycleId: string): Promise<Array<{ email: string; name: string | null }>> {
+    const result = await this.db.query<{ email: string; name: string | null }>(
+      `select e.email, e.name
+       from identity.survey_participants p
+       join identity.employees e on e.id = p.employee_id and e.tenant_id = p.tenant_id
+       where p.tenant_id = $1 and p.cycle_id = $2
+       order by e.email`,
+      [tenantId, cycleId],
+    );
+    return result.rows;
+  }
+
   /**
    * Total tokens issued for a cycle vs. how many have been spent (=
    * responded) -- sourced from identity.survey_participants only, never
@@ -1648,6 +1788,10 @@ function mapUserRow(row: UserRow): UserRecord {
     name: row.name,
     role: row.role,
   };
+}
+
+function extractBooleanFeatures(features: Record<string, unknown> | null | undefined): Record<string, boolean> {
+  return Object.fromEntries(Object.entries(features ?? {}).filter(([, value]) => typeof value === "boolean")) as Record<string, boolean>;
 }
 
 export function toTenantSlug(value: string) {

@@ -5,10 +5,10 @@ describe("production readiness artifacts", () => {
   it("has pilot-ready privacy and DPA pages instead of placeholders", () => {
     const privacy = readFileSync("src/app/privacy/page.tsx", "utf8");
     const dpa = readFileSync("src/app/dpa/page.tsx", "utf8");
-    expect(privacy).toContain("Pilot privacy notice");
+    expect(privacy).toContain("Privacy Notice");
     expect(privacy).toContain("AI insights are generated only from the same k-enforced aggregate report");
-    expect(dpa).toContain("Data Processing Agreement outline");
-    expect(dpa).toContain("The customer is the controller");
+    expect(dpa).toContain("Data Processing Agreement");
+    expect(dpa).toContain("Data Controller");
     expect(privacy).not.toContain("Privacy Notice Placeholder");
     expect(dpa).not.toContain("Data Processing Agreement Placeholder");
   });

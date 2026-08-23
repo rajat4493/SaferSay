@@ -24,11 +24,14 @@ type InsightsReportLoad = {
 async function loadReportForCycle(repo: ResponseRepository, tenantId: string, cycleId: string | null): Promise<InsightsReportLoad> {
   if (!cycleId) {
     const latest = await repo.getLatestProtectedReportForTenant(tenantId);
-    return { cycle: latest.cycle, report: latest.report };
+    return { cycle: latest.cycle, report: latest.report as ProtectedReport };
   }
 
   const cycle = await repo.getCycleForTenant(tenantId, cycleId);
-  if (!cycle) return { cycle: null, report: { protected: true as const, n: 0, rows: [] as [] } };
+  if (!cycle) {
+    const protectedReport: ProtectedReport = { protected: true, n: 0, rows: [] };
+    return { cycle: null, report: protectedReport };
+  }
 
   return {
     cycle: { id: cycle.id, name: cycle.name, minGroupSize: cycle.minGroupSize },

@@ -3,11 +3,15 @@ import { getSessionContext } from "@/lib/server/authSession";
 import { withTenantScopedDb } from "@/lib/server/db/tenantPool";
 import { ResponseRepository } from "@/lib/server/repositories/responseRepository";
 import { logSurveyClosed } from "@/lib/server/auditLog";
+import { canRunSurvey } from "@/lib/permissions";
 
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await getSessionContext();
   if (!session) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
+  }
+  if (!canRunSurvey(session.role)) {
+    return NextResponse.json({ ok: false, error: "You do not have permission to close surveys." }, { status: 403 });
   }
 
   const { id: cycleId } = await context.params;

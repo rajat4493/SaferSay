@@ -13,13 +13,15 @@ describe("both invite-sending routes open the cycle on a genuine send/queue acti
   it("/api/invites/send opens on queued > 0, not delivery.sent > 0", () => {
     const route = readFileSync("src/app/api/invites/send/route.ts", "utf8");
     expect(route).toContain('deliveryType === "invite" && queued > 0');
-    expect(route).toContain("openCycle(tenant.id, cycleId)");
+    expect(route).toContain("openCycleWithSurveyCredit(tenant.id, cycleId)");
   });
 
   it("/api/invites/queue opens the cycle too -- both on a bare queue and on queue+dispatch", () => {
     const route = readFileSync("src/app/api/invites/queue/route.ts", "utf8");
-    const openCycleCallCount = route.split("openCycle(tenant.id, cycleId)").length - 1;
-    expect(openCycleCallCount).toBeGreaterThanOrEqual(2);
+    const openCycleCallCount = route.split("openCycleWithSurveyCredit(tenant.id, cycleId)").length - 1;
+    // Both the bare queue and queue+dispatch paths pass through the same
+    // queue transition, so one guarded credit-opening call is sufficient.
+    expect(openCycleCallCount).toBeGreaterThanOrEqual(1);
   });
 
   it("both routes catch unexpected exceptions and return JSON instead of a bare 500", () => {

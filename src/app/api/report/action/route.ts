@@ -27,6 +27,9 @@ export async function POST(request: NextRequest) {
   if (isPlatformOwnerImpersonating(session)) {
     return NextResponse.json({ ok: false, error: "Platform owners cannot act on tenant reports." }, { status: 403 });
   }
+  if (!canRunSurvey(session.role)) {
+    return NextResponse.json({ ok: false, error: "You do not have permission to add survey notes." }, { status: 403 });
+  }
 
   const body = (await request.json().catch(() => ({}))) as { cycleId?: string; actionText?: string };
   const actionText = body.actionText?.trim();

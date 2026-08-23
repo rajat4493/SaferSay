@@ -148,7 +148,7 @@ export function AppShell({
             ))}
             <div className="my-1 border-t border-[var(--border)]" />
             <div className="px-1">
-              <SignOutButton fullWidth />
+              <SignOutButton />
             </div>
           </div>
         ) : null}

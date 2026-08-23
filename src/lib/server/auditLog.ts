@@ -44,7 +44,9 @@ export type AuditLogAction =
   | "team_invite_sent"
   | "team_member_removed"
   | "data_retention_purged"
-  | "deletion_requested";
+  | "deletion_requested"
+  | "commitment_published"
+  | "commitment_updated";
 
 export type AuditLogTargetType = "survey" | "workspace" | "people_list" | null;
 
