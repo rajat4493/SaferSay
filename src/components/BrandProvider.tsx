@@ -18,11 +18,20 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
   // localStorage is read here purely to paint the previously-fetched
   // value instantly on load instead of a default->real flash; it's a
   // cache, not the record of truth -- setBrand always PATCHes the server.
-  const [brand, setBrandState] = useState<BrandTheme>(() => {
-    if (typeof window === "undefined") return defaultBrand;
+  // Always starts at defaultBrand -- matches what the server rendered, so
+  // hydration's first client pass has nothing to mismatch against. The
+  // cached value (if any) is applied a moment later, in an effect, same as
+  // the server fetch just below.
+  const [brand, setBrandState] = useState<BrandTheme>(defaultBrand);
+
+  useEffect(() => {
     const saved = window.localStorage.getItem("safersay-brand");
-    return saved ? { ...defaultBrand, ...JSON.parse(saved) } : defaultBrand;
-  });
+    if (!saved) return;
+    // Deferred a tick, same as the server-fetch effect below resolving via
+    // a promise -- keeps this out of the synchronous effect body so it
+    // doesn't trigger a same-tick cascading render.
+    queueMicrotask(() => setBrandState((current) => ({ ...current, ...JSON.parse(saved) })));
+  }, []);
 
   useEffect(() => {
     fetch("/api/tenants/brand")

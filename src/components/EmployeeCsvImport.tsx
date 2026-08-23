@@ -11,7 +11,7 @@ priya@company.com,Priya Mehta,Sales,Manchester
 sam@company.com,Sam Taylor,Engineering,Bristol
 lee@company.com,Lee Chen,Customer Success,Remote`;
 
-export function EmployeeCsvImport({ onImported }: { onImported?: () => void } = {}) {
+export function EmployeeCsvImport({ onImported }: { onImported?: (count: number) => void } = {}) {
   const [csv, setCsv] = useState("");
   const [fileName, setFileName] = useState("");
   const [status, setStatus] = useState("");
@@ -41,7 +41,7 @@ export function EmployeeCsvImport({ onImported }: { onImported?: () => void } = 
       return;
     }
     setStatus(`${result.imported ?? 0} employees imported.`);
-    onImported?.();
+    onImported?.(result.imported ?? 0);
   }
 
   function useSampleCsv() {

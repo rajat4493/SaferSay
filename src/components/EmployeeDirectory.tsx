@@ -15,7 +15,7 @@ type Employee = {
   employmentStatus: string;
 };
 
-export function EmployeeDirectory({ refreshKey = 0 }: { refreshKey?: number }) {
+export function EmployeeDirectory({ refreshKey = 0, justImportedCount = 0 }: { refreshKey?: number; justImportedCount?: number }) {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
@@ -88,6 +88,12 @@ export function EmployeeDirectory({ refreshKey = 0 }: { refreshKey?: number }) {
           <p className="mt-1 secondary-text">
             {total} total, {activeCount} shown active. Search, deactivate, or reactivate people here.
           </p>
+          {!loading && justImportedCount > 0 && total === 0 ? (
+            <p className="mt-1.5 text-[12.5px] font-medium text-[var(--red)]">
+              Just imported {justImportedCount} people, but they&apos;re not showing up here yet — try reloading the page. If they
+              still don&apos;t appear, this is a bug, not an empty directory.
+            </p>
+          ) : null}
         </div>
         <div className="relative">
           <Search size={14} strokeWidth={1.8} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--ink-faint)]" />

@@ -22,6 +22,12 @@ export async function POST(request: NextRequest) {
   }
 
   const { tenant, userId } = session;
+  // Diagnostic for a reported bug where employees import successfully but
+  // never show up on the directory read afterward -- if that happens
+  // again, comparing this tenant.id against the one logged by GET
+  // /api/employees is the fastest way to confirm or rule out a
+  // session/tenant-resolution mismatch between the two requests.
+  console.log(`employees/import: tenant=${tenant.id} email=${session.email}`);
   const batchEmails = new Set(preview.employees.map((employee) => employee.email));
 
   const result = await withTenantScopedDb(tenant.id, async (db) => {

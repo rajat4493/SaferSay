@@ -12,11 +12,19 @@ type DataContextValue = {
 const DataContext = createContext<DataContextValue | null>(null);
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
-  const [data, setDataState] = useState<SurveyData>(() => {
-    if (typeof window === "undefined") return initialSurveyData;
+  // Always starts at initialSurveyData -- matches the server-rendered
+  // markup, so hydration's first client pass has nothing to mismatch
+  // against. The cached value (if any) is applied a moment later, in an
+  // effect, not during render.
+  const [data, setDataState] = useState<SurveyData>(initialSurveyData);
+
+  useEffect(() => {
     const saved = window.localStorage.getItem("safersay-data");
-    return saved ? JSON.parse(saved) : initialSurveyData;
-  });
+    if (!saved) return;
+    // Deferred a tick to avoid a synchronous setState in the effect body
+    // (same pattern as BrandProvider's equivalent cache-hydration effect).
+    queueMicrotask(() => setDataState(JSON.parse(saved)));
+  }, []);
 
   const value = useMemo<DataContextValue>(
     () => ({

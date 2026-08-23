@@ -8,7 +8,9 @@ import { CycleTrendPanel } from "@/components/CycleTrendPanel";
 import { ProtectedReportPanel } from "@/components/ProtectedReportPanel";
 import { SurveyStageTabs } from "@/components/SurveyStageTabs";
 import { useToast } from "@/components/ToastProvider";
+import { canRunSurvey } from "@/lib/permissions";
 import { titleCaseTeam } from "@/lib/textFormat";
+import type { UserRole } from "@/lib/server/repositories/types";
 
 type CycleSummary = { id: string; name: string };
 
@@ -30,6 +32,10 @@ export default function SurveyResultsPage() {
   const [protectedReport, setProtectedReport] = useState<boolean | null>(null);
   const [departments, setDepartments] = useState<string[]>([]);
   const [selectedDepartment, setSelectedDepartment] = useState<string>("");
+  // Read-only roles (auditor) can view this page but must never see the
+  // mutating controls below -- the APIs those controls call already 403 an
+  // auditor, but the buttons shouldn't render for them in the first place.
+  const [canManage, setCanManage] = useState(false);
   // Reset the department picker to "All teams" when the cycle changes,
   // without setState-in-effect -- adjusting state during render in
   // response to a changed prop is the pattern React recommends for this.
@@ -65,6 +71,15 @@ export default function SurveyResultsPage() {
       .then((response) => response.json())
       .then((data: { ok?: boolean; cycles?: CycleSummary[] }) => {
         if (data.ok) setCycles(data.cycles ?? []);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/tenants/current")
+      .then((response) => response.json())
+      .then((data: { ok?: boolean; role?: UserRole }) => {
+        if (data.ok) setCanManage(canRunSurvey(data.role as UserRole));
       })
       .catch(() => undefined);
   }, []);
@@ -185,42 +200,48 @@ export default function SurveyResultsPage() {
                 : "Responses are locked. Close the loop with your team, then start your next survey when you're ready."}
             </p>
             <div className="mt-4 space-y-2">
-              <button
-                onClick={() => router.push(`/app/${surveyId}/actions/update`)}
-                disabled={protectedReport === true}
-                className="btn-secondary w-full justify-start disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <FileEdit size={14} strokeWidth={1.8} />
-                {protectedReport ? "Team update unavailable — results never unlocked" : "Draft an update to the team"}
-              </button>
-              <button onClick={() => router.push("/app/surveys/new")} className="btn-primary w-full justify-start">
-                Start your next survey
-              </button>
+              {canManage ? (
+                <button
+                  onClick={() => router.push(`/app/${surveyId}/actions/update`)}
+                  disabled={protectedReport === true}
+                  className="btn-secondary w-full justify-start disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <FileEdit size={14} strokeWidth={1.8} />
+                  {protectedReport ? "Team update unavailable — results never unlocked" : "Draft an update to the team"}
+                </button>
+              ) : null}
+              {canManage ? (
+                <button onClick={() => router.push("/app/surveys/new")} className="btn-primary w-full justify-start">
+                  Start your next survey
+                </button>
+              ) : null}
             </div>
           </div>
         ) : (
-          <div className="card">
-            <h2 className="section-title">Manage survey</h2>
-            <div className="mt-4 space-y-2">
-              <button
-                onClick={() => router.push(`/app/${surveyId}/actions/update`)}
-                disabled={resultsState === "collecting"}
-                title={resultsState === "collecting" ? "Team update becomes available once results unlock." : undefined}
-                className="btn-secondary w-full justify-start disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <FileEdit size={14} strokeWidth={1.8} />
-                {resultsState === "collecting" ? "Team update becomes available once results unlock" : "Draft an update to the team"}
-              </button>
-              <button onClick={sendReminders} disabled={sendingReminders} className="btn-secondary w-full justify-start">
-                <Send size={14} strokeWidth={1.8} />
-                {sendingReminders ? "Sending..." : "Send reminders to non-respondents"}
-              </button>
-              <button onClick={closeSurvey} disabled={closing} className="btn-destructive w-full justify-start">
-                <Lock size={14} strokeWidth={1.8} />
-                {closing ? "Closing..." : "Close survey & lock responses"}
-              </button>
+          canManage ? (
+            <div className="card">
+              <h2 className="section-title">Manage survey</h2>
+              <div className="mt-4 space-y-2">
+                <button
+                  onClick={() => router.push(`/app/${surveyId}/actions/update`)}
+                  disabled={resultsState === "collecting"}
+                  title={resultsState === "collecting" ? "Team update becomes available once results unlock." : undefined}
+                  className="btn-secondary w-full justify-start disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <FileEdit size={14} strokeWidth={1.8} />
+                  {resultsState === "collecting" ? "Team update becomes available once results unlock" : "Draft an update to the team"}
+                </button>
+                <button onClick={sendReminders} disabled={sendingReminders} className="btn-secondary w-full justify-start">
+                  <Send size={14} strokeWidth={1.8} />
+                  {sendingReminders ? "Sending..." : "Send reminders to non-respondents"}
+                </button>
+                <button onClick={closeSurvey} disabled={closing} className="btn-destructive w-full justify-start">
+                  <Lock size={14} strokeWidth={1.8} />
+                  {closing ? "Closing..." : "Close survey & lock responses"}
+                </button>
+              </div>
             </div>
-          </div>
+          ) : null
         )}
 
         <div className="flex justify-start">

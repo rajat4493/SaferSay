@@ -9,6 +9,7 @@ import { PageGuide } from "@/components/PageGuide";
 
 export default function PeoplePage() {
   const [refreshKey, setRefreshKey] = useState(0);
+  const [justImportedCount, setJustImportedCount] = useState(0);
 
   return (
     <AppShell
@@ -26,8 +27,13 @@ export default function PeoplePage() {
         body="Import a CSV with employee email, name, team, and location. Use this page to add or deactivate people."
         actions={[{ href: "/app/surveys/new", label: "Next: create survey", primary: true }]}
       />
-      <EmployeeCsvImport onImported={() => setRefreshKey((key) => key + 1)} />
-      <EmployeeDirectory refreshKey={refreshKey} />
+      <EmployeeCsvImport
+        onImported={(count) => {
+          setJustImportedCount(count);
+          setRefreshKey((key) => key + 1);
+        }}
+      />
+      <EmployeeDirectory refreshKey={refreshKey} justImportedCount={justImportedCount} />
     </AppShell>
   );
 }

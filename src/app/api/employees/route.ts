@@ -17,6 +17,12 @@ export async function GET(request: NextRequest) {
   const limit = Number(request.nextUrl.searchParams.get("limit") ?? "25");
   const offset = Number(request.nextUrl.searchParams.get("offset") ?? "0");
 
+  // Diagnostic for a reported bug where employees import successfully but
+  // never show up here afterward -- see the matching log line in
+  // employees/import/route.ts. Compare tenant ids across the two log
+  // lines to confirm or rule out a session/tenant-resolution mismatch.
+  console.log(`employees GET: tenant=${session.tenant.id} email=${session.email}`);
+
   const { employees, total } = await withTenantScopedDb(session.tenant.id, (db) =>
     new IdentityRepository(db).listEmployees(session.tenant.id, { search, limit, offset }),
   );
