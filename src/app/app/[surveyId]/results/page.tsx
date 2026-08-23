@@ -132,12 +132,13 @@ export default function SurveyResultsPage() {
     setClosing(true);
     try {
       const response = await fetch(`/api/cycles/${surveyId}/close`, { method: "POST" });
-      const data = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-      if (data.ok) {
+      const data = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string; reason?: string };
+      if (response.ok && data.ok) {
         setStatus("closed");
         toast.show({ variant: "success", message: "Survey closed. Responses are locked." });
       } else {
-        toast.show({ variant: "error", message: data.error ?? "Couldn't close the survey." });
+        const detail = data.reason ? ` (${data.reason})` : !response.ok ? ` (server error, status ${response.status})` : "";
+        toast.show({ variant: "error", message: `${data.error ?? "Couldn't close the survey."}${detail}` });
       }
     } catch {
       toast.show({ variant: "error", message: "Couldn't close the survey. Try again." });

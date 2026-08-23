@@ -685,13 +685,23 @@ export class ResponseRepository {
   }
 
   async closeCycle(tenantId: string, cycleId: string) {
-    const result = await this.db.query(
+    const result = await this.db.query<{ id: string; status: string }>(
       `update responses.survey_cycles
        set status = 'closed', actual_closed_at = now()
-       where tenant_id = $1 and id = $2 and status <> 'closed'`,
+       where tenant_id = $1 and id = $2 and status <> 'closed'
+       returning id, status`,
       [tenantId, cycleId],
     );
-    return (result.rowCount ?? 0) > 0;
+    // Diagnostic for a reported "close doesn't persist" bug -- returns the
+    // row it actually touched (or none), so the API layer can report the
+    // ground truth back instead of a bare boolean, without needing direct
+    // DB access to confirm what really happened.
+    if ((result.rowCount ?? 0) > 0) return { closed: true as const, row: result.rows[0] };
+    const existing = await this.db.query<{ id: string; status: string; tenant_id: string }>(
+      `select id, status, tenant_id from responses.survey_cycles where id = $1`,
+      [cycleId],
+    );
+    return { closed: false as const, existing: existing.rows[0] ?? null };
   }
 
   async getLatestCycleForTenant(tenantId: string, tenantName?: string) {
