@@ -9,6 +9,15 @@ describe("real protected report flow", () => {
     expect(route).toContain("getLatestProtectedReportForTenant");
   });
 
+  it("distinguishes an unavailable requested cycle from a real protected report", () => {
+    const route = readFileSync("src/app/api/report/route.ts", "utf8");
+    const resultsPage = readFileSync("src/app/app/[surveyId]/results/page.tsx", "utf8");
+    const panel = readFileSync("src/components/ProtectedReportPanel.tsx", "utf8");
+    expect(route).toContain("notFound: true");
+    expect(resultsPage).toContain("Survey not found");
+    expect(panel).toContain("result?.notFound");
+  });
+
   it("keeps report repository reads in response schema only", () => {
     const repo = readFileSync("src/lib/server/repositories/responseRepository.ts", "utf8");
     expect(repo).toContain("getLatestProtectedReportForTenant");
@@ -45,6 +54,14 @@ describe("real protected report flow", () => {
     expect(route).toContain('cycle.status === "closed"');
     expect(route).toContain("Survey is closed and locked.");
     expect(page).toContain("No further responses can be submitted");
+  });
+
+  it("blocks both reading and writing report actions while a platform owner impersonates a tenant", () => {
+    const route = readFileSync("src/app/api/report/action/route.ts", "utf8");
+    const getStart = route.indexOf("export async function GET");
+    const postStart = route.indexOf("export async function POST");
+    expect(route.slice(getStart, postStart)).toContain("isPlatformOwnerImpersonating(session)");
+    expect(route.slice(postStart)).toContain("isPlatformOwnerImpersonating(session)");
   });
 
   it("does not keep a survey visually stuck in draft after launch or manual responses", () => {

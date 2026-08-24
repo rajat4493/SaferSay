@@ -15,6 +15,7 @@ type CycleAction = { id: string; authorEmail: string; actionText: string; create
 type ReportResponse = {
   ok?: boolean;
   error?: string;
+  notFound?: boolean;
   cycle?: { id: string; name: string; minGroupSize: number } | null;
   report?: {
     protected: boolean;
@@ -191,6 +192,15 @@ export function ProtectedReportPanel({
   // with zero open-text questions returns unprotected+empty, and that
   // shouldn't render an empty "What people said" card.
   const showTextSection = Boolean(textReport && (textReport.protected || textReport.rows.length > 0));
+
+  if (!loading && result?.notFound) {
+    return (
+      <ShellCard className="mt-[9px]">
+        <h2 className="section-title">Survey not found</h2>
+        <p className="mt-2 secondary-text">This survey is unavailable in your workspace. Check the link or return to Surveys.</p>
+      </ShellCard>
+    );
+  }
 
   return (
     <>

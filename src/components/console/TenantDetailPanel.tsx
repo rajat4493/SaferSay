@@ -69,6 +69,9 @@ export function TenantDetailPanel({ tenantId }: { tenantId: string }) {
   const [noteDraft, setNoteDraft] = useState("");
   const [addingNote, setAddingNote] = useState(false);
   const [entering, setEntering] = useState(false);
+  const [creditGrantCount, setCreditGrantCount] = useState("1");
+  const [grantingCredits, setGrantingCredits] = useState(false);
+  const [creditGrantError, setCreditGrantError] = useState("");
 
   async function enterWorkspace() {
     setEntering(true);
@@ -132,6 +135,31 @@ export function TenantDetailPanel({ tenantId }: { tenantId: string }) {
     await patch({ note: noteDraft.trim() });
     setNoteDraft("");
     setAddingNote(false);
+  }
+
+  async function grantCredits() {
+    const count = Number(creditGrantCount);
+    if (!Number.isSafeInteger(count) || count < 1) {
+      setCreditGrantError("Enter a whole number of credits to grant.");
+      return;
+    }
+    setGrantingCredits(true);
+    setCreditGrantError("");
+    try {
+      const response = await fetch(`/api/super-admin/tenants/${tenantId}/credits`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ count }),
+      });
+      const data = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!data.ok) {
+        setCreditGrantError(data.error ?? "Couldn't grant credits.");
+        return;
+      }
+      load();
+    } finally {
+      setGrantingCredits(false);
+    }
   }
 
   if (tenant === undefined) {
@@ -228,8 +256,27 @@ export function TenantDetailPanel({ tenantId }: { tenantId: string }) {
             <label className="block text-[13px] font-medium text-[var(--ink)]">
               Survey credits
               <p className="admin-input mt-1 flex h-9 items-center bg-[var(--bg-hover)] px-3 text-[var(--ink-mid)]">{tenant.billingTerms.surveyCredits}</p>
-              <span className="mt-1 block text-xs font-normal text-[var(--ink-faint)]">Ledger-derived. Credit adjustments require an audited support workflow.</span>
+              <span className="mt-1 block text-xs font-normal text-[var(--ink-faint)]">Ledger-derived. Manual grants create spendable, audited ledger entries.</span>
             </label>
+            <div className="rounded-[var(--radius-input)] border border-[var(--border)] bg-[var(--bg)] p-3">
+              <p className="text-[13px] font-medium text-[var(--ink)]">Grant credits</p>
+              <p className="mt-1 text-xs text-[var(--ink-faint)]">For a comped pilot or support case. This adds immutable ledger entries; it does not edit the balance.</p>
+              <div className="mt-3 flex gap-2">
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={creditGrantCount}
+                  onChange={(event) => setCreditGrantCount(event.target.value)}
+                  aria-label="Credits to grant"
+                  className="admin-input h-9 w-24"
+                />
+                <button onClick={grantCredits} disabled={grantingCredits} className="btn-secondary h-9">
+                  {grantingCredits ? "Granting..." : "Grant credits"}
+                </button>
+              </div>
+              {creditGrantError ? <p className="mt-2 text-xs font-medium text-[var(--red)]">{creditGrantError}</p> : null}
+            </div>
             <label className="block text-[13px] font-medium text-[var(--ink)]">
               Report retention
               <select

@@ -26,7 +26,12 @@ async function loadReportForCycle(
     ? await repo.getLatestProtectedReportForTenant(tenantId, undefined, tenantName)
     : await (async () => {
         const cycle = await repo.getCycleForTenant(tenantId, cycleId, tenantName);
-        if (!cycle) return { cycle: null, report: { protected: true as const, n: 0, rows: [] } };
+        // A cycle id is an access boundary. A missing/cross-tenant cycle
+        // must not masquerade as a real survey that is merely below the
+        // anonymity threshold: doing so leaves a confusing locked shell at
+        // another tenant's URL. The report remains structurally empty, but
+        // callers get an explicit signal to render a not-found state.
+        if (!cycle) return { notFound: true as const, cycle: null, report: { protected: true as const, n: 0, rows: [] } };
         return {
           cycle: { id: cycle.id, name: cycle.name, minGroupSize: cycle.minGroupSize },
           // A small segment is suppressed, never silently widened through a

@@ -9,6 +9,9 @@ export async function GET(request: NextRequest) {
   const session = await getSessionContext();
   if (!session) return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
 
+  if (isPlatformOwnerImpersonating(session)) {
+    return NextResponse.json({ ok: false, error: "Platform owners cannot view tenant report actions." }, { status: 403 });
+  }
   if (!canRunSurvey(session.role)) return NextResponse.json({ ok: false, error: "You do not have permission to add survey notes." }, { status: 403 });
 
   const cycleId = request.nextUrl.searchParams.get("cycleId");

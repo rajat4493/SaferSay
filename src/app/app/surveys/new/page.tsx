@@ -14,16 +14,22 @@ export default function NewSurveyPage() {
   const [, startTransition] = useTransition();
   const [accessChecked, setAccessChecked] = useState(false);
   const [employeeCount, setEmployeeCount] = useState<number | null>(null);
+  const [employeeCountError, setEmployeeCountError] = useState(false);
 
   useEffect(() => {
     async function checkEmployees() {
-      const response = await fetch("/api/employees?limit=1");
-      const data = (await response.json().catch(() => ({ ok: false }))) as { ok?: boolean; total?: number };
-      if (data.ok && data.total === 0) {
-        router.replace("/app/people");
-        return;
+      try {
+        const response = await fetch("/api/employees?limit=1");
+        const data = (await response.json().catch(() => ({ ok: false }))) as { ok?: boolean; total?: number };
+        if (data.ok && data.total === 0) {
+          router.replace("/app/people");
+          return;
+        }
+        if (data.ok) setEmployeeCount(data.total ?? 0);
+        else setEmployeeCountError(true);
+      } catch {
+        setEmployeeCountError(true);
       }
-      if (data.ok) setEmployeeCount(data.total ?? 0);
       setAccessChecked(true);
     }
     startTransition(() => {
@@ -73,7 +79,14 @@ export default function NewSurveyPage() {
           </p>
         </Card>
       ) : null}
-      <CreateSurveyCycle key={template.slug} templateSlug={template.slug} activeEmployees={employeeCount ?? 0} />
+      {employeeCountError ? (
+        <Card className="mt-2.5">
+          <p className="section-title">Couldn&apos;t load participant data</p>
+          <p className="mt-2 secondary-text">Refresh the page before creating a survey so invite and confidentiality checks use the real employee count.</p>
+        </Card>
+      ) : (
+        <CreateSurveyCycle key={template.slug} templateSlug={template.slug} activeEmployees={employeeCount ?? 0} />
+      )}
     </AppShell>
   );
 }

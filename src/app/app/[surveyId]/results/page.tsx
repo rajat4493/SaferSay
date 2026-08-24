@@ -32,6 +32,7 @@ export default function SurveyResultsPage() {
   const [protectedReport, setProtectedReport] = useState<boolean | null>(null);
   const [departments, setDepartments] = useState<string[]>([]);
   const [selectedDepartment, setSelectedDepartment] = useState<string>("");
+  const [notFound, setNotFound] = useState(false);
   // Read-only roles (auditor) can view this page but must never see the
   // mutating controls below -- the APIs those controls call already 403 an
   // auditor, but the buttons shouldn't render for them in the first place.
@@ -57,7 +58,12 @@ export default function SurveyResultsPage() {
     fetch(`/api/cycles/${surveyId}`)
       .then((response) => response.json())
       .then((data: { ok?: boolean; cycle?: { status: string } }) => {
-        if (!cancelled && data.ok && data.cycle) setStatus(data.cycle.status);
+        if (cancelled) return;
+        if (!data.ok || !data.cycle) {
+          setNotFound(true);
+          return;
+        }
+        setStatus(data.cycle.status);
       })
       .catch(() => undefined);
     return () => {
@@ -69,8 +75,13 @@ export default function SurveyResultsPage() {
     let cancelled = false;
     fetch(`/api/report?cycleId=${encodeURIComponent(surveyId)}`)
       .then((response) => response.json())
-      .then((data: { ok?: boolean; report?: { protected: boolean } }) => {
-        if (!cancelled && data.ok && data.report) setProtectedReport(data.report.protected);
+      .then((data: { ok?: boolean; notFound?: boolean; report?: { protected: boolean } }) => {
+        if (cancelled) return;
+        if (data.notFound) {
+          setNotFound(true);
+          return;
+        }
+        if (data.ok && data.report) setProtectedReport(data.report.protected);
       })
       .catch(() => undefined);
     return () => {
@@ -203,6 +214,17 @@ export default function SurveyResultsPage() {
       }
     >
       <div className="space-y-[9px]">
+        {notFound ? (
+          <div className="card">
+            <h2 className="section-title">Survey not found</h2>
+            <p className="mt-2 secondary-text">This survey is unavailable in your workspace. Return to Surveys to choose one you can access.</p>
+            <button onClick={() => router.push("/app/surveys")} className="btn-secondary mt-4">
+              <ArrowLeft size={14} strokeWidth={1.8} />
+              Back to surveys
+            </button>
+          </div>
+        ) : (
+          <>
         <SurveyStageTabs active="Results" status={status ?? undefined} />
 
         {resultsState ? <ResultsStateBanner state={resultsState} protectedReport={protectedReport} /> : null}
@@ -270,6 +292,8 @@ export default function SurveyResultsPage() {
             Back to surveys
           </button>
         </div>
+          </>
+        )}
       </div>
     </AppShell>
   );
