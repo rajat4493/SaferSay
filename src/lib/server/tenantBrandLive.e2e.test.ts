@@ -37,7 +37,7 @@ describeIfDb("Postgres live tenant brand", () => {
 
     expect(await identity.getBrand(tenant.id)).toBeNull();
 
-    const brand: BrandTheme = { name: "Acme Corp", tagline: "We ship things.", logoDataUrl: "data:image/png;base64,abc", accentColor: "#3366cc", fontFamily: "georgia" };
+    const brand: BrandTheme = { name: "Acme Corp", tagline: "We ship things.", logoDataUrl: "data:image/png;base64,abc", accentColor: "#3366cc", fontFamily: "georgia", presetId: "calm-teal" };
     await identity.setBrand(tenant.id, brand);
 
     expect(await identity.getBrand(tenant.id)).toEqual(brand);
@@ -48,10 +48,10 @@ describeIfDb("Postgres live tenant brand", () => {
     const tenant = await identity.createTenant("Brand E2E 2", `brand-e2e-2-${randomUUID()}`);
     tenantIds.push(tenant.id);
 
-    await identity.setBrand(tenant.id, { name: "First", tagline: "A", logoDataUrl: null, accentColor: "#111111", fontFamily: "inter" });
-    await identity.setBrand(tenant.id, { name: "Second", tagline: "B", logoDataUrl: null, accentColor: null, fontFamily: null });
+    await identity.setBrand(tenant.id, { name: "First", tagline: "A", logoDataUrl: null, accentColor: "#111111", fontFamily: "inter", presetId: "calm-teal" });
+    await identity.setBrand(tenant.id, { name: "Second", tagline: "B", logoDataUrl: null, accentColor: null, fontFamily: null, presetId: null });
 
     const result = await identity.getBrand(tenant.id);
-    expect(result).toEqual({ name: "Second", tagline: "B", logoDataUrl: null, accentColor: null, fontFamily: null });
+    expect(result).toEqual({ name: "Second", tagline: "B", logoDataUrl: null, accentColor: null, fontFamily: null, presetId: null });
   }, 30_000);
 });

@@ -315,9 +315,9 @@ export function ProtectedReportPanel({
                   <span className="font-semibold text-[var(--ink)]">{Math.round(row.score)}</span>
                 </div>
                 <div className="flex h-[8px] overflow-hidden rounded-[var(--radius-pill)] bg-[var(--bg-active)]">
-                  <div className="h-full bg-[var(--ink)]" style={{ width: `${row.promoterPct}%` }} title={`Promoters: ${row.promoterPct.toFixed(0)}%`} />
-                  <div className="h-full bg-[var(--ink-faint)]" style={{ width: `${row.passivePct}%` }} title={`Passives: ${row.passivePct.toFixed(0)}%`} />
-                  <div className="h-full bg-[var(--red)]" style={{ width: `${row.detractorPct}%` }} title={`Detractors: ${row.detractorPct.toFixed(0)}%`} />
+                  <div className="h-full bg-[var(--enps-promoter)]" style={{ width: `${row.promoterPct}%` }} title={`Promoters: ${row.promoterPct.toFixed(0)}%`} />
+                  <div className="h-full bg-[var(--enps-passive)]" style={{ width: `${row.passivePct}%` }} title={`Passives: ${row.passivePct.toFixed(0)}%`} />
+                  <div className="h-full bg-[var(--enps-detractor)]" style={{ width: `${row.detractorPct}%` }} title={`Detractors: ${row.detractorPct.toFixed(0)}%`} />
                 </div>
                 <div className="mt-1 flex justify-between text-xs text-[var(--ink-faint)]">
                   <span>{row.promoterPct.toFixed(0)}% promoters</span>

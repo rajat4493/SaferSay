@@ -5,6 +5,7 @@ import { IdentityRepository } from "@/lib/server/repositories/identityRepository
 import { canModifySettings } from "@/lib/permissions";
 import { defaultBrand, type BrandTheme } from "@/lib/brand";
 import { isValidHexColor } from "@/lib/brandTheme";
+import { findBrandPreset } from "@/lib/brandPresets";
 
 export async function GET() {
   const session = await getSessionContext();
@@ -25,6 +26,9 @@ export async function PATCH(request: NextRequest) {
   if (typeof body.accentColor === "string" && body.accentColor && !isValidHexColor(body.accentColor)) {
     return NextResponse.json({ ok: false, error: "Accent color must be a 6-digit hex value like #0d4f37." }, { status: 400 });
   }
+  if (typeof body.presetId === "string" && body.presetId && !findBrandPreset(body.presetId)) {
+    return NextResponse.json({ ok: false, error: "Unknown brand preset." }, { status: 400 });
+  }
 
   const brand: BrandTheme = {
     name: typeof body.name === "string" && body.name.trim() ? body.name.trim() : defaultBrand.name,
@@ -32,6 +36,7 @@ export async function PATCH(request: NextRequest) {
     logoDataUrl: typeof body.logoDataUrl === "string" ? body.logoDataUrl : null,
     accentColor: typeof body.accentColor === "string" && body.accentColor ? body.accentColor : null,
     fontFamily: typeof body.fontFamily === "string" && body.fontFamily ? body.fontFamily : null,
+    presetId: typeof body.presetId === "string" && body.presetId ? body.presetId : null,
   };
 
   await withTenantScopedDb(session.tenant.id, (db) => new IdentityRepository(db).setBrand(session.tenant.id, brand));

@@ -16,6 +16,11 @@ export type BrandTheme = {
   logoDataUrl: string | null;
   accentColor: string | null;
   fontFamily: string | null;
+  // Opt-in visual preset (see brandPresets.ts) -- an extra layer on top of
+  // accentColor/fontFamily, which stay independently editable after a
+  // preset is picked. null = today's look, unchanged (the default for
+  // every existing tenant).
+  presetId: string | null;
 };
 
 export const defaultBrand: BrandTheme = {
@@ -24,6 +29,7 @@ export const defaultBrand: BrandTheme = {
   logoDataUrl: null,
   accentColor: null,
   fontFamily: null,
+  presetId: null,
 };
 
 /** Curated, not free-text -- keeps every tenant's chosen font readable and license-safe (all already loaded as next/font in layout.tsx, or a system stack). */

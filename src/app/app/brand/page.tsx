@@ -6,9 +6,20 @@ import { BrandMark } from "@/components/BrandMark";
 import { useBrand } from "@/components/BrandProvider";
 import { brandFontOptions } from "@/lib/brand";
 import { isValidHexColor } from "@/lib/brandTheme";
+import { BRAND_PRESETS } from "@/lib/brandPresets";
 
 export default function BrandPage() {
   const { brand, setBrand, resetBrand } = useBrand();
+
+  function applyPreset(presetId: string | null) {
+    const preset = BRAND_PRESETS.find((candidate) => candidate.id === presetId) ?? null;
+    setBrand({
+      ...brand,
+      presetId,
+      accentColor: preset?.accentColor ?? null,
+      fontFamily: preset?.fontFamily ?? null,
+    });
+  }
 
   function uploadLogo(file: File | undefined) {
     if (!file) return;
@@ -45,6 +56,39 @@ export default function BrandPage() {
             Upload logo
             <input type="file" accept="image/*" className="hidden" onChange={(event) => uploadLogo(event.target.files?.[0])} />
           </label>
+        </div>
+      </Card>
+
+      <Card className="mt-[9px]">
+        <h2 className="section-title">Style preset</h2>
+        <p className="mt-1.5 secondary-text">
+          An optional starting point for colors, shape, and shadows -- still fully editable below afterward. Applies to your workspace admin app and the surveys your employees take.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            onClick={() => applyPreset(null)}
+            aria-pressed={!brand.presetId}
+            className={`flex items-center gap-2 rounded-[var(--radius-card)] border px-3 py-2 text-[13px] font-medium transition ${
+              !brand.presetId ? "border-[var(--green)] bg-[var(--green-bg)] text-[var(--green)]" : "border-[var(--border)] text-[var(--ink-mid)] hover:border-[var(--border-hover)]"
+            }`}
+          >
+            <span className="h-4 w-4 shrink-0 rounded-full border border-[var(--border)]" style={{ background: "#0d4f37" }} aria-hidden="true" />
+            SaferSay default
+          </button>
+          {BRAND_PRESETS.map((preset) => (
+            <button
+              key={preset.id}
+              onClick={() => applyPreset(preset.id)}
+              aria-pressed={brand.presetId === preset.id}
+              title={preset.description}
+              className={`flex items-center gap-2 rounded-[var(--radius-card)] border px-3 py-2 text-[13px] font-medium transition ${
+                brand.presetId === preset.id ? "border-[var(--green)] bg-[var(--green-bg)] text-[var(--green)]" : "border-[var(--border)] text-[var(--ink-mid)] hover:border-[var(--border-hover)]"
+              }`}
+            >
+              <span className="h-4 w-4 shrink-0 rounded-full border border-[var(--border)]" style={{ background: preset.accentColor }} aria-hidden="true" />
+              {preset.label}
+            </button>
+          ))}
         </div>
       </Card>
 

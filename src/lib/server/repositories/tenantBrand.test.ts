@@ -4,7 +4,7 @@ import { IdentityRepository } from "./identityRepository";
 import type { Queryable } from "@/lib/server/db/tenantPool";
 import type { BrandTheme } from "@/lib/brand";
 
-const sampleBrand: BrandTheme = { name: "Acme", tagline: "We ship things.", logoDataUrl: null, accentColor: "#3366cc", fontFamily: "system" };
+const sampleBrand: BrandTheme = { name: "Acme", tagline: "We ship things.", logoDataUrl: null, accentColor: "#3366cc", fontFamily: "system", presetId: null };
 
 describe("tenant brand", () => {
   it("getBrand returns null when the tenant has never saved one", async () => {

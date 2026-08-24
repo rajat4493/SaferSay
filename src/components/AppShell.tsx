@@ -30,6 +30,7 @@ import { canAccessAuditLog, canAccessPeople, canAccessSecurityProof, canAccessWo
 import type { UserRole } from "@/lib/server/repositories/types";
 import { brandFontOptions } from "@/lib/brand";
 import { deriveAccentPalette } from "@/lib/brandTheme";
+import { presetStyleOverrides } from "@/lib/brandPresets";
 
 type NavItemConfig = {
   href: string;
@@ -105,6 +106,10 @@ export function AppShell({
   // shell), so this override never reaches that surface -- deliberately,
   // per the white-label scoping decision.
   const themeOverrides: React.CSSProperties = {
+    // Preset tokens (radius/shadow/eNPS bar/sidebar) apply first -- accent
+    // color and font are layered on top so they stay independently
+    // editable even after a preset is picked (see brandPresets.ts).
+    ...(presetStyleOverrides(brand.presetId) as React.CSSProperties),
     ...(brand.accentColor ? (deriveAccentPalette(brand.accentColor) as React.CSSProperties) : {}),
     ...(brand.fontFamily ? ({ "--font-body": brandFontOptions.find((option) => option.value === brand.fontFamily)?.stack } as React.CSSProperties) : {}),
   };
@@ -114,9 +119,9 @@ export function AppShell({
       <div className="flex items-center justify-between px-4 pt-4 pb-3">
         <Link href="/" className="flex items-center gap-2.5">
           <BrandMark />
-          <span className="truncate text-[16px] font-semibold leading-none text-[var(--ink)]">{brand.name}</span>
+          <span className="truncate text-[16px] font-semibold leading-none text-[var(--sidebar-ink)]">{brand.name}</span>
         </Link>
-        <button onClick={() => setMobileNavOpen(false)} aria-label="Close menu" className="text-[var(--ink-mid)] lg:hidden">
+        <button onClick={() => setMobileNavOpen(false)} aria-label="Close menu" className="text-[var(--sidebar-ink-mid)] lg:hidden">
           <X size={18} strokeWidth={1.8} />
         </button>
       </div>
@@ -129,7 +134,7 @@ export function AppShell({
         </div>
       </nav>
 
-      <div className="relative mt-auto border-t border-[var(--bg-active)] px-2.5 py-2.5">
+      <div className="relative mt-auto border-t border-[var(--sidebar-border)] px-2.5 py-2.5">
         {accountMenuOpen && visibleFoldedItems.length > 0 ? (
           <div className="absolute inset-x-2.5 bottom-[54px] rounded-[12px] border border-[var(--border)] bg-white p-1.5 shadow-[var(--shadow-elevated)]">
             {visibleFoldedItems.map((item) => (
@@ -155,15 +160,15 @@ export function AppShell({
 
         <button
           onClick={() => setAccountMenuOpen((current) => !current)}
-          className="flex w-full items-center gap-2.5 rounded-[10px] px-1.5 py-1.5 text-left transition hover:bg-[var(--bg-hover)]"
+          className="flex w-full items-center gap-2.5 rounded-[10px] px-1.5 py-1.5 text-left transition hover:bg-[var(--sidebar-active-bg)]"
         >
           <Avatar label={info?.userName || info?.userEmail || brand.name} />
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[13px] font-medium text-[var(--ink)]">{info?.userName || info?.userEmail || brand.name}</div>
-            <div className="truncate text-[11.5px] text-[var(--ink-faint)]">{info?.tenantName ?? brand.name}</div>
+            <div className="truncate text-[13px] font-medium text-[var(--sidebar-ink)]">{info?.userName || info?.userEmail || brand.name}</div>
+            <div className="truncate text-[11.5px] text-[var(--sidebar-ink-faint)]">{info?.tenantName ?? brand.name}</div>
             <RoleTag />
           </div>
-          <ChevronDown size={14} strokeWidth={1.8} className={`shrink-0 text-[var(--ink-faint)] transition-transform ${accountMenuOpen ? "rotate-180" : ""}`} />
+          <ChevronDown size={14} strokeWidth={1.8} className={`shrink-0 text-[var(--sidebar-ink-faint)] transition-transform ${accountMenuOpen ? "rotate-180" : ""}`} />
         </button>
       </div>
     </>
@@ -178,8 +183,16 @@ export function AppShell({
         Skip to main content
       </a>
 
-      {/* Desktop sidebar -- always visible at lg+ */}
-      <aside className="sticky top-0 hidden h-screen w-[230px] shrink-0 flex-col border-r border-[var(--border-soft)] bg-[var(--bg-sidebar)] lg:flex">{sidebarContent}</aside>
+      {/* Desktop sidebar -- always visible at lg+. background/borderColor set
+          via inline style, not a Tailwind bg-[...] utility -- --sidebar-bg
+          can be a gradient (see brandPresets.ts), and background-color
+          (what bg-[...] sets) can't render one. */}
+      <aside
+        className="sticky top-0 hidden h-screen w-[230px] shrink-0 flex-col border-r lg:flex"
+        style={{ background: "var(--sidebar-bg)", borderColor: "var(--sidebar-border)" }}
+      >
+        {sidebarContent}
+      </aside>
 
       {/* Mobile sidebar -- slide-in drawer, per "sidebar collapses" (design directive) */}
       {mobileNavOpen ? (
@@ -189,7 +202,8 @@ export function AppShell({
             role="dialog"
             aria-modal="true"
             aria-label="Navigation"
-            className="absolute inset-y-0 left-0 flex w-[240px] flex-col border-r border-[var(--border-soft)] bg-[var(--bg-sidebar)]"
+            className="absolute inset-y-0 left-0 flex w-[240px] flex-col border-r"
+            style={{ background: "var(--sidebar-bg)", borderColor: "var(--sidebar-border)" }}
           >
             {sidebarContent}
           </aside>
@@ -235,7 +249,9 @@ function NavLink({ item, active, onNavigate }: { item: NavItemConfig; active: bo
       onClick={onNavigate}
       aria-current={active ? "page" : undefined}
       className={`flex h-12 items-center gap-3 rounded-[10px] px-4 text-[15px] font-medium transition ${
-        active ? "bg-[var(--bg-active)] text-[var(--ss-green-700)]" : "text-[#454A46] hover:bg-[var(--bg-hover)] hover:text-[var(--ink)]"
+        active
+          ? "bg-[var(--sidebar-active-bg)] text-[var(--sidebar-active-ink)]"
+          : "text-[var(--sidebar-ink-mid)] hover:bg-[var(--sidebar-active-bg)] hover:text-[var(--sidebar-ink)]"
       }`}
     >
       <item.icon size={18} strokeWidth={1.7} />
