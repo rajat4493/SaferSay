@@ -23,11 +23,22 @@ const BAND_COLOR: Record<ThemeBand, string> = { strength: "var(--green)", neutra
  * released report rows (see getProtectedReportForTenant), so the
  * difference itself discloses nothing new.
  */
-export function ThemeReportCard({ cycleId, department }: { cycleId?: string; department?: string }) {
+export function ThemeReportCard({
+  cycleId,
+  department,
+  initialExpandedConstruct,
+}: {
+  cycleId?: string;
+  department?: string;
+  /** Pre-expands one theme on first render -- used when arriving from the
+   * Overview heatmap's "click a tile to explore" links, so the linked
+   * theme opens already expanded instead of requiring a second click. */
+  initialExpandedConstruct?: string;
+}) {
   const [scopedRows, setScopedRows] = useState<ReportRow[] | null>(null);
   const [orgRows, setOrgRows] = useState<ReportRow[] | null>(null);
   const [protectedState, setProtectedState] = useState(true);
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(initialExpandedConstruct ?? null);
   const [, startTransition] = useTransition();
   const requestKeyRef = useRef<string>("");
 
@@ -35,7 +46,7 @@ export function ThemeReportCard({ cycleId, department }: { cycleId?: string; dep
     const requestKey = `${cycleId ?? ""}|${department ?? ""}`;
     requestKeyRef.current = requestKey;
     startTransition(() => {
-      setExpanded(null);
+      setExpanded(initialExpandedConstruct ?? null);
     });
 
     const params = new URLSearchParams();
@@ -53,7 +64,7 @@ export function ThemeReportCard({ cycleId, department }: { cycleId?: string; dep
         setOrgRows(org?.report && !org.report.protected ? org.report.rows : department ? [] : (report && !report.protected ? report.rows : []));
       })
       .catch(() => undefined);
-  }, [cycleId, department]);
+  }, [cycleId, department, initialExpandedConstruct]);
 
   if (protectedState || !scopedRows) {
     return (

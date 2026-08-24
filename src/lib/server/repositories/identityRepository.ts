@@ -1122,17 +1122,32 @@ export class IdentityRepository {
 
   async listEmployees(
     tenantId: string,
-    options: { search?: string; limit?: number; offset?: number } = {},
+    options: { search?: string; team?: string; limit?: number; offset?: number } = {},
   ): Promise<{ employees: EmployeeRecord[]; total: number }> {
     const limit = options.limit ?? 25;
     const offset = options.offset ?? 0;
     const search = options.search?.trim();
+    // Exact match, not fuzzy -- unlike `search`'s ilike, this is meant to
+    // answer "how many people are on this exact team" (see the Overview
+    // dashboard's department-scoped response rate), so it's normalized the
+    // same way every other team-label comparison in this codebase is (see
+    // normalizeTeamLabel / renameTeam / mergeTeams).
+    const team = normalizeTeamLabel(options.team);
 
-    const whereSearch = search ? `and (e.email ilike $2 or e.name ilike $2 or e.team ilike $2)` : "";
-    const params: unknown[] = search ? [tenantId, `%${search}%`] : [tenantId];
+    const conditions: string[] = [];
+    const params: unknown[] = [tenantId];
+    if (search) {
+      params.push(`%${search}%`);
+      conditions.push(`and (e.email ilike $${params.length} or e.name ilike $${params.length} or e.team ilike $${params.length})`);
+    }
+    if (team) {
+      params.push(team);
+      conditions.push(`and e.team = $${params.length}`);
+    }
+    const whereExtra = conditions.join(" ");
 
     const countResult = await this.db.query<{ count: string }>(
-      `select count(*)::text as count from identity.employees e where e.tenant_id = $1 ${whereSearch}`,
+      `select count(*)::text as count from identity.employees e where e.tenant_id = $1 ${whereExtra}`,
       params,
     );
 
@@ -1146,9 +1161,9 @@ export class IdentityRepository {
     }>(
       `select e.id, e.email, e.name, e.team, e.location, e.employment_status
        from identity.employees e
-       where e.tenant_id = $1 ${whereSearch}
+       where e.tenant_id = $1 ${whereExtra}
        order by e.name nulls last, e.email
-       limit ${search ? "$3" : "$2"} offset ${search ? "$4" : "$3"}`,
+       limit $${params.length + 1} offset $${params.length + 2}`,
       [...params, limit, offset],
     );
 

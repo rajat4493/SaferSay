@@ -22,7 +22,19 @@ export function Sparkline({ points, color = "var(--ink)" }: { points: number[]; 
     .join(" ");
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="h-14 w-full">
-      <path d={path} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      {/* pathLength normalizes the dash math to 0-100 regardless of the
+          path's actual geometry, so the draw-in animation below works the
+          same for any number of points without recomputing a real length. */}
+      <path
+        d={path}
+        fill="none"
+        stroke={color}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        pathLength={100}
+        style={{ strokeDasharray: 100, strokeDashoffset: 100, animation: "sparkline-draw 0.7s ease forwards" }}
+      />
     </svg>
   );
 }

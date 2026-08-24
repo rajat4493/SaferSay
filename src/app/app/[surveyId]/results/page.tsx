@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Calendar, CheckCircle2, FileEdit, Lock, Send } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { CycleTrendPanel } from "@/components/CycleTrendPanel";
@@ -25,8 +25,12 @@ type ResultsState = "collecting" | "ready" | "closed";
 export default function SurveyResultsPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const toast = useToast();
   const surveyId = params.surveyId as string;
+  // From the Overview heatmap's "click a tile to explore" links -- opens
+  // that theme pre-expanded instead of landing on a collapsed list.
+  const themeParam = searchParams.get("theme") ?? undefined;
   const [status, setStatus] = useState<string | null>(null);
   const [closing, setClosing] = useState(false);
   const [sendingReminders, setSendingReminders] = useState(false);
@@ -233,7 +237,7 @@ export default function SurveyResultsPage() {
 
         <ProtectedReportPanel cycleId={surveyId} department={selectedDepartment || undefined} />
 
-        <ThemeReportCard cycleId={surveyId} department={selectedDepartment || undefined} />
+        <ThemeReportCard cycleId={surveyId} department={selectedDepartment || undefined} initialExpandedConstruct={themeParam} />
 
         <p className="mt-2 secondary-text">
           <Link href={`/app/${surveyId}/comments`} className="font-medium text-[var(--ink)] underline">

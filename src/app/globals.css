@@ -62,15 +62,20 @@
      so a brand preset can put a dark/gradient background behind the
      sidebar (see brandPresets.ts's sidebarGradient) without needing to
      also darken the rest of the app; text/active-state colors flip to
-     match whatever's actually behind them. Defaults match today's flat
-     light sidebar exactly. */
-  --sidebar-bg: var(--bg-sidebar);
-  --sidebar-ink: var(--ink);
-  --sidebar-ink-mid: #454a46;
-  --sidebar-ink-faint: var(--ink-faint);
-  --sidebar-active-bg: var(--bg-active);
-  --sidebar-active-ink: var(--ss-green-700);
-  --sidebar-border: var(--border-soft);
+     match whatever's actually behind them. App-wide default is now the
+     deep-teal gradient (same values as the "Calm Teal" brand preset's
+     sidebar tokens in brandPresets.ts -- kept in sync deliberately, not
+     duplicated by coincidence) rather than the flat light sidebar this
+     used to default to; a tenant on "Calm Teal" now gets a no-op override
+     here specifically, but the preset keeps mattering for its other
+     tokens (radius/shadow/eNPS colors/accent). */
+  --sidebar-bg: linear-gradient(175deg, #0c3f3c 0%, #135048 65%, #0c3f3c 100%);
+  --sidebar-ink: #f3f8f6;
+  --sidebar-ink-mid: #cfe4de;
+  --sidebar-ink-faint: #9fc2b9;
+  --sidebar-active-bg: rgba(255, 255, 255, 0.12);
+  --sidebar-active-ink: #eafff6;
+  --sidebar-border: rgba(255, 255, 255, 0.14);
 
   --font-body: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 
@@ -332,6 +337,13 @@ input[type="radio"] {
   100% {
     opacity: 0;
     transform: scale(2.4);
+  }
+}
+
+/* Sparkline draw-in -- see Sparkline.tsx's pathLength={100} trick. */
+@keyframes sparkline-draw {
+  to {
+    stroke-dashoffset: 0;
   }
 }
 

@@ -72,6 +72,23 @@ function IconBadge({ icon: Icon, tier }: { icon: typeof ThumbsUp; tier: ReturnTy
   );
 }
 
+/** A small distinct tag marking a metric that doesn't scope with the
+ * page's department picker -- e.g. eNPS and trend are always org-wide.
+ * Previously a "(company-wide)" parenthetical in the card title, which
+ * read as describing the *selected* scope rather than a fixed exception
+ * to it. */
+function ScopeExceptionPill({ label }: { label: string }) {
+  return (
+    <span
+      className="rounded-[var(--radius-pill)] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.03em] text-[var(--ink-mid)]"
+      style={{ background: "var(--bg-active)" }}
+      title="This figure always reflects the whole company, regardless of the department filter above."
+    >
+      {label}
+    </span>
+  );
+}
+
 export default function OverviewPage() {
   const [report, setReport] = useState<ReportResponse | null>(null);
   const [employeeCount, setEmployeeCount] = useState<number | null>(null);
@@ -80,6 +97,7 @@ export default function OverviewPage() {
   const [trend, setTrend] = useState<TrendResponse | null>(null);
   const [departments, setDepartments] = useState<string[]>([]);
   const [selectedDepartment, setSelectedDepartment] = useState("");
+  const [scopedEligibleCount, setScopedEligibleCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [, startTransition] = useTransition();
 
@@ -98,6 +116,7 @@ export default function OverviewPage() {
   useEffect(() => {
     startTransition(() => {
       setLoading(true);
+      if (!selectedDepartment) setScopedEligibleCount(null);
     });
     const params = new URLSearchParams();
     if (selectedCycleId) params.set("cycleId", selectedCycleId);
@@ -118,6 +137,17 @@ export default function OverviewPage() {
         }
       })
       .catch(() => setLoading(false));
+
+    // Department-scoped eligible-employee count, for a response-rate ring
+    // that actually matches the department-scoped response count elsewhere
+    // on this page -- without this, the ring silently fell back to the
+    // org-wide count/rate while everything else was department-scoped.
+    if (selectedDepartment) {
+      fetch(`/api/employees?team=${encodeURIComponent(selectedDepartment)}&limit=1`)
+        .then((r) => r.json())
+        .then((data: { ok?: boolean; total?: number }) => setScopedEligibleCount(data.ok ? (data.total ?? 0) : null))
+        .catch(() => setScopedEligibleCount(null));
+    }
   }, [selectedCycleId, selectedDepartment]);
 
   if (loading && !report) {
@@ -135,18 +165,40 @@ export default function OverviewPage() {
   const scored = rows
     .filter((row) => row.average !== null)
     .map((row) => ({ ...row, average10: (row.average! / (row.scaleMax ?? 5)) * 10 }));
-  const strengths = [...scored].sort((a, b) => b.average10 - a.average10).slice(0, 3);
-  const priorities = [...scored].sort((a, b) => a.average10 - b.average10).slice(0, 3);
+  // A top-3/bottom-3 ranking implies real differentiation between
+  // questions. When scores are tied (or near-tied) or there simply aren't
+  // enough scored questions to rank meaningfully, forcing a ranking
+  // fabricates distinctions the data doesn't support -- so below this
+  // threshold, show an explicit "no distinct strengths/priorities" state
+  // instead of an arbitrary top/bottom split of near-identical numbers.
+  const scoreSpread = scored.length > 0 ? Math.max(...scored.map((r) => r.average10)) - Math.min(...scored.map((r) => r.average10)) : 0;
+  const hasDistinctSpread = scored.length >= 4 && scoreSpread >= 1.0;
+  const strengths = hasDistinctSpread ? [...scored].sort((a, b) => b.average10 - a.average10).slice(0, 3) : [];
+  const priorities = hasDistinctSpread ? [...scored].sort((a, b) => a.average10 - b.average10).slice(0, 3) : [];
 
   const overallScore = overallAverage10(rows);
   const overallTier = overallScore !== null ? getScoreTier(overallScore) : null;
   const themeGroups = groupByConstruct(rows);
 
+  // How many of this cycle's questions fall in each score tier -- a
+  // compact readout of the *spread* behind the single overall number,
+  // derived entirely from already-suppressed rows (no new query).
+  const scoreDistribution = {
+    strength: scored.filter((row) => getScoreTier(row.average10).tier === "strength").length,
+    neutral: scored.filter((row) => getScoreTier(row.average10).tier === "neutral").length,
+    priority: scored.filter((row) => getScoreTier(row.average10).tier === "priority").length,
+  };
+
   const enpsRow = report?.enps && !report.enps.protected ? report.enps.rows[0] : null;
 
   const latestOpenOrRecent = cycles?.find((c) => c.status === "open") ?? cycles?.[0] ?? null;
-  const responseRate =
-    latestOpenOrRecent && employeeCount ? Math.round((latestOpenOrRecent.responseCount / employeeCount) * 100) : null;
+  // When a department is selected, both the numerator and denominator must be
+  // department-scoped -- mixing an org-wide eligible count with a department-
+  // scoped response count produced impossible-looking figures (e.g. "12 of 12
+  // eligible / 100%" next to "About this view: 6 responses").
+  const responseCount = selectedDepartment ? (report?.report?.n ?? null) : (latestOpenOrRecent?.responseCount ?? null);
+  const eligibleCount = selectedDepartment ? scopedEligibleCount : employeeCount;
+  const responseRate = responseCount !== null && eligibleCount ? Math.round((responseCount / eligibleCount) * 100) : null;
 
   const overallByCycle = overallScoreByCycle(trend?.questions ?? []);
   const trendDelta =
@@ -199,21 +251,36 @@ export default function OverviewPage() {
       ) : (
         <>
           <div className="grid gap-3 md:grid-cols-4">
-            <Card className="border" style={overallTier ? { background: overallTier.bg, borderColor: overallTier.border } : undefined}>
+            <Card
+              className="border transition-[background-color,border-color] duration-300"
+              style={overallTier ? { background: overallTier.bg, borderColor: overallTier.border } : undefined}
+            >
               <div className="flex items-center gap-1.5">
                 <h2 className="section-title text-[15px]">Overall score</h2>
                 <span title="Every scored question this cycle, normalized to a 0-10 scale and averaged.">
                   <Info size={14} strokeWidth={1.8} className="text-[var(--ink-faint)]" />
                 </span>
               </div>
-              <p className="mt-2 text-[36px] font-semibold leading-none" style={{ color: overallTier?.text ?? "var(--ink)" }}>
+              <p className="mt-2 text-[36px] font-semibold leading-none tracking-tight" style={{ color: overallTier?.text ?? "var(--ink)" }}>
                 {overallScore !== null ? overallScore.toFixed(1) : "—"}
               </p>
               <p className="mt-1 secondary-text">out of 10</p>
+              {scored.length > 0 ? (
+                <div
+                  className="mt-2.5 flex h-[6px] overflow-hidden rounded-[var(--radius-pill)] bg-[var(--bg-active)]"
+                  title={`${scoreDistribution.strength} strength, ${scoreDistribution.neutral} neutral, ${scoreDistribution.priority} priority question${scored.length === 1 ? "" : "s"}`}
+                >
+                  <div className="h-full bg-[var(--green)]" style={{ width: `${(scoreDistribution.strength / scored.length) * 100}%` }} />
+                  <div className="h-full bg-[var(--warning)]" style={{ width: `${(scoreDistribution.neutral / scored.length) * 100}%` }} />
+                  <div className="h-full bg-[var(--red)]" style={{ width: `${(scoreDistribution.priority / scored.length) * 100}%` }} />
+                </div>
+              ) : null}
               {enpsRow ? (
                 <div className="mt-3 border-t border-[var(--border-soft)] pt-3">
                   <div className="flex items-baseline justify-between text-[12px]">
-                    <span className="text-[var(--ink-mid)]">eNPS (company-wide)</span>
+                    <span className="flex items-center gap-1.5 text-[var(--ink-mid)]">
+                      eNPS <ScopeExceptionPill label="Company-wide" />
+                    </span>
                     <span className="font-semibold text-[var(--ink)]">{Math.round(enpsRow.score)}</span>
                   </div>
                   <div className="mt-1.5 flex h-[6px] overflow-hidden rounded-[var(--radius-pill)] bg-[var(--bg-active)]">
@@ -235,15 +302,20 @@ export default function OverviewPage() {
                 size={120}
               />
               <p className="secondary-text">
-                {latestOpenOrRecent ? `${latestOpenOrRecent.responseCount} of ${employeeCount ?? "?"} eligible` : "No survey yet"}
+                {responseCount !== null ? `${responseCount} of ${eligibleCount ?? "?"} eligible` : "No survey yet"}
               </p>
             </Card>
 
-            <Card className="border" style={trendTier && overallByCycle.length >= 2 ? { background: trendTier.bg, borderColor: trendTier.border } : undefined}>
-              <h2 className="section-title text-[15px]">Change vs last survey (company-wide)</h2>
+            <Card
+              className="border transition-[background-color,border-color] duration-300"
+              style={trendTier && overallByCycle.length >= 2 ? { background: trendTier.bg, borderColor: trendTier.border } : undefined}
+            >
+              <h2 className="flex items-center gap-1.5 section-title text-[15px]">
+                Change vs last survey <ScopeExceptionPill label="Company-wide" />
+              </h2>
               {overallByCycle.length >= 2 ? (
                 <>
-                  <p className="mt-2 flex items-center gap-1.5 text-[28px] font-semibold" style={{ color: trendTier?.text }}>
+                  <p className="mt-2 flex items-center gap-1.5 text-[28px] font-semibold tracking-tight" style={{ color: trendTier?.text }}>
                     {(trendDelta ?? 0) >= 0 ? <TrendingUp size={22} strokeWidth={2} /> : <TrendingDown size={22} strokeWidth={2} />}
                     {(trendDelta ?? 0) >= 0 ? "+" : ""}
                     {trendDelta!.toFixed(1)}
@@ -251,7 +323,16 @@ export default function OverviewPage() {
                   <Sparkline points={overallByCycle.map((point) => point.value)} color={trendTier?.text} />
                 </>
               ) : (
-                <p className="mt-2 secondary-text">Needs a second survey cycle to show a trend.</p>
+                <>
+                  <p className="mt-2 text-[15px] font-semibold text-[var(--ink)]">Baseline established</p>
+                  <p className="mt-0.5 secondary-text">Run your next pulse to see change over time.</p>
+                  {/* Faint flat placeholder line -- same viewBox/stroke as
+                      Sparkline, dashed and muted, so the empty state reads
+                      as "measurement starts here" rather than blank space. */}
+                  <svg viewBox="0 0 280 60" className="mt-2 h-14 w-full" aria-hidden="true">
+                    <path d="M0,30 L280,30" fill="none" stroke="var(--ink-faint)" strokeWidth={2} strokeDasharray="4 5" strokeLinecap="round" />
+                  </svg>
+                </>
               )}
             </Card>
 
@@ -294,7 +375,11 @@ export default function OverviewPage() {
                     </li>
                   );
                 })}
-                {strengths.length === 0 ? <li className="secondary-text">No data yet.</li> : null}
+                {strengths.length === 0 ? (
+                  <li className="secondary-text">
+                    {scored.length === 0 ? "No data yet." : "No distinct strengths emerged yet -- scores are close together."}
+                  </li>
+                ) : null}
               </ol>
             </Card>
 
@@ -313,7 +398,11 @@ export default function OverviewPage() {
                     </li>
                   );
                 })}
-                {priorities.length === 0 ? <li className="secondary-text">No data yet.</li> : null}
+                {priorities.length === 0 ? (
+                  <li className="secondary-text">
+                    {scored.length === 0 ? "No data yet." : "No distinct priorities emerged yet -- scores are close together."}
+                  </li>
+                ) : null}
               </ol>
             </Card>
           </div>
@@ -322,16 +411,38 @@ export default function OverviewPage() {
 
       {!isProtected && themeGroups.length > 0 ? (
         <Card className="mt-3">
-          <h2 className="section-title text-[15px]">Theme heatmap</h2>
-          <p className="mt-1 secondary-text">Each theme&apos;s score, and how it compares to this survey&apos;s own overall score.</p>
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <div>
+              <h2 className="section-title text-[15px]">Theme heatmap</h2>
+              <p className="mt-1 secondary-text">
+                Each theme&apos;s score, and how it compares to this survey&apos;s own overall score. Click a tile to explore its questions.
+              </p>
+            </div>
+            {/* Inline tier legend -- the same three colors every tinted
+                element on this page already uses (getScoreTier), named
+                once here instead of relying on the reader to infer green/
+                amber/red's meaning from context alone. */}
+            <div className="flex shrink-0 items-center gap-3 text-[11px] text-[var(--ink-mid)]">
+              <span className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full" style={{ background: "var(--green)" }} /> Strength
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full" style={{ background: "var(--warning)" }} /> Neutral
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full" style={{ background: "var(--red)" }} /> Priority
+              </span>
+            </div>
+          </div>
           <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
             {themeGroups.map((group) => {
               const delta = overallScore !== null ? group.average10 - overallScore : null;
               const tier = getScoreTier(group.average10);
               return (
-                <div
+                <Link
                   key={group.construct}
-                  className="w-[168px] shrink-0 rounded-[var(--radius-card)] border p-3"
+                  href={report?.cycle ? `/app/${report.cycle.id}/results?theme=${encodeURIComponent(group.construct)}` : "#"}
+                  className="w-[136px] shrink-0 rounded-[var(--radius-card)] border p-2.5 transition-[background-color,border-color,box-shadow] duration-300 hover:shadow-[var(--shadow-elevated)]"
                   style={{ background: tier.bg, borderColor: tier.border }}
                 >
                   {/* A neutral, tier-colored badge -- never a per-theme
@@ -339,21 +450,21 @@ export default function OverviewPage() {
                       and tenant-defined (see the question bank), so no
                       fixed name -> icon mapping is safe. */}
                   <IconBadge icon={Circle} tier={tier} />
-                  <div className="mt-2 text-[12px] font-medium uppercase tracking-[0.04em] text-[var(--ink-mid)]">{group.construct}</div>
-                  <div className="mt-1 text-[24px] font-semibold" style={{ color: tier.text }}>
+                  <div className="mt-1.5 truncate text-[11px] font-medium uppercase tracking-[0.04em] text-[var(--ink-mid)]">{group.construct}</div>
+                  <div className="mt-0.5 text-[20px] font-semibold tracking-tight" style={{ color: tier.text }}>
                     {group.average10.toFixed(1)}
                   </div>
-                  {delta !== null ? (
-                    <div className="mt-0.5 flex items-center gap-1 text-[11px] font-medium" style={{ color: tier.text }}>
-                      {delta >= 0 ? <TrendingUp size={12} strokeWidth={2} /> : <TrendingDown size={12} strokeWidth={2} />}
+                  {delta !== null && Math.abs(delta) >= 0.05 ? (
+                    <div className="mt-0.5 flex items-center gap-1 text-[10.5px] font-medium" style={{ color: tier.text }}>
+                      {delta >= 0 ? <TrendingUp size={11} strokeWidth={2} /> : <TrendingDown size={11} strokeWidth={2} />}
                       {delta >= 0 ? "+" : ""}
                       {delta.toFixed(1)} vs overall
                     </div>
                   ) : null}
-                  <div className="mt-1 text-[11px] text-[var(--ink-faint)]">
+                  <div className="mt-0.5 text-[10.5px] text-[var(--ink-faint)]">
                     {group.questionCount} question{group.questionCount === 1 ? "" : "s"}
                   </div>
-                </div>
+                </Link>
               );
             })}
           </div>

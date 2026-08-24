@@ -25,8 +25,12 @@ export type BrandPresetTokens = {
   "--enps-detractor": string;
   /** Sidebar background + matching text/active-state colors -- always set
    * together, since a dark sidebarGradient needs light --sidebar-ink or
-   * the nav becomes unreadable. Omit the whole group for a flat sidebar
-   * matching today's default (--bg-sidebar / --ink). */
+   * the nav becomes unreadable. Calm Teal's values here are identical to
+   * globals.css's app-wide :root defaults (the sidebar default was
+   * deliberately flipped to match this preset), so this group is
+   * currently a no-op override for this preset specifically -- kept
+   * explicit rather than omitted so a future preset with a different
+   * sidebar treatment has a working example to follow. */
   sidebar?: {
     background: string;
     ink: string;
@@ -51,7 +55,7 @@ export const BRAND_PRESETS: BrandPreset[] = [
   {
     id: "calm-teal",
     label: "Calm Teal",
-    description: "Softer shadows and radii, a muted teal accent, and a gradient sidebar.",
+    description: "Softer shadows and radii, and a muted teal accent.",
     accentColor: "#0f6b63",
     fontFamily: "inter",
     tokens: {

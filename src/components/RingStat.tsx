@@ -41,6 +41,7 @@ export function RingStat({
         strokeDasharray={circumference}
         strokeDashoffset={circumference * (1 - clamped)}
         transform={`rotate(-90 ${center} ${center})`}
+        style={{ transition: "stroke-dashoffset 0.6s ease, stroke 0.3s ease" }}
       />
       <text x={center} y={center - 5} textAnchor="middle" className="fill-[var(--ink)]" style={{ fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 500 }}>
         {centerLabel}

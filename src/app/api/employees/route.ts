@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
   if (!canAccessPeople(session.role)) return NextResponse.json({ ok: false, error: "You don't have permission to view employees." }, { status: 403 });
 
   const search = request.nextUrl.searchParams.get("search") ?? undefined;
+  const team = request.nextUrl.searchParams.get("team") ?? undefined;
   const limit = Number(request.nextUrl.searchParams.get("limit") ?? "25");
   const offset = Number(request.nextUrl.searchParams.get("offset") ?? "0");
 
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
   console.log(`employees GET: tenant=${session.tenant.id} email=${session.email}`);
 
   const { employees, total } = await withTenantScopedDb(session.tenant.id, (db) =>
-    new IdentityRepository(db).listEmployees(session.tenant.id, { search, limit, offset }),
+    new IdentityRepository(db).listEmployees(session.tenant.id, { search, team, limit, offset }),
   );
 
   return NextResponse.json({ ok: true, employees, total });
