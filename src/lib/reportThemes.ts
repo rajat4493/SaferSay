@@ -66,6 +66,21 @@ export function groupByConstruct(rows: ThemeableRow[]): ThemeGroup[] {
 }
 
 /**
+ * The single headline number a report's questions average out to, on the
+ * same normalized 0-10 scale groupByConstruct uses -- the "Overall Score"
+ * tile, and the baseline every theme's "vs overall" badge on the Overview
+ * dashboard compares against. Pure arithmetic over rows already on the
+ * page; not a new query, and never crosses outside the caller's own
+ * report rows (no cross-tenant/cross-company comparison here or anywhere
+ * in this module).
+ */
+export function overallAverage10(rows: ThemeableRow[]): number | null {
+  const scored = rows.filter((row): row is ThemeableRow & { average: number } => row.average !== null);
+  if (scored.length === 0) return null;
+  return scored.reduce((sum, row) => sum + normalizeTo10(row.average, row.scaleMax), 0) / scored.length;
+}
+
+/**
  * A scoped theme's score minus the same theme's org-wide score -- both
  * inputs are already-suppressed/already-released averages (see
  * groupByConstruct's doc comment), so a difference of two already-public

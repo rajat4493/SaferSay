@@ -46,12 +46,13 @@ async function loadReportForCycle(
   // never let a client-supplied ?department= widen a scoped role's view.
   const scope: ReportScope | undefined = forcedScope ? forcedScope : department ? { type: "department", department } : undefined;
 
-  // department/team scope only applies when a specific cycle is requested --
-  // the no-cycleId "latest cycle" convenience path still honors a forced
-  // People Leader scope (they never get an org-wide fallback), but not an
-  // ordinary department param.
+  // The no-cycleId "latest cycle" convenience path honors scope too --
+  // e.g. the Overview dashboard's department picker calls /api/report
+  // without a cycleId (it doesn't know the latest cycle's id upfront) and
+  // still expects department scoping to apply, same as when a cycleId is
+  // given explicitly.
   const result = !cycleId
-    ? await repo.getLatestProtectedReportForTenant(tenantId, forcedScope ?? undefined, tenantName)
+    ? await repo.getLatestProtectedReportForTenant(tenantId, scope, tenantName)
     : await (async () => {
         const cycle = await repo.getCycleForTenant(tenantId, cycleId, tenantName);
         // A cycle id is an access boundary. A missing/cross-tenant cycle

@@ -52,7 +52,7 @@ describe("manager-subtree (People Leader) scoped report", () => {
     expect(report).toEqual({
       protected: false,
       n: 6,
-      rows: [{ questionId: "q1", label: "How supported do you feel?", construct: "Support", n: 6, average: 4.1 }],
+      rows: [{ questionId: "q1", label: "How supported do you feel?", construct: "Support", n: 6, average: 4.1, scaleMax: 5 }],
     });
   });
 

@@ -544,8 +544,8 @@ export class ResponseRepository {
     // suppressed to protect a sibling subtree, or genuinely empty.
     if (!entry || !entry.releasable || scope.teamLabels.length === 0) return { protected: true, n: 0, rows: [] };
 
-    const result = await this.db.query<{ question_id: string; question_text: string; construct: string | null; n: number; average: string | null }>(
-      `select r.question_id, q.question_text, q.construct, r.n, r.average
+    const result = await this.db.query<{ question_id: string; question_text: string; question_type: QuestionType; construct: string | null; n: number; average: string | null }>(
+      `select r.question_id, q.question_text, q.question_type, q.construct, r.n, r.average
        from responses.report_question_scores_by_departments($1, $2, $3) r
        join responses.survey_cycles c on c.id = $1
        join responses.template_questions q on q.id = r.question_id
@@ -562,6 +562,7 @@ export class ResponseRepository {
         construct: row.construct,
         n: row.n,
         average: row.average === null ? null : Number(row.average),
+        scaleMax: scaleMaxForQuestionType(row.question_type),
       })),
     };
   }
@@ -586,8 +587,8 @@ export class ResponseRepository {
     // has zero responses at all.
     if (!entry || !entry.releasable) return { protected: true, n: 0, rows: [] };
 
-    const result = await this.db.query<{ question_id: string; question_text: string; construct: string | null; n: number; average: string | null }>(
-      `select r.question_id, q.question_text, q.construct, r.n, r.average
+    const result = await this.db.query<{ question_id: string; question_text: string; question_type: QuestionType; construct: string | null; n: number; average: string | null }>(
+      `select r.question_id, q.question_text, q.question_type, q.construct, r.n, r.average
        from responses.report_question_scores_by_department($1, $2, $3) r
        join responses.survey_cycles c on c.id = $1
        join responses.template_questions q on q.id = r.question_id
@@ -604,6 +605,7 @@ export class ResponseRepository {
         construct: row.construct,
         n: row.n,
         average: row.average === null ? null : Number(row.average),
+        scaleMax: scaleMaxForQuestionType(row.question_type),
       })),
     };
   }
@@ -869,11 +871,12 @@ export class ResponseRepository {
       cycle_id: string;
       question_id: string;
       question_text: string;
+      question_type: QuestionType;
       n: number;
       average: string | null;
       protected: boolean;
     }>(
-      `select cycle_id, question_id, question_text, n, average, protected
+      `select cycle_id, question_id, question_text, question_type, n, average, protected
        from responses.report_question_trend($1, $2)`,
       [tenantId, cycleIds],
     );
@@ -906,6 +909,7 @@ export class ResponseRepository {
         n: row.protected ? 0 : row.n,
         average: row.protected || row.average === null ? null : Number(row.average),
         protected: row.protected,
+        scaleMax: scaleMaxForQuestionType(row.question_type),
       });
     }
 

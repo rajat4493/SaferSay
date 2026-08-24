@@ -129,6 +129,27 @@ describe("getCrossCycleTrendForTenant", () => {
     expect(result).toHaveLength(0);
   });
 
+  it("carries scaleMax through per point, so a mixed likert/eNPS cycle can be normalized before averaging", async () => {
+    const dbTwoCycles = fakeDb({
+      cycles: [
+        { id: "cycle-b", name: "Pulse 2", status: "closed", min_group_size: 5, created_at: "2026-04-01", response_count: 6 },
+        { id: "cycle-a", name: "Pulse", status: "closed", min_group_size: 5, created_at: "2026-01-01", response_count: 6 },
+      ],
+      trend: [
+        { cycle_id: "cycle-a", question_id: "q-a1", question_text: "Recommend us?", question_type: "enps_0_10", n: 6, average: "8", protected: false },
+        { cycle_id: "cycle-b", question_id: "q-b1", question_text: "Recommend us?", question_type: "enps_0_10", n: 6, average: "9", protected: false },
+        { cycle_id: "cycle-a", question_id: "q-a2", question_text: "I feel supported", question_type: "likert_5", n: 6, average: "4", protected: false },
+        { cycle_id: "cycle-b", question_id: "q-b2", question_text: "I feel supported", question_type: "likert_5", n: 6, average: "4.2", protected: false },
+      ],
+    });
+
+    const result = await new ResponseRepository(dbTwoCycles).getCrossCycleTrendForTenant(tenantId);
+    const enpsQuestion = result.find((q) => q.questionText === "Recommend us?")!;
+    const likertQuestion = result.find((q) => q.questionText === "I feel supported")!;
+    expect(enpsQuestion.points.every((p) => p.scaleMax === 10)).toBe(true);
+    expect(likertQuestion.points.every((p) => p.scaleMax === 5)).toBe(true);
+  });
+
   it("keeps a question with a genuine mix of one protected and one real point", async () => {
     const db = fakeDb({
       cycles: [

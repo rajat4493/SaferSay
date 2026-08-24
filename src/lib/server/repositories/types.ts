@@ -398,6 +398,11 @@ export type CycleTrendPoint = {
   n: number;
   average: number | null;
   protected: boolean;
+  // Lets a consumer normalize this point onto a common 0-10 scale before
+  // averaging across questions of different types (see the Overview
+  // dashboard's per-cycle overall-score derivation) -- see
+  // scaleMaxForQuestionType.
+  scaleMax: 5 | 10;
 };
 
 export type CycleTrendQuestion = {
