@@ -26,5 +26,9 @@ export async function POST() {
   );
   await logDeletionRequested(session.tenant.id, session.role, session.email);
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({
+    ok: true,
+    status: "requested",
+    requestedAt: new Date().toISOString(),
+  });
 }

@@ -59,5 +59,7 @@ describe("data export and deletion request", () => {
     const source = readFileSync("src/app/api/tenants/deletion-request/route.ts", "utf8");
     expect(source).not.toMatch(/delete from|drop table|truncate/i);
     expect(source).toContain("logDeletionRequested");
+    expect(source).toContain('status: "requested"');
+    expect(source).toContain("requestedAt");
   });
 });

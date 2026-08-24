@@ -58,6 +58,7 @@ export function TenantSettingsPanel() {
   const [creatingApiKey, setCreatingApiKey] = useState(false);
   const [requestingDeletion, setRequestingDeletion] = useState(false);
   const [deletionRequested, setDeletionRequested] = useState(false);
+  const [deletionRequestedAt, setDeletionRequestedAt] = useState<string | null>(null);
   const [nameDraft, setNameDraft] = useState<string | null>(null);
   const [savingName, setSavingName] = useState(false);
   const [recurrences, setRecurrences] = useState<Recurrence[]>([]);
@@ -320,15 +321,21 @@ export function TenantSettingsPanel() {
   }
 
   async function requestDeletion() {
+    const confirmed = window.confirm(
+      "Request deletion for this workspace? This records your request now. Deletion is irreversible and will be confirmed with you by email before it is carried out.",
+    );
+    if (!confirmed) return;
+
     setRequestingDeletion(true);
     const response = await fetch("/api/tenants/deletion-request", { method: "POST" });
-    const data = await response.json().catch(() => ({ ok: false }));
+    const data = await response.json().catch(() => ({ ok: false })) as { ok?: boolean; requestedAt?: string; error?: string };
     setRequestingDeletion(false);
     if (data.ok) {
       setDeletionRequested(true);
-      toast.show({ variant: "success", message: "Deletion request logged. We'll follow up by email." });
+      setDeletionRequestedAt(data.requestedAt ?? new Date().toISOString());
+      toast.show({ variant: "success", message: "Deletion request recorded. We'll confirm the deletion steps by email." });
     } else {
-      toast.show({ variant: "error", message: "Couldn't log that request. Try again." });
+      toast.show({ variant: "error", message: data.error ?? "Couldn't log that request. Try again." });
     }
   }
 
@@ -605,7 +612,9 @@ export function TenantSettingsPanel() {
             Export full workspace data (JSON)
           </button>
           {deletionRequested ? (
-            <span className="btn-secondary btn-pill cursor-default opacity-70">Deletion requested -- we&apos;ll follow up by email</span>
+            <span className="btn-secondary btn-pill cursor-default opacity-70">
+              Deletion requested{deletionRequestedAt ? ` ${new Date(deletionRequestedAt).toLocaleDateString()}` : ""}
+            </span>
           ) : (
             <button onClick={requestDeletion} disabled={requestingDeletion} className="btn-secondary btn-pill">
               {requestingDeletion ? "Logging request..." : "Request account deletion"}
@@ -613,8 +622,8 @@ export function TenantSettingsPanel() {
           )}
         </div>
         <p className="mt-2 text-xs text-[var(--ink-faint)]">
-          Requesting deletion logs it to your workspace&apos;s audit trail immediately -- actual deletion is a
-          manual step we confirm with you by email first, since it can&apos;t be undone. You can also reach us
+          Requesting deletion requires confirmation and logs a dated receipt to your workspace&apos;s audit trail.
+          Actual deletion is a manual step we confirm with you by email first, since it can&apos;t be undone. You can also reach us
           directly at <a href="mailto:privacy@safersay.com" className="underline">privacy@safersay.com</a>.
         </p>
       </Card>
