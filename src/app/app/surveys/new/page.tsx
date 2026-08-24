@@ -13,6 +13,7 @@ export default function NewSurveyPage() {
   const template = surveyTemplates.find((item) => item.slug === selected) ?? surveyTemplates[0];
   const [, startTransition] = useTransition();
   const [accessChecked, setAccessChecked] = useState(false);
+  const [employeeCount, setEmployeeCount] = useState<number | null>(null);
 
   useEffect(() => {
     async function checkEmployees() {
@@ -22,6 +23,7 @@ export default function NewSurveyPage() {
         router.replace("/app/people");
         return;
       }
+      if (data.ok) setEmployeeCount(data.total ?? 0);
       setAccessChecked(true);
     }
     startTransition(() => {
@@ -63,7 +65,15 @@ export default function NewSurveyPage() {
           <p className="mt-4 secondary-text">{template.questions.length} questions — customize them below before launching the survey.</p>
         </Card>
       </div>
-      <CreateSurveyCycle key={template.slug} templateSlug={template.slug} />
+      {employeeCount !== null ? (
+        <Card className="mt-2.5">
+          <p className="meta-label">Participant data check</p>
+          <p className="mt-2 secondary-text">
+            {employeeCount} active people will receive a secure link. {employeeCount >= 5 ? "Your organisation can reach the minimum protected-report threshold." : "This survey can launch, but results remain protected until at least five people submit."}
+          </p>
+        </Card>
+      ) : null}
+      <CreateSurveyCycle key={template.slug} templateSlug={template.slug} activeEmployees={employeeCount ?? 0} />
     </AppShell>
   );
 }

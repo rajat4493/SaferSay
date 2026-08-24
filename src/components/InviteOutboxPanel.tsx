@@ -47,6 +47,7 @@ export function InviteOutboxPanel({ cycleId }: { cycleId?: string } = {}) {
   const [result, setResult] = useState<OutboxResult | null>(null);
   const [loading, setLoading] = useState("");
   const [copiedId, setCopiedId] = useState("");
+  const [developerMode, setDeveloperMode] = useState(false);
   const [, startTransition] = useTransition();
   const toast = useToast();
 
@@ -75,6 +76,13 @@ export function InviteOutboxPanel({ cycleId }: { cycleId?: string } = {}) {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cycleId]);
+
+  useEffect(() => {
+    fetch("/api/readiness")
+      .then((response) => response.json())
+      .then((data: { mode?: string }) => setDeveloperMode(data.mode !== "production"))
+      .catch(() => setDeveloperMode(false));
+  }, []);
 
   async function sendSmart(deliveryType: "invite" | "reminder") {
     setSending(true);
@@ -129,7 +137,7 @@ export function InviteOutboxPanel({ cycleId }: { cycleId?: string } = {}) {
         <SendAction state={sendState} sending={sending} onSend={sendSmart} />
       </div>
 
-      {sendState?.cycleStatus === "closed" ? null : (
+      {developerMode && sendState?.cycleStatus !== "closed" ? (
       <details className="mt-5 group">
         <summary className="cursor-pointer select-none text-[12px] font-medium text-[var(--ink-faint)] hover:text-[var(--ink-mid)]">Developer / test mode</summary>
 
@@ -211,7 +219,7 @@ export function InviteOutboxPanel({ cycleId }: { cycleId?: string } = {}) {
           </div>
         ) : null}
       </details>
-      )}
+      ) : null}
     </Card>
   );
 }

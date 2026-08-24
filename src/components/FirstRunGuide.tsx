@@ -52,7 +52,7 @@ export function FirstRunGuide() {
   const steps: Step[] = [
     { label: "Load the people who should receive surveys", body: "Import a CSV of your employees so SaferSay knows who to invite.", href: "/app/people", action: "Upload employees" },
     { label: "Create your first survey", body: "Pick a template — SaferSay issues a secure invite link for each active employee.", href: "/app/surveys/new", action: "Create survey" },
-    { label: "Send it", body: "Send confidential invite links. During pilots, you can also copy secure links manually if email delivery is not verified yet.", href: hasCycle ? `/app/${state.cycle!.id}/send` : "/app/surveys/new", action: "Open send step" },
+    { label: "Send it", body: "Send confidential invite links. SaferSay shows delivery status and tells you if anything needs attention.", href: hasCycle ? `/app/${state.cycle!.id}/send` : "/app/surveys/new", action: "Open send step" },
   ];
   const step = steps[stepIndex];
 

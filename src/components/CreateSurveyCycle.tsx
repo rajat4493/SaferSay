@@ -23,7 +23,7 @@ function hasCustomizations(template: SurveyTemplate, questions: EditableQuestion
   });
 }
 
-export function CreateSurveyCycle({ templateSlug }: { templateSlug: string }) {
+export function CreateSurveyCycle({ templateSlug, activeEmployees }: { templateSlug: string; activeEmployees: number }) {
   const template = surveyTemplates.find((item) => item.slug === templateSlug) ?? surveyTemplates[0];
   const [questions, setQuestions] = useState<EditableQuestion[]>(() => toEditable(template));
   const [cycleName, setCycleName] = useState("");
@@ -150,6 +150,9 @@ export function CreateSurveyCycle({ templateSlug }: { templateSlug: string }) {
           <h2 className="section-title mt-2">Create draft cycle</h2>
           <p className="mt-1.5 secondary-text">
             Creates a survey cycle from {template.name} and issues one secure token per active employee.
+          </p>
+          <p className={`mt-2 text-[13px] font-medium ${activeEmployees >= 5 ? "text-[var(--green)]" : "text-[var(--red)]"}`}>
+            {activeEmployees >= 5 ? `${activeEmployees} active people are ready to invite.` : `${activeEmployees} active people: the survey can launch, but reports remain protected until five submissions.`}
           </p>
         </div>
         <div className="grid gap-2 sm:grid-cols-[minmax(220px,1fr)_auto]">

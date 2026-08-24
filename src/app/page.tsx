@@ -5,6 +5,8 @@ import { ArrowRight, EyeOff, Power, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { BrandMark } from "@/components/BrandMark";
 import { useBrand } from "@/components/BrandProvider";
+import { ProductDemo } from "@/components/ProductDemo";
+import { retentionPlans, surveyCreditPacks } from "@/lib/billingCatalog";
 
 const tickerItems = ["Easy to start.", "Easy to leave.", "Easy to understand.", "Confidential by design."];
 
@@ -63,6 +65,9 @@ export default function Home() {
             <Link href="/app/brand" className="inline-flex h-12 items-center justify-center rounded-[var(--radius-pill)] border border-white/20 bg-white/5 px-6 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/10">
               Customize brand
             </Link>
+            <a href="#pricing" className="inline-flex h-12 items-center justify-center rounded-[var(--radius-pill)] border border-white/20 bg-white/5 px-6 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/10">
+              See pricing
+            </a>
           </div>
         </div>
       </section>
@@ -83,6 +88,42 @@ export default function Home() {
           <Value icon={ArrowRight} title="Easy to start" text="Three setup steps, defaults selected, template-first." />
           <Value icon={EyeOff} title="Easy to understand" text="Respondents see what is stored and what HR cannot see." />
           <Value icon={Power} title="Easy to leave" text="Export and cancel are visible. No data hostage pattern." />
+        </div>
+      </section>
+
+      <section id="pricing" className="bg-white px-4 py-20 text-[var(--brand-ink)] sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <p className="meta-label text-[var(--green)]">Simple, usage-based pricing</p>
+          <div className="mt-3 flex max-w-3xl flex-col justify-between gap-4 md:flex-row md:items-end">
+            <div>
+              <h2 className="font-[family-name:var(--font-display)] text-4xl leading-none tracking-[-0.02em] sm:text-5xl">Pay when you listen.</h2>
+              <p className="mt-3 secondary-text">One credit opens one protected survey cycle for up to 100 active employees. Drafts and cancelled drafts are free.</p>
+            </div>
+            <p className="shrink-0 text-sm font-medium text-[var(--ink-mid)]">No annual contract. No per-person fee.</p>
+          </div>
+          <div className="mt-8 grid gap-4 md:grid-cols-3">
+            {surveyCreditPacks.map((pack) => (
+              <div key={pack.id} className="card flex flex-col">
+                <p className="meta-label">{pack.credits} cycle{pack.credits === 1 ? "" : "s"}</p>
+                <p className="mt-3 text-4xl font-semibold tracking-[-0.04em] text-[var(--ink)]">{pack.price}</p>
+                <h3 className="mt-4 text-lg font-semibold">{pack.name}</h3>
+                <p className="mt-2 flex-1 secondary-text">{pack.description}</p>
+                <Link href={signedIn ? "/app/workspace/billing" : "/login"} className="btn-secondary mt-6 w-full justify-center">Choose this pack</Link>
+              </div>
+            ))}
+          </div>
+          <p className="mt-5 text-sm text-[var(--ink-mid)]">{retentionPlans.find((plan) => plan.id === "monthly")?.description} {retentionPlans.find((plan) => plan.id === "monthly")?.price}.</p>
+        </div>
+      </section>
+
+      <section id="demo" className="bg-[var(--brand-bg)] px-4 py-20 text-[var(--brand-ink)] sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <p className="meta-label text-[var(--green)]">Try the workflow</p>
+          <h2 className="mt-3 max-w-3xl font-[family-name:var(--font-display)] text-4xl leading-none tracking-[-0.02em] sm:text-5xl">See protected reporting before you share a single employee email.</h2>
+          <p className="mt-4 max-w-2xl secondary-text">This is an interactive sample workspace. It uses fictional people in your browser only; it creates no account and sends no email.</p>
+          <div className="mt-8">
+            <ProductDemo />
+          </div>
         </div>
       </section>
 

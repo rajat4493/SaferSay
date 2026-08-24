@@ -24,11 +24,12 @@ describe("production readiness artifacts", () => {
     expect(outreach).toContain("Do Not Promise Yet");
   });
 
-  it("keeps readiness and first-run guidance action-oriented", () => {
+  it("keeps readiness and first-run guidance action-oriented without test-mode dependencies", () => {
     const readiness = readFileSync("src/components/console/ReadinessPanel.tsx", "utf8");
     const firstRun = readFileSync("src/components/FirstRunGuide.tsx", "utf8");
     expect(readiness).toContain("Next actions");
     expect(readiness).toContain("Verify a Resend sending domain");
-    expect(firstRun).toContain("copy secure links manually");
+    expect(firstRun).toContain("SaferSay shows delivery status");
+    expect(firstRun).not.toContain("copy secure links manually");
   });
 });

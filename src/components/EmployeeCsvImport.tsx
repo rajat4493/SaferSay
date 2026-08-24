@@ -1,15 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { FileCheck2 } from "lucide-react";
+import { Download, FileCheck2 } from "lucide-react";
 import { parseEmployeeCsv } from "@/lib/csvEmployees";
 
-const sampleCsv = `email,name,team,location
-alex@company.com,Alex Morgan,Operations,London
-jamie@company.com,Jamie Shah,Product,London
-priya@company.com,Priya Mehta,Sales,Manchester
-sam@company.com,Sam Taylor,Engineering,Bristol
-lee@company.com,Lee Chen,Customer Success,Remote`;
+const sampleCsv = `email,name,team,location,manager_email
+alex@company.com,Alex Morgan,Operations,London,
+jamie@company.com,Jamie Shah,Product,London,alex@company.com
+priya@company.com,Priya Mehta,Sales,Manchester,
+sam@company.com,Sam Taylor,Engineering,Bristol,
+lee@company.com,Lee Chen,Customer Success,Remote,`;
 
 export function EmployeeCsvImport({ onImported }: { onImported?: (count: number) => void } = {}) {
   const [csv, setCsv] = useState("");
@@ -44,10 +44,14 @@ export function EmployeeCsvImport({ onImported }: { onImported?: (count: number)
     onImported?.(result.imported ?? 0);
   }
 
-  function useSampleCsv() {
-    setCsv(sampleCsv);
-    setFileName("sample-employees.csv");
-    setStatus("");
+  function downloadSampleCsv() {
+    const blob = new Blob([sampleCsv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "safersay-employee-import-template.csv";
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   return (
@@ -56,11 +60,12 @@ export function EmployeeCsvImport({ onImported }: { onImported?: (count: number)
         <div>
           <p className="meta-label">CSV import</p>
           <h2 className="section-title mt-2">Load employees</h2>
-          <p className="mt-1.5 secondary-text">Use columns: email, name, team, location.</p>
+          <p className="mt-1.5 secondary-text">Use columns: email, name, team, location, manager_email. Only email is required.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button onClick={useSampleCsv} className="btn-secondary">
-            Use sample CSV
+          <button onClick={downloadSampleCsv} className="btn-secondary">
+            <Download size={14} strokeWidth={1.8} />
+            Download template
           </button>
           <label className="btn-primary cursor-pointer">
             Choose CSV
@@ -77,26 +82,33 @@ export function EmployeeCsvImport({ onImported }: { onImported?: (count: number)
       ) : null}
 
       {csv ? (
-        <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_220px]">
+        <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_240px]">
           <div className="overflow-hidden rounded-[var(--radius-card)] border border-[var(--border)] bg-white">
-            <div className="grid grid-cols-4 gap-3 border-b border-[var(--border)] bg-[var(--bg)] p-3 meta-label">
+            <div className="grid grid-cols-5 gap-3 border-b border-[var(--border)] bg-[var(--bg)] p-3 meta-label">
               <span>Email</span>
               <span>Name</span>
               <span>Team</span>
               <span>Location</span>
+              <span>Manager</span>
             </div>
             {preview.employees.slice(0, 6).map((employee) => (
-              <div key={employee.email} className="grid grid-cols-4 gap-3 border-b border-[var(--border)] p-3 text-[13px] last:border-b-0">
+              <div key={employee.email} className="grid grid-cols-5 gap-3 border-b border-[var(--border)] p-3 text-[13px] last:border-b-0">
                 <span className="truncate font-medium text-[var(--ink)]">{employee.email}</span>
                 <span className="truncate text-[var(--ink-mid)]">{employee.name ?? "-"}</span>
                 <span className="truncate text-[var(--ink-mid)]">{employee.team ?? "-"}</span>
                 <span className="truncate text-[var(--ink-mid)]">{employee.location ?? "-"}</span>
+                <span className="truncate text-[var(--ink-mid)]">{employee.managerEmail ?? "-"}</span>
               </div>
             ))}
           </div>
           <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--bg)] p-4">
             <div className="data-number">{preview.employees.length}</div>
             <p className="secondary-text">valid employees</p>
+            <p className={`mt-3 text-[13px] leading-5 ${preview.employees.length >= 5 ? "text-[var(--green)]" : "text-[var(--red)]"}`}>
+              {preview.employees.length >= 5
+                ? "Enough people to reach SaferSay's minimum protected-report threshold."
+                : `Add at least ${5 - preview.employees.length} more people before results can unlock safely.`}
+            </p>
             {preview.errors.length > 0 ? (
               <div className="mt-3 space-y-2 text-[13px] font-medium text-[var(--red)]">
                 {preview.errors.slice(0, 4).map((error) => (
