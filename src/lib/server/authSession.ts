@@ -17,6 +17,10 @@ export type SessionContext = {
   tenant: { id: string; name: string; slug: string };
   isSuperAdmin: boolean;
   homeTenantId: string;
+  // Only meaningful for role === "people_leader" -- see UserRecord's doc
+  // comment. null for every other role, and null (never a stale value)
+  // for a people_leader who hasn't been assigned a subtree yet.
+  peopleLeaderRootEmployeeId: string | null;
 };
 
 export const superAdminTenantCookieName = "safersay_super_admin_tenant";
@@ -29,6 +33,7 @@ const localDevContext: SessionContext = {
   tenant: localTenant,
   isSuperAdmin: false,
   homeTenantId: localTenant.id,
+  peopleLeaderRootEmployeeId: null,
 };
 
 function hasSupabaseConfig() {
@@ -89,7 +94,7 @@ export async function getSessionContext(): Promise<SessionContext | null> {
   const db = getDatabasePool();
   if (!db) {
     const { tenant } = await resolveTenantContext();
-    return { userId: authId, email: authEmail, name: null, role: "customer_admin", tenant, isSuperAdmin: false, homeTenantId: tenant.id };
+    return { userId: authId, email: authEmail, name: null, role: "customer_admin", tenant, isSuperAdmin: false, homeTenantId: tenant.id, peopleLeaderRootEmployeeId: null };
   }
 
   const repo = new IdentityRepository(db);
@@ -116,7 +121,16 @@ export async function getSessionContext(): Promise<SessionContext | null> {
   // it doesn't correspond to a users row and the dev-bypass authId is an
   // email, not a UUID at all -- record.id is the only value that's actually
   // correct for both.
-  return { userId: record.id, email: record.email, name: record.name, role: record.role, tenant, isSuperAdmin, homeTenantId: homeTenant.id };
+  return {
+    userId: record.id,
+    email: record.email,
+    name: record.name,
+    role: record.role,
+    tenant,
+    isSuperAdmin,
+    homeTenantId: homeTenant.id,
+    peopleLeaderRootEmployeeId: record.peopleLeaderRootEmployeeId,
+  };
 }
 
 async function resolveUserRecord(

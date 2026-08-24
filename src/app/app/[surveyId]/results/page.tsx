@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Calendar, CheckCircle2, FileEdit, Lock, Send } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { CycleTrendPanel } from "@/components/CycleTrendPanel";
 import { ProtectedReportPanel } from "@/components/ProtectedReportPanel";
+import { ThemeReportCard } from "@/components/ThemeReportCard";
 import { SurveyStageTabs } from "@/components/SurveyStageTabs";
 import { useToast } from "@/components/ToastProvider";
 import { canRunSurvey } from "@/lib/permissions";
@@ -230,6 +232,14 @@ export default function SurveyResultsPage() {
         {resultsState ? <ResultsStateBanner state={resultsState} protectedReport={protectedReport} /> : null}
 
         <ProtectedReportPanel cycleId={surveyId} department={selectedDepartment || undefined} />
+
+        <ThemeReportCard cycleId={surveyId} department={selectedDepartment || undefined} />
+
+        <p className="mt-2 secondary-text">
+          <Link href={`/app/${surveyId}/comments`} className="font-medium text-[var(--ink)] underline">
+            View comments, filterable by team and theme
+          </Link>
+        </p>
 
         {cycles.length > 1 ? <CycleTrendPanel /> : null}
 

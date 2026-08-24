@@ -2,9 +2,30 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getSessionContext, isPlatformOwnerImpersonating } from "@/lib/server/authSession";
 import { getDatabasePool } from "@/lib/server/db/pool";
 import { getTenantPool, withTenantContext, type Queryable } from "@/lib/server/db/tenantPool";
+import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import { ResponseRepository } from "@/lib/server/repositories/responseRepository";
+import type { ReportScope } from "@/lib/server/repositories/types";
 import { getProtectedServerReport } from "@/lib/serverStore";
 import { canViewSurveyResults } from "@/lib/permissions";
+
+/**
+ * Resolves a People Leader's fixed report scope server-side -- never from
+ * a client-supplied param. Siblings are every direct report of the root
+ * manager's own parent (including the root itself), each resolved to
+ * their own subtree's team labels, matching ReportScope's "team" variant
+ * doc comment. Returns null when the user has no assigned subtree yet (a
+ * people_leader with no rootEmployeeId sees nothing, never org-wide).
+ */
+async function resolvePeopleLeaderScope(identity: IdentityRepository, tenantId: string, rootEmployeeId: string | null): Promise<ReportScope | null> {
+  if (!rootEmployeeId) return null;
+  const parentId = await identity.getEmployeeManagerId(tenantId, rootEmployeeId);
+  const siblingIds = await identity.getSiblingManagerIds(tenantId, parentId);
+  const siblingSubtrees = await Promise.all(
+    siblingIds.map(async (managerId) => ({ managerId, teamLabels: await identity.getSubtreeTeamLabels(tenantId, managerId) })),
+  );
+  const own = siblingSubtrees.find((entry) => entry.managerId === rootEmployeeId);
+  return { type: "team", rootManagerId: rootEmployeeId, teamLabels: own?.teamLabels ?? [], siblingSubtrees };
+}
 
 /**
  * Reads a specific cycle's report when ?cycleId= is given (the
@@ -19,11 +40,18 @@ async function loadReportForCycle(
   cycleId: string | null,
   tenantName?: string,
   department?: string | null,
+  forcedScope?: ReportScope | null,
 ) {
-  // department scope only applies when a specific cycle is requested --
-  // the no-cycleId "latest cycle" convenience path stays org-scoped.
+  // forcedScope (People Leader) overrides the department param entirely --
+  // never let a client-supplied ?department= widen a scoped role's view.
+  const scope: ReportScope | undefined = forcedScope ? forcedScope : department ? { type: "department", department } : undefined;
+
+  // department/team scope only applies when a specific cycle is requested --
+  // the no-cycleId "latest cycle" convenience path still honors a forced
+  // People Leader scope (they never get an org-wide fallback), but not an
+  // ordinary department param.
   const result = !cycleId
-    ? await repo.getLatestProtectedReportForTenant(tenantId, undefined, tenantName)
+    ? await repo.getLatestProtectedReportForTenant(tenantId, forcedScope ?? undefined, tenantName)
     : await (async () => {
         const cycle = await repo.getCycleForTenant(tenantId, cycleId, tenantName);
         // A cycle id is an access boundary. A missing/cross-tenant cycle
@@ -37,20 +65,24 @@ async function loadReportForCycle(
           // A small segment is suppressed, never silently widened through a
           // manager/team roll-up. Showing a related group instead leaks a
           // count-derived clue and breaks the promise the picker implies.
-          report: department
-            ? await repo.getProtectedReportForTenant(tenantId, cycle.id, cycle.minGroupSize, { type: "department", department })
-            : await repo.getProtectedReportForTenant(tenantId, cycle.id, cycle.minGroupSize),
+          report: scope ? await repo.getProtectedReportForTenant(tenantId, cycle.id, cycle.minGroupSize, scope) : await repo.getProtectedReportForTenant(tenantId, cycle.id, cycle.minGroupSize),
         };
       })();
 
-  // Open text stays org-wide in v1 regardless of the department picker --
-  // see getProtectedOpenTextReport's doc comment on why department-scoped
-  // text is a deliberate non-goal, not an oversight.
-  const textAnswers = result.cycle
-    ? await repo.getProtectedOpenTextReport(tenantId, result.cycle.id, result.cycle.minGroupSize)
+  // Comments have no subtree scope (only org and department -- see
+  // getProtectedOpenTextReport's doc comment) and eNPS has no scope at all
+  // yet -- rather than risk leaking beyond a People Leader's subtree,
+  // both stay empty/protected for a forced (people_leader) scope, never
+  // an org-wide fallback.
+  const textAnswers = result.cycle && !forcedScope
+    ? await repo.getProtectedOpenTextReport(tenantId, result.cycle.id, result.cycle.minGroupSize, department ?? undefined)
     : { protected: true as const, n: 0, rows: [] };
 
-  return { ...result, textAnswers };
+  const enps = result.cycle && !forcedScope
+    ? await repo.getProtectedEnpsReport(tenantId, result.cycle.id, result.cycle.minGroupSize)
+    : { protected: true as const, n: 0, rows: [] };
+
+  return { ...result, textAnswers, enps };
 }
 
 export async function GET(request: NextRequest) {
@@ -71,22 +103,35 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  // An unassigned People Leader must never fall back to an org-wide (or
+  // any other) report -- block outright rather than let a missing scope
+  // silently resolve to "no scope" downstream.
+  if (session.role === "people_leader" && !session.peopleLeaderRootEmployeeId) {
+    return NextResponse.json({ ok: true, tenant: session.tenant, cycle: null, report: { protected: true, n: 0, rows: [] } });
+  }
+
   const cycleId = request.nextUrl.searchParams.get("cycleId");
-  const department = request.nextUrl.searchParams.get("department");
+  // A People Leader's scope is resolved server-side from their own
+  // assignment, never from this query param -- see resolvePeopleLeaderScope.
+  const department = session.role === "people_leader" ? null : request.nextUrl.searchParams.get("department");
   const tenantPool = getTenantPool();
   const { tenant } = session;
   if (tenantPool) {
-    const result = await withTenantContext(tenantPool, tenant.id, (client) =>
-      loadReportForCycle(client, new ResponseRepository(client), tenant.id, cycleId, tenant.name, department),
-    );
+    const result = await withTenantContext(tenantPool, tenant.id, async (client) => {
+      const forcedScope =
+        session.role === "people_leader" ? await resolvePeopleLeaderScope(new IdentityRepository(client), tenant.id, session.peopleLeaderRootEmployeeId) : null;
+      return loadReportForCycle(client, new ResponseRepository(client), tenant.id, cycleId, tenant.name, department, forcedScope);
+    });
     return NextResponse.json({ ok: true, tenant, ...result });
   }
   const adminPool = getDatabasePool();
   if (adminPool) {
+    const forcedScope =
+      session.role === "people_leader" ? await resolvePeopleLeaderScope(new IdentityRepository(adminPool), tenant.id, session.peopleLeaderRootEmployeeId) : null;
     return NextResponse.json({
       ok: true,
       tenant,
-      ...(await loadReportForCycle(adminPool, new ResponseRepository(adminPool), tenant.id, cycleId, tenant.name, department)),
+      ...(await loadReportForCycle(adminPool, new ResponseRepository(adminPool), tenant.id, cycleId, tenant.name, department, forcedScope)),
     });
   }
   return NextResponse.json({ ok: true, cycle: null, report: await getProtectedServerReport() });

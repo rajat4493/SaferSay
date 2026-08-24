@@ -24,6 +24,13 @@ export async function GET() {
       { status: 403 },
     );
   }
+  // Trend has no subtree scope -- it's always an org-wide pivot of report
+  // data. A People Leader is scoped to just their own subtree (see
+  // /api/report's team-scope enforcement); rather than teach trend a scope
+  // it doesn't otherwise support, it simply isn't available to this role.
+  if (session.role === "people_leader") {
+    return NextResponse.json({ ok: false, error: "Not available for this role." }, { status: 403 });
+  }
 
   const { tenant } = session;
   const tenantPool = getTenantPool();

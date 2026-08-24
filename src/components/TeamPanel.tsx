@@ -22,6 +22,7 @@ const roleLabels: Record<string, string> = {
   survey_creator: "Survey Admin",
   auditor: "Report Viewer",
   employee: "Employee",
+  people_leader: "People Leader",
 };
 
 const inviteRoles: Array<{ value: TeamRole; label: string }> = [
@@ -38,6 +39,9 @@ export function TeamPanel() {
   const [inviteRole, setInviteRole] = useState<TeamRole>("survey_creator");
   const [inviting, setInviting] = useState(false);
   const [removingId, setRemovingId] = useState("");
+  const [peopleLeaderUserId, setPeopleLeaderUserId] = useState("");
+  const [peopleLeaderEmail, setPeopleLeaderEmail] = useState("");
+  const [assigningLeader, setAssigningLeader] = useState(false);
   const [, startTransition] = useTransition();
   const toast = useToast();
 
@@ -76,6 +80,26 @@ export function TeamPanel() {
     setInviteEmail("");
     setTeam(data.team ?? null);
     toast.show({ variant: "success", message: `Invited ${email}.` });
+  }
+
+  async function assignPeopleLeader() {
+    const employeeEmail = peopleLeaderEmail.trim().toLowerCase();
+    if (!peopleLeaderUserId || !employeeEmail) return;
+    setAssigningLeader(true);
+    const response = await fetch("/api/tenants/team/people-leader", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userId: peopleLeaderUserId, employeeEmail }),
+    });
+    const data = (await response.json().catch(() => ({ ok: false }))) as { ok?: boolean; team?: TeamMember[]; error?: string };
+    setAssigningLeader(false);
+    if (!data.ok) {
+      toast.show({ variant: "error", message: data.error ?? "Couldn't assign that People Leader." });
+      return;
+    }
+    setPeopleLeaderEmail("");
+    setTeam(data.team ?? null);
+    toast.show({ variant: "success", message: "People Leader assigned." });
   }
 
   async function remove(member: TeamMember) {
@@ -158,6 +182,46 @@ export function TeamPanel() {
         )}
       </div>
 
+      {team && team.some((member) => member.status === "active") ? (
+        <div className="mt-4 rounded-[var(--radius-card)] border border-dashed border-[var(--border)] bg-[var(--bg)] p-3">
+          <p className="text-[13px] font-medium text-[var(--ink)]">Assign a People Leader</p>
+          <p className="mt-1 secondary-text">
+            Scopes an existing teammate to one manager&apos;s reporting subtree only -- never company-wide, never another manager&apos;s team.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <select
+              value={peopleLeaderUserId}
+              onChange={(event) => setPeopleLeaderUserId(event.target.value)}
+              className="admin-input h-9 w-auto shrink-0"
+              aria-label="Teammate to assign as People Leader"
+            >
+              <option value="">Choose a teammate</option>
+              {team
+                .filter((member) => member.status === "active")
+                .map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.name || member.email}
+                  </option>
+                ))}
+            </select>
+            <input
+              value={peopleLeaderEmail}
+              onChange={(event) => setPeopleLeaderEmail(event.target.value)}
+              placeholder="manager@company.com (subtree root)"
+              aria-label="Employee email whose reporting subtree this teammate is scoped to"
+              className="admin-input h-9 min-w-0 flex-1"
+            />
+            <button
+              onClick={assignPeopleLeader}
+              disabled={assigningLeader || !peopleLeaderUserId || !peopleLeaderEmail.trim()}
+              className="btn-secondary h-9 shrink-0"
+            >
+              {assigningLeader ? "Assigning..." : "Assign"}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <p className="mt-5 meta-label">What will they see?</p>
       <div className="mt-2 overflow-x-auto rounded-[var(--radius-card)] border border-[var(--border)]">
         <table className="w-full text-left text-[13px]">
@@ -185,11 +249,18 @@ export function TeamPanel() {
               <td className="p-3">Full</td>
               <td className="p-3">—</td>
             </tr>
-            <tr className="text-[var(--ink-mid)]">
+            <tr className="border-b border-[var(--border)] text-[var(--ink-mid)] last:border-b-0">
               <td className="p-3 font-medium text-[var(--ink)]">Report Viewer</td>
               <td className="p-3">View only</td>
               <td className="p-3">—</td>
               <td className="p-3">View only</td>
+              <td className="p-3">—</td>
+            </tr>
+            <tr className="text-[var(--ink-mid)]">
+              <td className="p-3 font-medium text-[var(--ink)]">People Leader</td>
+              <td className="p-3">—</td>
+              <td className="p-3">—</td>
+              <td className="p-3">Own subtree only</td>
               <td className="p-3">—</td>
             </tr>
           </tbody>

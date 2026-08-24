@@ -5,6 +5,7 @@ import {
   ProtectedReport,
   ProtectedTextReport,
   ProtectedOptionReport,
+  ProtectedEnpsReport,
   QuestionBankItem,
   QuestionBankQuestionType,
   QuestionOption,
@@ -25,6 +26,61 @@ function normalizeQuestionText(text: string): string {
 
 function scaleMaxForQuestionType(type: QuestionType): 5 | 10 {
   return type === "enps_0_10" ? 10 : 5;
+}
+
+/**
+ * Complementary suppression against differencing attacks: a viewer who
+ * can see the org total plus every sibling group's report except one
+ * could back-calculate the suppressed group's exact average by
+ * subtraction. If exactly one group in this set would be the lone
+ * suppressed remainder, an additional (smallest-n) releasable group is
+ * bundled into suppression too, so at least two groups' worth of data
+ * stay ambiguous together. Pure function -- shared by
+ * getDepartmentReleasability (one key = one department label) and
+ * getManagerSubtreeProtectedReport (one key = one manager's whole
+ * subtree, its count already summed across that subtree's team labels).
+ */
+function computeReleasability(counts: Array<{ key: string; n: number }>, minGroupSize: number): Map<string, { n: number; releasable: boolean }> {
+  const belowThreshold = counts.filter((row) => row.n < minGroupSize);
+  const releasable = counts.filter((row) => row.n >= minGroupSize);
+
+  const additionallySuppressed = new Set<string>();
+  if (belowThreshold.length === 1 && releasable.length >= 1) {
+    const smallest = releasable.reduce((min, row) => (row.n < min.n ? row : min));
+    additionallySuppressed.add(smallest.key);
+  }
+
+  const result = new Map<string, { n: number; releasable: boolean }>();
+  for (const row of counts) {
+    const naturallyBelow = row.n < minGroupSize;
+    result.set(row.key, { n: row.n, releasable: !naturallyBelow && !additionallySuppressed.has(row.key) });
+  }
+  return result;
+}
+
+/** Groups raw open-text answer rows (one row per answer) into one entry
+ * per question -- shared by getProtectedOpenTextReport's org and
+ * department-scoped branches, which differ only in which SQL function and
+ * which releasability check feed it. */
+function groupOpenTextRows(
+  rows: Array<{ question_id: string; question_text: string; construct?: string | null; n: number; text_value: string | null }>,
+): Array<{ questionId: string; label: string; construct: string | null; n: number; answers: string[] }> {
+  const byQuestion = new Map<string, { label: string; construct: string | null; n: number; answers: string[] }>();
+  for (const row of rows) {
+    let entry = byQuestion.get(row.question_id);
+    if (!entry) {
+      entry = { label: row.question_text, construct: row.construct ?? null, n: row.n, answers: [] };
+      byQuestion.set(row.question_id, entry);
+    }
+    if (row.text_value) entry.answers.push(row.text_value);
+  }
+  return Array.from(byQuestion.entries()).map(([questionId, entry]) => ({
+    questionId,
+    label: entry.label,
+    construct: entry.construct,
+    n: entry.n,
+    answers: entry.answers,
+  }));
 }
 
 const orgScope: ReportScope = { type: "org" };
@@ -196,12 +252,7 @@ export class ResponseRepository {
     scope: ReportScope = orgScope,
   ): Promise<ProtectedReport> {
     if (scope.type === "team") {
-      // manager_email is unverified free text with no hierarchy table --
-      // building a k-anonymity-gated view on top of it risks the same
-      // "team" being sliced differently across cycles as values drift.
-      // Fails loudly rather than silently degrading; ship department scope
-      // (backed by the validated, snapshotted segment_team) first.
-      throw new Error(`Report scope "team" is not implemented -- see department scope.`);
+      return this.getManagerSubtreeProtectedReport(tenantId, cycleId, minGroupSize, scope);
     }
 
     if (scope.type === "department") {
@@ -247,13 +298,33 @@ export class ResponseRepository {
    * the UI layer (a persistent content-note banner), not something this
    * repository should silently do to what someone actually wrote.
    *
-   * v1 scope: org-only, no department-scoped text -- text is more
-   * identifying than numbers, so department-slicing it would compound the
-   * differencing-attack risk getDepartmentReleasability exists to guard
-   * against. Deliberate non-goal, not an oversight.
+   * Optional department scope reuses getDepartmentReleasability -- the
+   * exact same complementary-suppression check department-scoped numeric
+   * reports use -- at the stricter text threshold, before ever calling
+   * report_open_text_answers_by_department (0043). A department that isn't
+   * releasable (naturally below threshold, or additionally suppressed to
+   * protect a sibling department from a differencing attack) always looks
+   * identical, same as getDepartmentProtectedReport's numeric counterpart.
    */
-  async getProtectedOpenTextReport(tenantId: string, cycleId: string, minGroupSize = 5): Promise<ProtectedTextReport> {
+  async getProtectedOpenTextReport(tenantId: string, cycleId: string, minGroupSize = 5, department?: string): Promise<ProtectedTextReport> {
     const minTextGroupSize = minGroupSize + 3;
+
+    if (department) {
+      const releasability = await this.getDepartmentReleasability(tenantId, cycleId, minTextGroupSize);
+      const entry = releasability.get(department);
+      if (!entry || !entry.releasable) return { protected: true, n: 0, rows: [] };
+
+      const deptResult = await this.db.query<{ question_id: string; question_text: string; construct: string | null; n: number; text_value: string | null }>(
+        `select r.question_id, q.question_text, q.construct, r.n, r.text_value
+         from responses.report_open_text_answers_by_department($1, $2, $3) r
+         join responses.survey_cycles c on c.id = $1
+         join responses.template_questions q on q.id = r.question_id
+         where c.tenant_id = $4
+           and r.protected = false`,
+        [cycleId, department, minTextGroupSize, tenantId],
+      );
+      return { protected: false, n: entry.n, rows: groupOpenTextRows(deptResult.rows) };
+    }
 
     const countResult = await this.db.query<{ n: string }>(
       "select count(*)::text as n from responses.submissions where tenant_id = $1 and cycle_id = $2",
@@ -262,8 +333,8 @@ export class ResponseRepository {
     const n = Number(countResult.rows[0]?.n ?? 0);
     if (n < minTextGroupSize) return { protected: true, n, rows: [] };
 
-    const result = await this.db.query<{ question_id: string; question_text: string; n: number; text_value: string | null }>(
-      `select r.question_id, q.question_text, r.n, r.text_value
+    const result = await this.db.query<{ question_id: string; question_text: string; construct: string | null; n: number; text_value: string | null }>(
+      `select r.question_id, q.question_text, q.construct, r.n, r.text_value
        from responses.report_open_text_answers($1, $2) r
        join responses.survey_cycles c on c.id = $1
        join responses.template_questions q on q.id = r.question_id
@@ -272,26 +343,7 @@ export class ResponseRepository {
       [cycleId, minTextGroupSize, tenantId],
     );
 
-    const byQuestion = new Map<string, { label: string; n: number; answers: string[] }>();
-    for (const row of result.rows) {
-      let entry = byQuestion.get(row.question_id);
-      if (!entry) {
-        entry = { label: row.question_text, n: row.n, answers: [] };
-        byQuestion.set(row.question_id, entry);
-      }
-      if (row.text_value) entry.answers.push(row.text_value);
-    }
-
-    return {
-      protected: false,
-      n,
-      rows: Array.from(byQuestion.entries()).map(([questionId, entry]) => ({
-        questionId,
-        label: entry.label,
-        n: entry.n,
-        answers: entry.answers,
-      })),
-    };
+    return { protected: false, n, rows: groupOpenTextRows(result.rows) };
   }
 
   /**
@@ -352,6 +404,76 @@ export class ResponseRepository {
   }
 
   /**
+   * eNPS promoter(9-10)/passive(7-8)/detractor(0-6) breakdown for
+   * enps_0_10 questions -- see responses.report_enps_buckets (0042) and
+   * ProtectedEnpsReport's doc comment for why a question is included only
+   * when all three buckets independently clear minGroupSize, never
+   * partially. Org-scoped only in v1, same non-goal reasoning as open text
+   * (a department-sliced bucket count compounds the differencing-attack
+   * surface department scope already has to guard against).
+   */
+  async getProtectedEnpsReport(tenantId: string, cycleId: string, minGroupSize = 5): Promise<ProtectedEnpsReport> {
+    const countResult = await this.db.query<{ n: string }>(
+      "select count(*)::text as n from responses.submissions where tenant_id = $1 and cycle_id = $2",
+      [tenantId, cycleId],
+    );
+    const n = Number(countResult.rows[0]?.n ?? 0);
+    if (n < minGroupSize) return { protected: true, n, rows: [] };
+
+    const result = await this.db.query<{
+      question_id: string;
+      question_text: string;
+      bucket: "promoter" | "passive" | "detractor";
+      n: number;
+    }>(
+      `select r.question_id, q.question_text, r.bucket, r.n
+       from responses.report_enps_buckets($1, $2) r
+       join responses.survey_cycles c on c.id = $1
+       join responses.template_questions q on q.id = r.question_id
+       where c.tenant_id = $3
+         and q.question_type = 'enps_0_10'
+         and r.protected = false`,
+      [cycleId, minGroupSize, tenantId],
+    );
+
+    const byQuestion = new Map<string, { label: string; buckets: Partial<Record<"promoter" | "passive" | "detractor", number>> }>();
+    for (const row of result.rows) {
+      let entry = byQuestion.get(row.question_id);
+      if (!entry) {
+        entry = { label: row.question_text, buckets: {} };
+        byQuestion.set(row.question_id, entry);
+      }
+      entry.buckets[row.bucket] = row.n;
+    }
+
+    const rows: Extract<ProtectedEnpsReport, { protected: false }>["rows"] = [];
+    for (const [questionId, entry] of byQuestion.entries()) {
+      const { promoter, passive, detractor } = entry.buckets;
+      // All three buckets must have independently cleared the threshold --
+      // a partial breakdown (e.g. promoter + passive released, detractor
+      // missing) would let the missing bucket be back-calculated from the
+      // question's own already-known total. Drop the whole question rather
+      // than reveal two of three.
+      if (promoter === undefined || passive === undefined || detractor === undefined) continue;
+      const questionN = promoter + passive + detractor;
+      const promoterPct = (promoter / questionN) * 100;
+      const passivePct = (passive / questionN) * 100;
+      const detractorPct = (detractor / questionN) * 100;
+      rows.push({
+        questionId,
+        label: entry.label,
+        n: questionN,
+        promoterPct,
+        passivePct,
+        detractorPct,
+        score: promoterPct - detractorPct,
+      });
+    }
+
+    return { protected: false, n, rows };
+  }
+
+  /**
    * Complementary suppression against differencing attacks: a viewer who
    * can see the org total plus every department's report except one could
    * back-calculate the suppressed department's exact average by
@@ -375,22 +497,73 @@ export class ResponseRepository {
       [tenantId, cycleId],
     );
 
-    const counts = countsResult.rows.map((row) => ({ department: row.segment_team, n: Number(row.n) }));
-    const belowThreshold = counts.filter((row) => row.n < minGroupSize);
-    const releasable = counts.filter((row) => row.n >= minGroupSize);
+    return computeReleasability(countsResult.rows.map((row) => ({ key: row.segment_team, n: Number(row.n) })), minGroupSize);
+  }
 
-    const additionallySuppressed = new Set<string>();
-    if (belowThreshold.length === 1 && releasable.length >= 1) {
-      const smallest = releasable.reduce((min, row) => (row.n < min.n ? row : min));
-      additionallySuppressed.add(smallest.department);
+  /**
+   * People Leader / manager-subtree scope -- see ReportScope's "team"
+   * variant doc comment for how scope.teamLabels/siblingSubtrees are
+   * resolved (identity-side, by the caller) before reaching here. Applies
+   * the same complementary-suppression math getDepartmentReleasability
+   * uses (see computeReleasability), generalized from single department
+   * labels to whole sibling subtrees: if the root manager's subtree would
+   * be the lone suppressed remainder among its siblings, an additional
+   * (smallest-n) releasable sibling subtree is bundled into suppression
+   * too, so at least two subtrees' worth of data stay ambiguous together --
+   * exactly the guard the original (removed) manager-rollup feature
+   * lacked. v1 scope: no auto-climb to a wider ancestor subtree when the
+   * root's own subtree isn't releasable -- same "suppressed, try again
+   * once there's more data" UX department scope already has, not a richer
+   * fallback chain.
+   */
+  private async getManagerSubtreeProtectedReport(
+    tenantId: string,
+    cycleId: string,
+    minGroupSize: number,
+    scope: Extract<ReportScope, { type: "team" }>,
+  ): Promise<ProtectedReport> {
+    const counts: Array<{ key: string; n: number }> = [];
+    for (const sibling of scope.siblingSubtrees) {
+      if (sibling.teamLabels.length === 0) {
+        counts.push({ key: sibling.managerId, n: 0 });
+        continue;
+      }
+      const result = await this.db.query<{ n: string }>(
+        `select count(*)::text as n from responses.submissions where tenant_id = $1 and cycle_id = $2 and segment_team = any($3)`,
+        [tenantId, cycleId, sibling.teamLabels],
+      );
+      counts.push({ key: sibling.managerId, n: Number(result.rows[0]?.n ?? 0) });
     }
 
-    const result = new Map<string, { n: number; releasable: boolean }>();
-    for (const row of counts) {
-      const naturallyBelow = row.n < minGroupSize;
-      result.set(row.department, { n: row.n, releasable: !naturallyBelow && !additionallySuppressed.has(row.department) });
-    }
-    return result;
+    const releasability = computeReleasability(counts, minGroupSize);
+    const entry = releasability.get(scope.rootManagerId);
+
+    // Deliberately never returns the real n here, same reasoning as
+    // getDepartmentProtectedReport -- a suppressed subtree must look
+    // identical whether naturally below threshold, additionally
+    // suppressed to protect a sibling subtree, or genuinely empty.
+    if (!entry || !entry.releasable || scope.teamLabels.length === 0) return { protected: true, n: 0, rows: [] };
+
+    const result = await this.db.query<{ question_id: string; question_text: string; construct: string | null; n: number; average: string | null }>(
+      `select r.question_id, q.question_text, q.construct, r.n, r.average
+       from responses.report_question_scores_by_departments($1, $2, $3) r
+       join responses.survey_cycles c on c.id = $1
+       join responses.template_questions q on q.id = r.question_id
+       where c.tenant_id = $4
+         and r.protected = false`,
+      [cycleId, scope.teamLabels, minGroupSize, tenantId],
+    );
+    return {
+      protected: false,
+      n: entry.n,
+      rows: result.rows.map((row) => ({
+        questionId: row.question_id,
+        label: row.question_text,
+        construct: row.construct,
+        n: row.n,
+        average: row.average === null ? null : Number(row.average),
+      })),
+    };
   }
 
   // SUPPRESSION ASSUMPTION -- see getProtectedReportForTenant above before

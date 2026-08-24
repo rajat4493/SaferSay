@@ -26,6 +26,13 @@ export async function GET(request: NextRequest) {
       { status: 403 },
     );
   }
+  // The full department picker isn't relevant to a People Leader -- their
+  // report scope is fixed to their own assigned subtree (see /api/report's
+  // team-scope enforcement), and listing every org department here would
+  // reveal org structure beyond that subtree.
+  if (session.role === "people_leader") {
+    return NextResponse.json({ ok: true, departments: [] });
+  }
 
   const cycleId = request.nextUrl.searchParams.get("cycleId");
   if (!cycleId) {

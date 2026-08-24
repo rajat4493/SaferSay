@@ -8,7 +8,7 @@ import { resolveTenantFromApiKey } from "@/lib/server/apiKeyAuth";
 import { canViewSurveyResults } from "@/lib/permissions";
 import { renderReportPdf } from "@/lib/server/reportPdf";
 import { logReportExported } from "@/lib/server/auditLog";
-import type { ProtectedReport } from "@/lib/server/repositories/types";
+import type { ProtectedReport, UserRole } from "@/lib/server/repositories/types";
 
 /**
  * Read-only report export for external tools (PowerBI/Tableau, a
@@ -21,7 +21,7 @@ import type { ProtectedReport } from "@/lib/server/repositories/types";
  */
 async function resolveTenantId(
   request: NextRequest,
-): Promise<{ tenantId: string; actorRole: "customer_admin" | "survey_creator" | "auditor" | "employee"; actorId: string } | null> {
+): Promise<{ tenantId: string; actorRole: UserRole; actorId: string } | null> {
   const apiKeyTenantId = await resolveTenantFromApiKey(request);
   if (apiKeyTenantId) return { tenantId: apiKeyTenantId, actorRole: "customer_admin", actorId: "api-key-integration" };
 
@@ -29,6 +29,12 @@ async function resolveTenantId(
   if (!session) return null;
   if (!canViewSurveyResults(session.role)) return null;
   if (isPlatformOwnerImpersonating(session)) return null;
+  // Export has no department/team scope param -- it only ever pulls the
+  // org-wide report. A People Leader is scoped to their own subtree only
+  // (see /api/report's team-scope enforcement); rather than teach this
+  // route a scope it doesn't otherwise support, export is simply not
+  // available to this role yet.
+  if (session.role === "people_leader") return null;
   return { tenantId: session.tenant.id, actorRole: session.role, actorId: session.email };
 }
 
