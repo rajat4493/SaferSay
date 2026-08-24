@@ -6,6 +6,9 @@ import { canManageTeam } from "@/lib/permissions";
 import { logTeamInviteSent } from "@/lib/server/auditLog";
 import type { TeamRole } from "@/lib/server/repositories/types";
 
+// people_leader deliberately excluded -- it needs a real
+// identity.employees row to scope to, which this generic invite flow has
+// no way to collect. See IdentityRepository.setPeopleLeaderAssignment.
 const teamRoles: TeamRole[] = ["customer_admin", "survey_creator", "auditor"];
 
 export async function POST(request: NextRequest) {

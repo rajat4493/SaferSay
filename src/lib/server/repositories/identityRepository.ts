@@ -52,7 +52,7 @@ export class IdentityRepository {
 
   async findUserByAuthSubject(authProvider: string, providerSubject: string): Promise<UserRecord | null> {
     const result = await this.db.query<UserRow>(
-      `select id, tenant_id, auth_provider, provider_subject, email, name, role
+      `select id, tenant_id, auth_provider, provider_subject, email, name, role, people_leader_root_employee_id
        from identity.users
        where auth_provider = $1 and provider_subject = $2`,
       [authProvider, providerSubject],
@@ -62,7 +62,7 @@ export class IdentityRepository {
 
   async findUserByEmail(email: string): Promise<UserRecord | null> {
     const result = await this.db.query<UserRow>(
-      `select id, tenant_id, auth_provider, provider_subject, email, name, role
+      `select id, tenant_id, auth_provider, provider_subject, email, name, role, people_leader_root_employee_id
        from identity.users
        where email = $1`,
       [email],
@@ -82,10 +82,30 @@ export class IdentityRepository {
     const result = await this.db.query<UserRow>(
       `insert into identity.users (id, tenant_id, auth_provider, provider_subject, email, name, role)
        values ($1, $2, $3, $4, $5, $6, $7)
-       returning id, tenant_id, auth_provider, provider_subject, email, name, role`,
+       returning id, tenant_id, auth_provider, provider_subject, email, name, role, people_leader_root_employee_id`,
       [id, input.tenantId, input.authProvider, input.providerSubject, input.email, input.name, input.role],
     );
     return mapUserRow(result.rows[0]);
+  }
+
+  /**
+   * Assigns (or reassigns) an existing team member as a People Leader
+   * scoped to one manager's reporting subtree, in a single action --
+   * deliberately not exposed through the generic team-invite flow (see
+   * /api/tenants/team/invite's teamRoles allowlist), since it needs a real
+   * identity.employees row to scope to, not just a role string. A
+   * people_leader with no rootEmployeeId (or one being reassigned away
+   * from the role) sees nothing -- see /api/report's server-side
+   * enforcement, never a client-trusted scope.
+   */
+  async setPeopleLeaderAssignment(tenantId: string, userId: string, rootEmployeeId: string | null): Promise<void> {
+    const result = await this.db.query(
+      `update identity.users
+       set role = 'people_leader', people_leader_root_employee_id = $3
+       where id = $1 and tenant_id = $2`,
+      [userId, tenantId, rootEmployeeId],
+    );
+    if (result.rowCount !== 1) throw new Error("User not found.");
   }
 
   async linkAuthSubject(userId: string, authProvider: string, providerSubject: string) {
@@ -1286,6 +1306,14 @@ export class IdentityRepository {
     return result.rows.length === 1 ? result.rows[0].manager_id : null;
   }
 
+  /** Resolves an employee's identity.employees.id from their email --
+   * used by the People Leader assignment action so an admin can type an
+   * email rather than needing a raw employee id. */
+  async findEmployeeIdByEmail(tenantId: string, email: string): Promise<string | null> {
+    const result = await this.db.query<{ id: string }>(`select id from identity.employees where tenant_id = $1 and email = $2`, [tenantId, email]);
+    return result.rows[0]?.id ?? null;
+  }
+
   async getEmployeeManagerId(tenantId: string, employeeId: string): Promise<string | null> {
     const result = await this.db.query<{ manager_id: string | null }>(`select manager_id from identity.employees where tenant_id = $1 and id = $2`, [
       tenantId,
@@ -1772,6 +1800,7 @@ type UserRow = {
   email: string;
   name: string | null;
   role: UserRole;
+  people_leader_root_employee_id: string | null;
 };
 
 function mapUserRow(row: UserRow): UserRecord {
@@ -1783,6 +1812,7 @@ function mapUserRow(row: UserRow): UserRecord {
     email: row.email,
     name: row.name,
     role: row.role,
+    peopleLeaderRootEmployeeId: row.people_leader_root_employee_id,
   };
 }
 

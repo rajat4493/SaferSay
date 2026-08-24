@@ -115,11 +115,9 @@ describeIfDb("Postgres department-scoped protected report", () => {
     const orgReport = await response.getProtectedReportForTenant(tenant.id, cycle.cycleId, 5);
     expect(orgReport.protected).toBe(false);
     expect(orgReport.n).toBe(16);
-
-    // team scope still explicitly unimplemented.
-    await expect(
-      response.getProtectedReportForTenant(tenant.id, cycle.cycleId, 5, { type: "team", managerEmail: "m@x.com" }),
-    ).rejects.toThrow(/not implemented/i);
+    // team scope (People Leader) has its own dedicated live e2e coverage --
+    // see managerHierarchyLive.e2e.test.ts, which builds a real manager_id
+    // hierarchy this test's tenant doesn't have.
   }, 30_000);
 });
 

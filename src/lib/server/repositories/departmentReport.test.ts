@@ -126,12 +126,6 @@ describe("department-scoped protected report", () => {
     expect(report).toEqual({ protected: true, n: 0, rows: [] });
   });
 
-  it("still throws for team scope (manager_email is not implemented)", async () => {
-    const db = fakeDb({ counts: [] });
-    await expect(
-      new ResponseRepository(db).getProtectedReportForTenant(tenantId, cycleId, 5, { type: "team", managerEmail: "m@x.com" }),
-    ).rejects.toThrow(/not implemented/i);
-  });
 });
 
 describe("listDepartmentsForCycle", () => {

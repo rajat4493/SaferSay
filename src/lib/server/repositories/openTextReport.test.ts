@@ -17,6 +17,18 @@ function fakeDb(handlers: { count: string; textRows: unknown[] }): Queryable {
   };
 }
 
+/** Same routing idea, but for the department-scoped branch -- also needs
+ * getDepartmentReleasability's own segment_team-grouped count query. */
+function fakeDepartmentDb(handlers: { counts: unknown[]; textRows?: unknown[] }): Queryable {
+  return {
+    query: (async (sql: string) => {
+      if (sql.includes("group by segment_team")) return { rows: handlers.counts };
+      if (sql.includes("responses.report_open_text_answers_by_department")) return { rows: handlers.textRows ?? [] };
+      throw new Error(`Unexpected query in test: ${sql}`);
+    }) as Queryable["query"],
+  };
+}
+
 const tenantId = "tenant-1";
 const cycleId = "cycle-1";
 
@@ -44,8 +56,8 @@ describe("getProtectedOpenTextReport", () => {
     if (report.protected) throw new Error("unreachable");
     expect(report.n).toBe(8);
     expect(report.rows).toEqual([
-      { questionId: "q1", label: "What would help?", n: 8, answers: ["More clarity on priorities", "Faster decisions"] },
-      { questionId: "q2", label: "Anything else?", n: 8, answers: ["No"] },
+      { questionId: "q1", label: "What would help?", construct: null, n: 8, answers: ["More clarity on priorities", "Faster decisions"] },
+      { questionId: "q2", label: "Anything else?", construct: null, n: 8, answers: ["No"] },
     ]);
   });
 
@@ -57,5 +69,51 @@ describe("getProtectedOpenTextReport", () => {
     const report = await new ResponseRepository(db).getProtectedOpenTextReport(tenantId, cycleId, 5);
     if (report.protected) throw new Error("unreachable");
     expect(report.rows[0].answers[0]).toBe("This is absolutely ridiculous and unacceptable");
+  });
+
+  describe("department scope", () => {
+    it("suppresses a department below the (stricter, minGroupSize+3) text threshold, without revealing its real n", async () => {
+      const db = fakeDepartmentDb({
+        counts: [
+          { segment_team: "engineering", n: "6" }, // clears numeric min_n=5 but not text's 8
+          { segment_team: "sales", n: "20" },
+        ],
+      });
+      const report = await new ResponseRepository(db).getProtectedOpenTextReport(tenantId, cycleId, 5, "engineering");
+      expect(report).toEqual({ protected: true, n: 0, rows: [] });
+    });
+
+    it("applies the same complementary-suppression check department-scoped numeric reports use", async () => {
+      // Only "support" is naturally below the text threshold (8). Releasing
+      // both other departments' comments alongside the org total would let
+      // "support"'s comments be inferred by elimination -- so the
+      // smallest-n releasable department must also be suppressed here too,
+      // exactly like getDepartmentReleasability's numeric-report guard.
+      const db = fakeDepartmentDb({
+        counts: [
+          { segment_team: "engineering", n: "9" },
+          { segment_team: "sales", n: "20" },
+          { segment_team: "support", n: "2" },
+        ],
+      });
+      const repo = new ResponseRepository(db);
+
+      const engineeringReport = await repo.getProtectedOpenTextReport(tenantId, cycleId, 5, "engineering");
+      expect(engineeringReport).toEqual({ protected: true, n: 0, rows: [] });
+
+      const salesReport = await repo.getProtectedOpenTextReport(tenantId, cycleId, 5, "sales");
+      expect(salesReport.protected).toBe(false);
+    });
+
+    it("returns real, construct-tagged comments for a releasable department", async () => {
+      const db = fakeDepartmentDb({
+        counts: [{ segment_team: "engineering", n: "9" }],
+        textRows: [{ question_id: "q1", question_text: "What would help?", construct: "Support", n: 9, text_value: "More 1:1 time" }],
+      });
+      const report = await new ResponseRepository(db).getProtectedOpenTextReport(tenantId, cycleId, 5, "engineering");
+      expect(report.protected).toBe(false);
+      if (report.protected) throw new Error("unreachable");
+      expect(report.rows).toEqual([{ questionId: "q1", label: "What would help?", construct: "Support", n: 9, answers: ["More 1:1 time"] }]);
+    });
   });
 });

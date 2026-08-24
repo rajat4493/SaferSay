@@ -6,7 +6,7 @@ export type TenantRecord = {
   slug: string;
 };
 
-export type UserRole = "customer_admin" | "survey_creator" | "auditor" | "employee";
+export type UserRole = "customer_admin" | "survey_creator" | "auditor" | "employee" | "people_leader";
 
 export type UserRecord = {
   id: string;
@@ -16,6 +16,13 @@ export type UserRecord = {
   email: string;
   name: string | null;
   role: UserRole;
+  // Only meaningful for role === "people_leader": the identity.employees
+  // row whose reporting subtree this user is scoped to. Never set (or
+  // read) for any other role -- see getProtectedReportForTenant's team
+  // scope and /api/report's server-side enforcement that a people_leader
+  // can only ever request their own assigned subtree, never org-wide or
+  // another manager's.
+  peopleLeaderRootEmployeeId: string | null;
 };
 
 export type OnboardingEventKey = "signup" | "employees" | "cycle" | "tokens" | "outbox" | "queue" | "responses" | "report";
@@ -306,13 +313,6 @@ export type RespondentSurveySession = {
   questions: RespondentSurveyQuestion[];
 };
 
-/**
- * Reporting scope: what slice of the org a report is aggregated over.
- * v1 only ever passes { type: "org" } -- Department/Team scoping is
- * deferred to v1.1+ (see docs/strategy/SAFERSAY_FINAL_ARCHITECTURE.md
- * §4). The parameter exists now so adding those scopes later is a query
- * change, not a reporting-layer rewrite.
- */
 export type QuestionBankQuestionType = "scale" | "open_text" | "multiple_choice" | "ranking" | "matrix";
 
 export type QuestionBankItem = {
@@ -327,10 +327,33 @@ export type QuestionBankItem = {
   options: QuestionOption[] | null;
 };
 
+/**
+ * Reporting scope: what slice of the org a report is aggregated over.
+ *
+ * "team" scopes to one manager's full reporting subtree (a People
+ * Leader's assigned scope -- see permissions.ts). ResponseRepository
+ * never resolves manager hierarchy itself (that stays identity-side, see
+ * IdentityRepository.getSubtreeTeamLabels/getSiblingManagerIds) -- the
+ * caller (the /api/report route, for the people_leader role only) resolves
+ * rootManagerId to its own subtree's team labels, plus every SIBLING
+ * subtree's team labels at the same level (same parent manager, including
+ * the root's own subtree), and passes the resolved sets in. This is what
+ * lets getProtectedReportForTenant run a generalized complementary-
+ * suppression check across sibling subtrees (see getManagerSubtreeReport)
+ * -- the same differencing-attack guard department scope already has
+ * (getDepartmentReleasability), one level up: if a viewer could see every
+ * sibling subtree's report except one, they could back-calculate the
+ * missing one by subtraction from the parent's own total.
+ */
 export type ReportScope =
   | { type: "org" }
   | { type: "department"; department: string }
-  | { type: "team"; managerEmail: string };
+  | {
+      type: "team";
+      rootManagerId: string;
+      teamLabels: string[];
+      siblingSubtrees: Array<{ managerId: string; teamLabels: string[] }>;
+    };
 
 export type ProtectedReport =
   | { protected: true; n: number; rows: [] }
@@ -353,7 +376,7 @@ export type ProtectedTextReport =
   | {
       protected: false;
       n: number;
-      rows: Array<{ questionId: string; label?: string; n: number; answers: string[] }>;
+      rows: Array<{ questionId: string; label?: string; construct?: string | null; n: number; answers: string[] }>;
     };
 
 /**
@@ -400,5 +423,33 @@ export type ProtectedOptionReport =
         questionId: string;
         label?: string;
         options: Array<{ optionKey: string; n: number; avgRank: number | null }>;
+      }>;
+    };
+
+/**
+ * eNPS classification (promoter 9-10 / passive 7-8 / detractor 0-6) for
+ * enps_0_10 questions -- see responses.report_enps_buckets (0042). A
+ * question only appears here when ALL THREE buckets independently clear
+ * min_group_size; if even one bucket is too small, the whole question is
+ * omitted rather than partially shown, because releasing two of three
+ * bucket counts alongside the question's already-public total n would let
+ * the third (suppressed) bucket be back-calculated by subtraction -- the
+ * same differencing-attack shape getDepartmentReleasability guards
+ * against, one level down. `score` is the standard NPS formula:
+ * promoterPct - detractorPct, on a -100..100 scale.
+ */
+export type ProtectedEnpsReport =
+  | { protected: true; n: number; rows: [] }
+  | {
+      protected: false;
+      n: number;
+      rows: Array<{
+        questionId: string;
+        label?: string;
+        n: number;
+        promoterPct: number;
+        passivePct: number;
+        detractorPct: number;
+        score: number;
       }>;
     };

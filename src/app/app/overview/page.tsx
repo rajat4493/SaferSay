@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AppShell, Card } from "@/components/AppShell";
+import { groupByConstruct } from "@/lib/reportThemes";
 
-type ReportRow = { questionId: string; label?: string; construct?: string | null; n: number; average: number | null };
+type ReportRow = { questionId: string; label?: string; construct?: string | null; n: number; average: number | null; scaleMax?: 5 | 10 };
 type ReportResponse = {
   ok?: boolean;
   cycle?: { id: string; name: string; minGroupSize: number } | null;
@@ -52,17 +53,7 @@ export default function OverviewPage() {
   const strengths = [...scored].sort((a, b) => b.average - a.average).slice(0, 3);
   const priorities = [...scored].sort((a, b) => a.average - b.average).slice(0, 3);
 
-  const byConstruct = new Map<string, { total: number; count: number }>();
-  for (const row of scored) {
-    const key = row.construct?.trim() || "Other";
-    const entry = byConstruct.get(key) ?? { total: 0, count: 0 };
-    entry.total += row.average;
-    entry.count += 1;
-    byConstruct.set(key, entry);
-  }
-  const heatmap = Array.from(byConstruct.entries())
-    .map(([construct, { total, count }]) => ({ construct, average: total / count, questionCount: count }))
-    .sort((a, b) => b.average - a.average);
+  const heatmap = groupByConstruct(rows).map((group) => ({ construct: group.construct, average: group.average10, questionCount: group.questionCount }));
 
   const latestOpenOrRecent = cycles?.find((c) => c.status === "open") ?? cycles?.[0] ?? null;
   const responseRate =

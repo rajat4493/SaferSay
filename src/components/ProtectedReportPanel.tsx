@@ -27,6 +27,11 @@ type ReportResponse = {
     n: number;
     rows: Array<{ questionId: string; label?: string; n: number; answers: string[] }>;
   };
+  enps?: {
+    protected: boolean;
+    n: number;
+    rows: Array<{ questionId: string; label?: string; n: number; promoterPct: number; passivePct: number; detractorPct: number; score: number }>;
+  };
 };
 
 // Score bars are black by default, red only for scores needing attention
@@ -193,6 +198,15 @@ export function ProtectedReportPanel({
   // shouldn't render an empty "What people said" card.
   const showTextSection = Boolean(textReport && (textReport.protected || textReport.rows.length > 0));
 
+  // eNPS is its own card, not folded into the generic 1-5 bar chart above --
+  // %promoters-%detractors is a -100..100 scale, meaningless on the same
+  // bar width as a Likert average. Only rendered when there's a real
+  // enps_0_10 question with a fully-releasable breakdown (see
+  // getProtectedEnpsReport -- a question with any suppressed bucket is
+  // simply absent from rows, not shown partially).
+  const enpsReport = result?.enps;
+  const showEnpsSection = Boolean(enpsReport && !enpsReport.protected && enpsReport.rows.length > 0);
+
   if (!loading && result?.notFound) {
     return (
       <ShellCard className="mt-[9px]">
@@ -288,6 +302,33 @@ export function ProtectedReportPanel({
           </div>
         )}
       </ShellCard>
+
+      {showEnpsSection && enpsReport ? (
+        <ShellCard className="mt-[9px]">
+          <h2 className="section-title">eNPS</h2>
+          <p className="mt-1 secondary-text">% promoters (9-10) minus % detractors (0-6). A -100 to 100 scale.</p>
+          <div className="mt-4 space-y-5">
+            {enpsReport.rows.map((row) => (
+              <div key={row.questionId}>
+                <div className="mb-2 flex justify-between gap-4 text-[13px] text-[var(--ink-mid)]">
+                  <span>{row.label ?? row.questionId}</span>
+                  <span className="font-semibold text-[var(--ink)]">{Math.round(row.score)}</span>
+                </div>
+                <div className="flex h-[8px] overflow-hidden rounded-[var(--radius-pill)] bg-[var(--bg-active)]">
+                  <div className="h-full bg-[var(--ink)]" style={{ width: `${row.promoterPct}%` }} title={`Promoters: ${row.promoterPct.toFixed(0)}%`} />
+                  <div className="h-full bg-[var(--ink-faint)]" style={{ width: `${row.passivePct}%` }} title={`Passives: ${row.passivePct.toFixed(0)}%`} />
+                  <div className="h-full bg-[var(--red)]" style={{ width: `${row.detractorPct}%` }} title={`Detractors: ${row.detractorPct.toFixed(0)}%`} />
+                </div>
+                <div className="mt-1 flex justify-between text-xs text-[var(--ink-faint)]">
+                  <span>{row.promoterPct.toFixed(0)}% promoters</span>
+                  <span>{row.passivePct.toFixed(0)}% passives</span>
+                  <span>{row.detractorPct.toFixed(0)}% detractors</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </ShellCard>
+      ) : null}
 
       {showTextSection && textReport ? (
         <ShellCard className="mt-[9px]">
