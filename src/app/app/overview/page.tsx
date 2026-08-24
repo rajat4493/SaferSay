@@ -2,10 +2,12 @@
 
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
+import { Circle, Flag, Info, ThumbsUp, TrendingDown, TrendingUp } from "lucide-react";
 import { AppShell, Card } from "@/components/AppShell";
 import { RingStat } from "@/components/RingStat";
 import { Sparkline } from "@/components/Sparkline";
 import { groupByConstruct, overallAverage10 } from "@/lib/reportThemes";
+import { getScoreTier } from "@/lib/scoreTier";
 import { titleCaseTeam } from "@/lib/textFormat";
 
 type ReportRow = { questionId: string; label?: string; construct?: string | null; n: number; average: number | null; scaleMax?: 5 | 10 };
@@ -22,12 +24,6 @@ type Cycle = { id: string; name: string; status: string; responseCount: number; 
 
 type TrendPoint = { cycleId: string; cycleName: string; cycleCreatedAt: string; n: number; average: number | null; protected: boolean; scaleMax?: 5 | 10 };
 type TrendResponse = { ok?: boolean; questions?: Array<{ questionText: string; points: TrendPoint[] }> };
-
-function scoreColor(average: number) {
-  if (average >= 7.5) return "var(--green)";
-  if (average >= 5.5) return "var(--warning)";
-  return "var(--red)";
-}
 
 /**
  * One overall-score-per-cycle series, derived client-side from the
@@ -63,10 +59,24 @@ function overallScoreByCycle(questions: Array<{ points: TrendPoint[] }>): Array<
     });
 }
 
+/** Small colored circular badge -- the reference dashboard's recurring
+ * icon-in-a-circle motif, reused for strengths/priorities/heatmap tiles.
+ * Deliberately generic (never a per-theme-name icon): construct names are
+ * open-ended and tenant-defined via the question bank, so there's no safe
+ * fixed name->icon mapping -- see the heatmap tile below. */
+function IconBadge({ icon: Icon, tier }: { icon: typeof ThumbsUp; tier: ReturnType<typeof getScoreTier> }) {
+  return (
+    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full" style={{ background: tier.bg }}>
+      <Icon size={14} strokeWidth={2} style={{ color: tier.text }} />
+    </span>
+  );
+}
+
 export default function OverviewPage() {
   const [report, setReport] = useState<ReportResponse | null>(null);
   const [employeeCount, setEmployeeCount] = useState<number | null>(null);
   const [cycles, setCycles] = useState<Cycle[] | null>(null);
+  const [selectedCycleId, setSelectedCycleId] = useState("");
   const [trend, setTrend] = useState<TrendResponse | null>(null);
   const [departments, setDepartments] = useState<string[]>([]);
   const [selectedDepartment, setSelectedDepartment] = useState("");
@@ -90,6 +100,7 @@ export default function OverviewPage() {
       setLoading(true);
     });
     const params = new URLSearchParams();
+    if (selectedCycleId) params.set("cycleId", selectedCycleId);
     if (selectedDepartment) params.set("department", selectedDepartment);
     const url = params.toString() ? `/api/report?${params.toString()}` : "/api/report";
     fetch(url)
@@ -107,7 +118,7 @@ export default function OverviewPage() {
         }
       })
       .catch(() => setLoading(false));
-  }, [selectedDepartment]);
+  }, [selectedCycleId, selectedDepartment]);
 
   if (loading && !report) {
     return (
@@ -128,6 +139,7 @@ export default function OverviewPage() {
   const priorities = [...scored].sort((a, b) => a.average10 - b.average10).slice(0, 3);
 
   const overallScore = overallAverage10(rows);
+  const overallTier = overallScore !== null ? getScoreTier(overallScore) : null;
   const themeGroups = groupByConstruct(rows);
 
   const enpsRow = report?.enps && !report.enps.protected ? report.enps.rows[0] : null;
@@ -139,6 +151,7 @@ export default function OverviewPage() {
   const overallByCycle = overallScoreByCycle(trend?.questions ?? []);
   const trendDelta =
     overallByCycle.length >= 2 ? overallByCycle[overallByCycle.length - 1].value - overallByCycle[overallByCycle.length - 2].value : null;
+  const trendTier = trendDelta !== null ? (trendDelta >= 0 ? getScoreTier(10) : getScoreTier(0)) : null;
 
   const isProtected = !report?.report || report.report.protected;
 
@@ -147,21 +160,32 @@ export default function OverviewPage() {
       title="Overview"
       subtitle="A company-wide read on how things stand."
       headerActions={
-        departments.length > 0 ? (
-          <select
-            value={selectedDepartment}
-            onChange={(event) => setSelectedDepartment(event.target.value)}
-            className="pill-select"
-            title="Team-level results still respect the anonymity threshold -- some views may not be available yet."
-          >
-            <option value="">All of {report?.tenant?.name ?? "Company"}</option>
-            {departments.map((department) => (
-              <option key={department} value={department}>
-                {titleCaseTeam(department)}
-              </option>
-            ))}
-          </select>
-        ) : null
+        <>
+          {cycles && cycles.length > 1 ? (
+            <select value={selectedCycleId} onChange={(event) => setSelectedCycleId(event.target.value)} className="pill-select">
+              {cycles.map((cycle) => (
+                <option key={cycle.id} value={cycle.id}>
+                  {cycle.name}
+                </option>
+              ))}
+            </select>
+          ) : null}
+          {departments.length > 0 ? (
+            <select
+              value={selectedDepartment}
+              onChange={(event) => setSelectedDepartment(event.target.value)}
+              className="pill-select"
+              title="Team-level results still respect the anonymity threshold -- some views may not be available yet."
+            >
+              <option value="">All of {report?.tenant?.name ?? "Company"}</option>
+              {departments.map((department) => (
+                <option key={department} value={department}>
+                  {titleCaseTeam(department)}
+                </option>
+              ))}
+            </select>
+          ) : null}
+        </>
       }
     >
       {isProtected ? (
@@ -175,9 +199,14 @@ export default function OverviewPage() {
       ) : (
         <>
           <div className="grid gap-3 md:grid-cols-4">
-            <Card>
-              <h2 className="section-title text-[15px]">Overall score</h2>
-              <p className="mt-2 text-[36px] font-semibold leading-none" style={{ color: overallScore !== null ? scoreColor(overallScore) : "var(--ink)" }}>
+            <Card className="border" style={overallTier ? { background: overallTier.bg, borderColor: overallTier.border } : undefined}>
+              <div className="flex items-center gap-1.5">
+                <h2 className="section-title text-[15px]">Overall score</h2>
+                <span title="Every scored question this cycle, normalized to a 0-10 scale and averaged.">
+                  <Info size={14} strokeWidth={1.8} className="text-[var(--ink-faint)]" />
+                </span>
+              </div>
+              <p className="mt-2 text-[36px] font-semibold leading-none" style={{ color: overallTier?.text ?? "var(--ink)" }}>
                 {overallScore !== null ? overallScore.toFixed(1) : "—"}
               </p>
               <p className="mt-1 secondary-text">out of 10</p>
@@ -210,15 +239,16 @@ export default function OverviewPage() {
               </p>
             </Card>
 
-            <Card>
+            <Card className="border" style={trendTier && overallByCycle.length >= 2 ? { background: trendTier.bg, borderColor: trendTier.border } : undefined}>
               <h2 className="section-title text-[15px]">Change vs last survey (company-wide)</h2>
               {overallByCycle.length >= 2 ? (
                 <>
-                  <p className="mt-2 text-[28px] font-semibold" style={{ color: (trendDelta ?? 0) >= 0 ? "var(--green)" : "var(--red)" }}>
+                  <p className="mt-2 flex items-center gap-1.5 text-[28px] font-semibold" style={{ color: trendTier?.text }}>
+                    {(trendDelta ?? 0) >= 0 ? <TrendingUp size={22} strokeWidth={2} /> : <TrendingDown size={22} strokeWidth={2} />}
                     {(trendDelta ?? 0) >= 0 ? "+" : ""}
                     {trendDelta!.toFixed(1)}
                   </p>
-                  <Sparkline points={overallByCycle.map((point) => point.value)} color="var(--ink-mid)" />
+                  <Sparkline points={overallByCycle.map((point) => point.value)} color={trendTier?.text} />
                 </>
               ) : (
                 <p className="mt-2 secondary-text">Needs a second survey cycle to show a trend.</p>
@@ -251,30 +281,38 @@ export default function OverviewPage() {
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             <Card>
               <h2 className="section-title text-[15px]">Top strengths</h2>
-              <ol className="mt-2 space-y-1.5">
-                {strengths.map((row) => (
-                  <li key={row.questionId} className="flex items-center justify-between gap-2 text-[13px]">
-                    <span className="min-w-0 truncate text-[var(--ink)]">{row.label}</span>
-                    <span className="font-semibold" style={{ color: scoreColor(row.average10) }}>
-                      {row.average10.toFixed(1)}
-                    </span>
-                  </li>
-                ))}
+              <ol className="mt-2.5 space-y-2">
+                {strengths.map((row) => {
+                  const tier = getScoreTier(row.average10);
+                  return (
+                    <li key={row.questionId} className="flex items-center gap-2.5 text-[13px]">
+                      <IconBadge icon={ThumbsUp} tier={tier} />
+                      <span className="min-w-0 flex-1 truncate text-[var(--ink)]">{row.label}</span>
+                      <span className="font-semibold" style={{ color: tier.text }}>
+                        {row.average10.toFixed(1)}
+                      </span>
+                    </li>
+                  );
+                })}
                 {strengths.length === 0 ? <li className="secondary-text">No data yet.</li> : null}
               </ol>
             </Card>
 
             <Card>
               <h2 className="section-title text-[15px]">Top priorities</h2>
-              <ol className="mt-2 space-y-1.5">
-                {priorities.map((row) => (
-                  <li key={row.questionId} className="flex items-center justify-between gap-2 text-[13px]">
-                    <span className="min-w-0 truncate text-[var(--ink)]">{row.label}</span>
-                    <span className="font-semibold" style={{ color: scoreColor(row.average10) }}>
-                      {row.average10.toFixed(1)}
-                    </span>
-                  </li>
-                ))}
+              <ol className="mt-2.5 space-y-2">
+                {priorities.map((row) => {
+                  const tier = getScoreTier(row.average10);
+                  return (
+                    <li key={row.questionId} className="flex items-center gap-2.5 text-[13px]">
+                      <IconBadge icon={Flag} tier={tier} />
+                      <span className="min-w-0 flex-1 truncate text-[var(--ink)]">{row.label}</span>
+                      <span className="font-semibold" style={{ color: tier.text }}>
+                        {row.average10.toFixed(1)}
+                      </span>
+                    </li>
+                  );
+                })}
                 {priorities.length === 0 ? <li className="secondary-text">No data yet.</li> : null}
               </ol>
             </Card>
@@ -286,27 +324,33 @@ export default function OverviewPage() {
         <Card className="mt-3">
           <h2 className="section-title text-[15px]">Theme heatmap</h2>
           <p className="mt-1 secondary-text">Each theme&apos;s score, and how it compares to this survey&apos;s own overall score.</p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
             {themeGroups.map((group) => {
               const delta = overallScore !== null ? group.average10 - overallScore : null;
+              const tier = getScoreTier(group.average10);
               return (
-                <div key={group.construct} className="rounded-[var(--radius-card)] border border-[var(--border)] p-3">
-                  <div className="flex items-center gap-1.5">
-                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: scoreColor(group.average10) }} aria-hidden="true" />
-                    <span className="text-[12px] font-medium uppercase tracking-[0.04em] text-[var(--ink-mid)]">{group.construct}</span>
+                <div
+                  key={group.construct}
+                  className="w-[168px] shrink-0 rounded-[var(--radius-card)] border p-3"
+                  style={{ background: tier.bg, borderColor: tier.border }}
+                >
+                  {/* A neutral, tier-colored badge -- never a per-theme
+                      semantic icon, since construct names are open-ended
+                      and tenant-defined (see the question bank), so no
+                      fixed name -> icon mapping is safe. */}
+                  <IconBadge icon={Circle} tier={tier} />
+                  <div className="mt-2 text-[12px] font-medium uppercase tracking-[0.04em] text-[var(--ink-mid)]">{group.construct}</div>
+                  <div className="mt-1 text-[24px] font-semibold" style={{ color: tier.text }}>
+                    {group.average10.toFixed(1)}
                   </div>
-                  <div className="mt-1 flex items-baseline gap-2">
-                    <span className="text-[22px] font-semibold" style={{ color: scoreColor(group.average10) }}>
-                      {group.average10.toFixed(1)}
-                    </span>
-                    {delta !== null ? (
-                      <span className={`text-[11px] font-medium ${delta >= 0 ? "text-[var(--green)]" : "text-[var(--red)]"}`}>
-                        {delta >= 0 ? "+" : ""}
-                        {delta.toFixed(1)} vs overall
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="text-[11px] text-[var(--ink-faint)]">
+                  {delta !== null ? (
+                    <div className="mt-0.5 flex items-center gap-1 text-[11px] font-medium" style={{ color: tier.text }}>
+                      {delta >= 0 ? <TrendingUp size={12} strokeWidth={2} /> : <TrendingDown size={12} strokeWidth={2} />}
+                      {delta >= 0 ? "+" : ""}
+                      {delta.toFixed(1)} vs overall
+                    </div>
+                  ) : null}
+                  <div className="mt-1 text-[11px] text-[var(--ink-faint)]">
                     {group.questionCount} question{group.questionCount === 1 ? "" : "s"}
                   </div>
                 </div>

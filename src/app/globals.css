@@ -47,6 +47,7 @@
   --success-bg: #eaf3eb;
   --warning: #a56b32;
   --warning-bg: #fbf1e5;
+  --warning-border: #e8cda3;
 
   /* eNPS distribution-bar segment colors -- a separate token trio (not
      reused --green/--ink-faint/--red directly) so a brand preset can
