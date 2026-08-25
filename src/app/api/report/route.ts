@@ -119,21 +119,24 @@ export async function GET(request: NextRequest) {
   const { tenant } = session;
   if (tenantPool) {
     const result = await withTenantContext(tenantPool, tenant.id, async (client) => {
-      const forcedScope =
-        session.role === "people_leader" ? await resolvePeopleLeaderScope(new IdentityRepository(client), tenant.id, session.peopleLeaderRootEmployeeId) : null;
-      return loadReportForCycle(client, new ResponseRepository(client), tenant.id, cycleId, tenant.name, department, forcedScope);
+      const identity = new IdentityRepository(client);
+      const forcedScope = session.role === "people_leader" ? await resolvePeopleLeaderScope(identity, tenant.id, session.peopleLeaderRootEmployeeId) : null;
+      const report = await loadReportForCycle(client, new ResponseRepository(client), tenant.id, cycleId, tenant.name, department, forcedScope);
+      // A People Leader's Response Rate needs their own subtree's
+      // headcount, not the whole tenant's -- see countActiveEmployeesByTeams.
+      const eligibleCount =
+        forcedScope?.type === "team" ? await identity.countActiveEmployeesByTeams(tenant.id, forcedScope.teamLabels) : undefined;
+      return { ...report, eligibleCount };
     });
     return NextResponse.json({ ok: true, tenant, ...result });
   }
   const adminPool = getDatabasePool();
   if (adminPool) {
-    const forcedScope =
-      session.role === "people_leader" ? await resolvePeopleLeaderScope(new IdentityRepository(adminPool), tenant.id, session.peopleLeaderRootEmployeeId) : null;
-    return NextResponse.json({
-      ok: true,
-      tenant,
-      ...(await loadReportForCycle(adminPool, new ResponseRepository(adminPool), tenant.id, cycleId, tenant.name, department, forcedScope)),
-    });
+    const identity = new IdentityRepository(adminPool);
+    const forcedScope = session.role === "people_leader" ? await resolvePeopleLeaderScope(identity, tenant.id, session.peopleLeaderRootEmployeeId) : null;
+    const report = await loadReportForCycle(adminPool, new ResponseRepository(adminPool), tenant.id, cycleId, tenant.name, department, forcedScope);
+    const eligibleCount = forcedScope?.type === "team" ? await identity.countActiveEmployeesByTeams(tenant.id, forcedScope.teamLabels) : undefined;
+    return NextResponse.json({ ok: true, tenant, ...report, eligibleCount });
   }
   return NextResponse.json({ ok: true, cycle: null, report: await getProtectedServerReport() });
 }

@@ -19,7 +19,7 @@ import type { UserRole } from "@/lib/server/repositories/types";
 
 type CycleSummary = { id: string; name: string };
 type ReportRow = { questionId: string; label?: string; n: number; average: number | null; scaleMax?: 5 | 10 };
-type ScopedReport = { report?: { protected: boolean; n: number; rows: ReportRow[] } };
+type ScopedReport = { report?: { protected: boolean; n: number; rows: ReportRow[] }; eligibleCount?: number };
 
 // Three states a survey's results page can be in -- the page framing
 // (banner + which actions are shown) follows this, not just the raw
@@ -128,7 +128,12 @@ export default function SurveyResultsPage() {
   const priorities = hasDistinctSpread ? [...scoredRows].sort((a, b) => a.average10 - b.average10).slice(0, 3) : [];
 
   const responseCount = scopedReport?.report && !scopedReport.report.protected ? scopedReport.report.n : null;
-  const eligibleCount = selectedDepartment ? scopedEligibleCount : employeeCount;
+  // A People Leader's scope is resolved server-side and comes back with
+  // its own subtree headcount (scopedReport.eligibleCount) -- their
+  // report is already scoped to a subtree regardless of the department
+  // picker (which they don't have access to), so that figure always
+  // takes precedence over the org/department-derived one below.
+  const eligibleCount = scopedReport?.eligibleCount ?? (selectedDepartment ? scopedEligibleCount : employeeCount);
   const responseRate = responseCount !== null && eligibleCount ? Math.round((responseCount / eligibleCount) * 100) : null;
 
   useEffect(() => {

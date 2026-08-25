@@ -1286,6 +1286,23 @@ export class IdentityRepository {
   }
 
   /**
+   * Eligible headcount for a manager's subtree (getSubtreeTeamLabels'
+   * team-label set) -- the denominator a People Leader's Response Rate
+   * needs. Without this, a People Leader's response rate was computed
+   * against the tenant's whole-company headcount instead of their own
+   * subtree's, understating it (a real subtree response count divided by
+   * a much larger org-wide denominator reads as a misleadingly low rate).
+   */
+  async countActiveEmployeesByTeams(tenantId: string, teams: string[]): Promise<number> {
+    if (teams.length === 0) return 0;
+    const result = await this.db.query<{ count: string }>(
+      "select count(*)::text from identity.employees where tenant_id = $1 and employment_status = 'active' and team = any($2)",
+      [tenantId, teams],
+    );
+    return Number(result.rows[0]?.count ?? 0);
+  }
+
+  /**
    * All team labels in a manager's reporting subtree (the manager's own
    * team plus every descendant's team, deduped), via WITH RECURSIVE over
    * manager_id (0035_manager_hierarchy.sql). This stays on the identity
