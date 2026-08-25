@@ -5,7 +5,7 @@ import { getTenantPool, withTenantContext, type Queryable } from "@/lib/server/d
 import { ResponseRepository } from "@/lib/server/repositories/responseRepository";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import { resolveTenantFromApiKey } from "@/lib/server/apiKeyAuth";
-import { canViewSurveyResults } from "@/lib/permissions";
+import { canExportReports } from "@/lib/permissions";
 import { renderReportPdf } from "@/lib/server/reportPdf";
 import { logReportExported } from "@/lib/server/auditLog";
 import type { ProtectedReport, UserRole } from "@/lib/server/repositories/types";
@@ -27,7 +27,7 @@ async function resolveTenantId(
 
   const session = await getSessionContext();
   if (!session) return null;
-  if (!canViewSurveyResults(session.role)) return null;
+  if (!canExportReports(session.role)) return null;
   if (isPlatformOwnerImpersonating(session)) return null;
   // Export has no department/team scope param -- it only ever pulls the
   // org-wide report. A People Leader is scoped to their own subtree only

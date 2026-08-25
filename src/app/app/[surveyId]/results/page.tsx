@@ -12,7 +12,7 @@ import { RingStat } from "@/components/RingStat";
 import { ThemeReportCard } from "@/components/ThemeReportCard";
 import { SurveyStageTabs } from "@/components/SurveyStageTabs";
 import { useToast } from "@/components/ToastProvider";
-import { canRunSurvey } from "@/lib/permissions";
+import { canExportReports, canRunSurvey, canViewComments, canViewCrossCycleTrend } from "@/lib/permissions";
 import { getScoreTier } from "@/lib/scoreTier";
 import { titleCaseTeam } from "@/lib/textFormat";
 import type { UserRole } from "@/lib/server/repositories/types";
@@ -56,6 +56,7 @@ export default function SurveyResultsPage() {
   // mutating controls below -- the APIs those controls call already 403 an
   // auditor, but the buttons shouldn't render for them in the first place.
   const [canManage, setCanManage] = useState(false);
+  const [role, setRole] = useState<UserRole | null>(null);
   // Reset the department picker to "All teams" when the cycle changes,
   // without setState-in-effect -- adjusting state during render in
   // response to a changed prop is the pattern React recommends for this.
@@ -149,7 +150,11 @@ export default function SurveyResultsPage() {
     fetch("/api/tenants/current")
       .then((response) => response.json())
       .then((data: { ok?: boolean; role?: UserRole }) => {
-        if (data.ok) setCanManage(canRunSurvey(data.role as UserRole));
+        if (data.ok) {
+          const nextRole = data.role as UserRole;
+          setRole(nextRole);
+          setCanManage(canRunSurvey(data.role as UserRole));
+        }
       })
       .catch(() => undefined);
   }, []);
@@ -374,17 +379,17 @@ export default function SurveyResultsPage() {
           </div>
         ) : null}
 
-        <ProtectedReportPanel cycleId={surveyId} department={selectedDepartment || undefined} />
+        <ProtectedReportPanel cycleId={surveyId} department={selectedDepartment || undefined} allowExport={role ? canExportReports(role) : false} />
 
         <ThemeReportCard cycleId={surveyId} department={selectedDepartment || undefined} initialExpandedConstruct={themeParam} />
 
-        <p className="mt-2 secondary-text">
+        {role && canViewComments(role) ? <p className="mt-2 secondary-text">
           <Link href={`/app/${surveyId}/comments`} className="font-medium text-[var(--ink)] underline">
             View comments, filterable by team and theme
           </Link>
-        </p>
+        </p> : null}
 
-        {cycles.length > 1 ? <CycleTrendPanel /> : null}
+        {role && canViewCrossCycleTrend(role) && cycles.length > 1 ? <CycleTrendPanel /> : null}
 
         {resultsState === "closed" ? (
           <div className="card">

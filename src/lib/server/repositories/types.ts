@@ -6,7 +6,19 @@ export type TenantRecord = {
   slug: string;
 };
 
-export type UserRole = "customer_admin" | "survey_creator" | "auditor" | "employee" | "people_leader";
+/**
+ * Tenant roles. Platform SuperAdmin is deliberately not included here: it is
+ * an environment-allowlisted SaferSay operator capability, not a role a
+ * customer can grant inside their workspace.
+ */
+export type UserRole =
+  | "customer_admin"
+  | "survey_creator"
+  | "auditor"
+  | "people_leader"
+  | "integration_admin"
+  | "compliance_reviewer"
+  | "employee";
 
 export type UserRecord = {
   id: string;
@@ -27,8 +39,7 @@ export type UserRecord = {
 
 export type OnboardingEventKey = "signup" | "employees" | "cycle" | "tokens" | "outbox" | "queue" | "responses" | "report";
 
-/** A teammate's role is limited to the three staff roles -- "employee" is
- * the respondent role, never assignable through team invites. */
+/** A teammate can never be invited as an employee/respondent. */
 export type TeamRole = Exclude<UserRole, "employee">;
 
 export type PendingInviteRecord = {

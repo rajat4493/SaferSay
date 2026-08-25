@@ -40,6 +40,9 @@ const roleLabels: Record<string, string> = {
   customer_admin: "Workspace Owner",
   survey_creator: "Survey Admin",
   auditor: "Report Viewer",
+  people_leader: "People Leader",
+  integration_admin: "Integration Admin",
+  compliance_reviewer: "Compliance Reviewer",
   employee: "Employee",
 };
 

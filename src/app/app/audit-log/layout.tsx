@@ -13,8 +13,8 @@ export default async function AuditLogLayout({
     redirect("/login");
   }
 
-  // Gate to customer_admin and auditor (Viewer) -- the two roles permissions.ts
-  // grants audit-log access to. Not under /app/workspace: auditor has no
+  // Gate to customer_admin and compliance_reviewer -- the two roles permissions.ts
+  // grants audit-log access to. Not under /app/workspace: compliance has no
   // Workspace access, but does have audit-log access.
   if (!canAccessAuditLog(session.role)) {
     redirect("/app");

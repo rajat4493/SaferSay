@@ -48,6 +48,10 @@ export default function HomePage() {
           router.replace("/console");
           return;
         }
+        if (data.role === "integration_admin") {
+          router.replace("/app/integrations");
+          return;
+        }
         setCanCreate(canCreateSurvey(data.role as UserRole));
         setMode("home");
       })

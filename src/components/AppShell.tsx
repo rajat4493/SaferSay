@@ -10,6 +10,7 @@ import {
   Lock,
   LockKeyhole,
   Menu,
+  PlugZap,
   ScrollText,
   Settings,
   UserPlus,
@@ -26,7 +27,7 @@ import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import { RoleTag } from "@/components/RoleTag";
 import { SignOutButton } from "@/components/SignOutButton";
 import { useTenantSession } from "@/lib/useTenantSession";
-import { canAccessAuditLog, canAccessPeople, canAccessSecurityProof, canAccessWorkspace, canCreateSurvey, canViewSurveyResults } from "@/lib/permissions";
+import { canAccessAuditLog, canAccessPeople, canAccessSecurityProof, canAccessWorkspace, canCreateSurvey, canManageIntegrations, canViewSurveyResults } from "@/lib/permissions";
 import type { UserRole } from "@/lib/server/repositories/types";
 import { brandFontOptions } from "@/lib/brand";
 import { deriveAccentPalette } from "@/lib/brandTheme";
@@ -48,6 +49,7 @@ const primaryNavItems: NavItemConfig[] = [
   { href: "/app/overview", label: "Overview", icon: BarChart3, hideForPureOwner: true, visible: canViewSurveyResults },
   { href: "/app/surveys", label: "Surveys", icon: ClipboardList, hideForPureOwner: true },
   { href: "/app/people", label: "People", icon: Users, hideForPureOwner: true, visible: canAccessPeople },
+  { href: "/app/integrations", label: "Integrations", icon: PlugZap, hideForPureOwner: true, visible: canManageIntegrations },
 ];
 
 const foldedMenuItems: NavItemConfig[] = [

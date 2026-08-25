@@ -3,7 +3,7 @@ import { getSessionContext, isPlatformOwnerImpersonating } from "@/lib/server/au
 import { getDatabasePool } from "@/lib/server/db/pool";
 import { getTenantPool, withTenantContext } from "@/lib/server/db/tenantPool";
 import { ResponseRepository } from "@/lib/server/repositories/responseRepository";
-import { canViewSurveyResults } from "@/lib/permissions";
+import { canViewComments, canViewSurveyResults } from "@/lib/permissions";
 
 /**
  * Department name list for the department picker -- labels only, always
@@ -19,6 +19,9 @@ export async function GET(request: NextRequest) {
   }
   if (!canViewSurveyResults(session.role)) {
     return NextResponse.json({ ok: false, error: "You don't have permission to view reports." }, { status: 403 });
+  }
+  if (!canViewComments(session.role)) {
+    return NextResponse.json({ ok: true, departments: [] });
   }
   if (isPlatformOwnerImpersonating(session)) {
     return NextResponse.json(

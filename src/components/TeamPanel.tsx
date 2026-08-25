@@ -23,12 +23,16 @@ const roleLabels: Record<string, string> = {
   auditor: "Report Viewer",
   employee: "Employee",
   people_leader: "People Leader",
+  integration_admin: "Integration Admin",
+  compliance_reviewer: "Compliance Reviewer",
 };
 
 const inviteRoles: Array<{ value: TeamRole; label: string }> = [
   { value: "customer_admin", label: "Workspace Owner" },
   { value: "survey_creator", label: "Survey Admin" },
   { value: "auditor", label: "Report Viewer" },
+  { value: "integration_admin", label: "Integration Admin" },
+  { value: "compliance_reviewer", label: "Compliance Reviewer" },
 ];
 
 export function TeamPanel() {
@@ -256,12 +260,26 @@ export function TeamPanel() {
               <td className="p-3">View only</td>
               <td className="p-3">—</td>
             </tr>
-            <tr className="text-[var(--ink-mid)]">
+            <tr className="border-b border-[var(--border)] text-[var(--ink-mid)]">
               <td className="p-3 font-medium text-[var(--ink)]">People Leader</td>
-              <td className="p-3">—</td>
+              <td className="p-3">Scoped view</td>
               <td className="p-3">—</td>
               <td className="p-3">Own subtree only</td>
               <td className="p-3">—</td>
+            </tr>
+            <tr className="border-b border-[var(--border)] text-[var(--ink-mid)]">
+              <td className="p-3 font-medium text-[var(--ink)]">Integration Admin</td>
+              <td className="p-3">—</td>
+              <td className="p-3">—</td>
+              <td className="p-3">—</td>
+              <td className="p-3">Technical only</td>
+            </tr>
+            <tr className="text-[var(--ink-mid)]">
+              <td className="p-3 font-medium text-[var(--ink)]">Compliance Reviewer</td>
+              <td className="p-3">View only</td>
+              <td className="p-3">—</td>
+              <td className="p-3">Numeric evidence only</td>
+              <td className="p-3">Audit &amp; security</td>
             </tr>
           </tbody>
         </table>

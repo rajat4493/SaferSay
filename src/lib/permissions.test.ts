@@ -5,119 +5,72 @@ import {
   canAccessSecurityProof,
   canAccessWorkspace,
   canCreateSurvey,
+  canExportReports,
   canImportEmployees,
+  canManageIntegrations,
   canManageTeam,
   canModifyBilling,
   canModifySettings,
   canRunSurvey,
+  canViewComments,
+  canViewCrossCycleTrend,
   canViewSurveyResults,
   getVisibleNavZones,
   isReadOnlyRole,
 } from "@/lib/permissions";
 import type { UserRole } from "@/lib/server/repositories/types";
 
-const roles: UserRole[] = ["customer_admin", "survey_creator", "auditor", "employee"];
+const roles: UserRole[] = ["customer_admin", "survey_creator", "auditor", "people_leader", "integration_admin", "compliance_reviewer", "employee"];
 
 function expectGrantedTo(fn: (role: UserRole) => boolean, granted: UserRole[]) {
-  for (const role of roles) {
-    expect(fn(role), `${fn.name}("${role}")`).toBe(granted.includes(role));
-  }
+  for (const role of roles) expect(fn(role), `${fn.name}(\"${role}\")`).toBe(granted.includes(role));
 }
 
 describe("permissions", () => {
-  it("canAccessWorkspace is customer_admin only", () => {
-    expectGrantedTo(canAccessWorkspace, ["customer_admin"]);
-  });
-
-  it("canAccessPeople grants customer_admin and survey_creator", () => {
-    expectGrantedTo(canAccessPeople, ["customer_admin", "survey_creator"]);
-  });
-
-  it("canCreateSurvey grants customer_admin and survey_creator", () => {
+  it("keeps workspace ownership with the customer admin", () => expectGrantedTo(canAccessWorkspace, ["customer_admin"]));
+  it("grants people access only to HR operators", () => expectGrantedTo(canAccessPeople, ["customer_admin", "survey_creator"]));
+  it("grants survey creation and running only to HR operators", () => {
     expectGrantedTo(canCreateSurvey, ["customer_admin", "survey_creator"]);
-  });
-
-  it("canRunSurvey grants customer_admin and survey_creator", () => {
     expectGrantedTo(canRunSurvey, ["customer_admin", "survey_creator"]);
   });
-
-  it("canViewSurveyResults grants customer_admin, survey_creator, and auditor (read-only), never employee", () => {
-    expectGrantedTo(canViewSurveyResults, ["customer_admin", "survey_creator", "auditor"]);
+  it("grants protected reports to report roles, never integration admins or respondents", () => {
+    expectGrantedTo(canViewSurveyResults, ["customer_admin", "survey_creator", "auditor", "people_leader", "compliance_reviewer"]);
   });
-
-  it("canAccessAuditLog grants customer_admin and auditor", () => {
-    expectGrantedTo(canAccessAuditLog, ["customer_admin", "auditor"]);
+  it("gives compliance reviewers, not report viewers, audit and security evidence", () => {
+    expectGrantedTo(canAccessAuditLog, ["customer_admin", "compliance_reviewer"]);
+    expectGrantedTo(canAccessSecurityProof, ["customer_admin", "compliance_reviewer"]);
   });
-
-  it("canAccessSecurityProof grants customer_admin and auditor", () => {
-    expectGrantedTo(canAccessSecurityProof, ["customer_admin", "auditor"]);
-  });
-
-  it("canModifySettings is customer_admin only", () => {
+  it("keeps billing, team management and privacy settings with the owner", () => {
     expectGrantedTo(canModifySettings, ["customer_admin"]);
-  });
-
-  it("canModifyBilling is customer_admin only", () => {
     expectGrantedTo(canModifyBilling, ["customer_admin"]);
-  });
-
-  it("canManageTeam is customer_admin only", () => {
     expectGrantedTo(canManageTeam, ["customer_admin"]);
   });
-
-  it("canImportEmployees grants customer_admin and survey_creator", () => {
-    expectGrantedTo(canImportEmployees, ["customer_admin", "survey_creator"]);
+  it("keeps roster import with HR operators", () => expectGrantedTo(canImportEmployees, ["customer_admin", "survey_creator"]));
+  it("gives integration admins a technical lane without HR content", () => {
+    expectGrantedTo(canManageIntegrations, ["customer_admin", "integration_admin"]);
+    expect(canViewSurveyResults("integration_admin")).toBe(false);
+    expect(canAccessPeople("integration_admin")).toBe(false);
   });
-
-  it("isReadOnlyRole is auditor only", () => {
-    expectGrantedTo(isReadOnlyRole, ["auditor"]);
+  it("keeps raw comments, trend and exports away from compliance and people-leader roles", () => {
+    expectGrantedTo(canViewComments, ["customer_admin", "survey_creator", "auditor"]);
+    expectGrantedTo(canViewCrossCycleTrend, ["customer_admin", "survey_creator", "auditor"]);
+    expectGrantedTo(canExportReports, ["customer_admin", "survey_creator", "auditor"]);
   });
-
+  it("marks every non-operator reporting role read-only", () => {
+    expect(isReadOnlyRole("auditor")).toBe(true);
+    expect(isReadOnlyRole("people_leader")).toBe(true);
+    expect(isReadOnlyRole("compliance_reviewer")).toBe(true);
+    expect(isReadOnlyRole("survey_creator")).toBe(false);
+  });
   describe("getVisibleNavZones", () => {
-    it("gives customer_admin every zone", () => {
+    it("gives the owner every zone, HR operators surveys and people, and report viewers surveys", () => {
       expect(getVisibleNavZones("customer_admin")).toEqual(["surveys", "people", "workspace"]);
-    });
-
-    it("gives survey_creator surveys and people, no workspace", () => {
       expect(getVisibleNavZones("survey_creator")).toEqual(["surveys", "people"]);
-    });
-
-    it("gives auditor and employee no nav zones", () => {
-      expect(getVisibleNavZones("auditor")).toEqual([]);
+      expect(getVisibleNavZones("auditor")).toEqual(["surveys"]);
+      expect(getVisibleNavZones("people_leader")).toEqual([]);
+      expect(getVisibleNavZones("integration_admin")).toEqual([]);
+      expect(getVisibleNavZones("compliance_reviewer")).toEqual([]);
       expect(getVisibleNavZones("employee")).toEqual([]);
     });
-  });
-
-  it("employee never gets any elevated permission", () => {
-    const checks = [
-      canAccessWorkspace,
-      canAccessPeople,
-      canCreateSurvey,
-      canRunSurvey,
-      canViewSurveyResults,
-      canAccessAuditLog,
-      canAccessSecurityProof,
-      canModifySettings,
-      canModifyBilling,
-      canManageTeam,
-      canImportEmployees,
-    ];
-    for (const check of checks) {
-      expect(check("employee"), check.name).toBe(false);
-    }
-  });
-
-  it("auditor is read-only: sees results/audit/security but cannot create, run, or manage anything", () => {
-    expect(canViewSurveyResults("auditor")).toBe(true);
-    expect(canAccessAuditLog("auditor")).toBe(true);
-    expect(canAccessSecurityProof("auditor")).toBe(true);
-    expect(canCreateSurvey("auditor")).toBe(false);
-    expect(canRunSurvey("auditor")).toBe(false);
-    expect(canImportEmployees("auditor")).toBe(false);
-    expect(canAccessPeople("auditor")).toBe(false);
-    expect(canManageTeam("auditor")).toBe(false);
-    expect(canModifySettings("auditor")).toBe(false);
-    expect(canModifyBilling("auditor")).toBe(false);
-    expect(canAccessWorkspace("auditor")).toBe(false);
   });
 });

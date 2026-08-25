@@ -47,10 +47,12 @@ export function ProtectedReportPanel({
   mode = "admin",
   cycleId,
   department,
+  allowExport = true,
 }: {
   mode?: "admin" | "viewer";
   cycleId?: string;
   department?: string;
+  allowExport?: boolean;
 }) {
   const [result, setResult] = useState<ReportResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -242,7 +244,7 @@ export function ProtectedReportPanel({
               <RefreshCw size={13} strokeWidth={1.8} />
               Refresh
             </button>
-            {report && !report.protected ? (
+            {report && !report.protected && allowExport ? (
               <>
                 <button onClick={exportCsv} className="btn-secondary">
                   <Download size={13} strokeWidth={1.8} />

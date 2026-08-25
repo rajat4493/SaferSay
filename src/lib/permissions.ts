@@ -8,13 +8,16 @@ import type { UserRole } from "@/lib/server/repositories/types";
  * Roles:
  * - customer_admin: owner, controls everything
  * - survey_creator: day-to-day HR, creates/runs surveys & manages people (Workspace hidden)
- * - auditor: read-only verification, views confidentiality proof + audit logs (NEW, v1.1+)
+ * - auditor: Report Viewer, reads protected organisation-level reports
  * - employee: respondent, token link only
  * - people_leader: read-only, scoped to one manager's reporting subtree
  *   only (see UserRecord.peopleLeaderRootEmployeeId and
  *   getProtectedReportForTenant's team-scope branch) -- never org-wide,
  *   never another manager's subtree, enforced server-side in /api/report,
  *   not just by hiding the scope picker in the UI.
+ * - integration_admin: operates technical connections, never HR content
+ * - compliance_reviewer: reads security/audit proof and protected numeric
+ *   reports, never raw comments or portable exports
  */
 
 export function canAccessWorkspace(role: UserRole): boolean {
@@ -35,10 +38,11 @@ export function canRunSurvey(role: UserRole): boolean {
 
 export function canViewSurveyResults(role: UserRole): boolean {
   // customer_admin and survey_creator see full, k-safe results
-  // auditor sees k-safe results only (never individuals, never sub-k)
+  // auditor (Report Viewer) sees k-safe organisation results only
   // people_leader sees k-safe results scoped to their own subtree only
+  // compliance_reviewer sees k-safe numeric evidence only
   // employee cannot view results
-  return role === "customer_admin" || role === "survey_creator" || role === "auditor" || role === "people_leader";
+  return role === "customer_admin" || role === "survey_creator" || role === "auditor" || role === "people_leader" || role === "compliance_reviewer";
 }
 
 /** True only for the scoped-to-one-subtree role -- see permissions.ts's
@@ -50,13 +54,13 @@ export function isScopedToOwnSubtree(role: UserRole): boolean {
 }
 
 export function canAccessAuditLog(role: UserRole): boolean {
-  return role === "auditor" || role === "customer_admin";
+  return role === "compliance_reviewer" || role === "customer_admin";
 }
 
 export function canAccessSecurityProof(role: UserRole): boolean {
-  // auditor can view confidentiality architecture proof
+  // compliance reviewers can view confidentiality architecture proof
   // customer_admin can view all settings including security proof
-  return role === "auditor" || role === "customer_admin";
+  return role === "compliance_reviewer" || role === "customer_admin";
 }
 
 export function canModifySettings(role: UserRole): boolean {
@@ -75,8 +79,26 @@ export function canImportEmployees(role: UserRole): boolean {
   return role === "customer_admin" || role === "survey_creator";
 }
 
+/** Technical configuration only: mail delivery, Slack and future SSO/HRIS. */
+export function canManageIntegrations(role: UserRole): boolean {
+  return role === "customer_admin" || role === "integration_admin";
+}
+
+/** Open text carries more re-identification risk than numeric aggregates. */
+export function canViewComments(role: UserRole): boolean {
+  return role === "customer_admin" || role === "survey_creator" || role === "auditor";
+}
+
+export function canViewCrossCycleTrend(role: UserRole): boolean {
+  return role === "customer_admin" || role === "survey_creator" || role === "auditor";
+}
+
+export function canExportReports(role: UserRole): boolean {
+  return role === "customer_admin" || role === "survey_creator" || role === "auditor";
+}
+
 export function isReadOnlyRole(role: UserRole): boolean {
-  return role === "auditor" || role === "people_leader";
+  return role === "auditor" || role === "people_leader" || role === "compliance_reviewer";
 }
 
 export function getVisibleNavZones(role: UserRole): ("surveys" | "people" | "workspace")[] {
@@ -86,14 +108,15 @@ export function getVisibleNavZones(role: UserRole): ("surveys" | "people" | "wor
     case "survey_creator":
       return ["surveys", "people"];
     case "auditor":
-      // Auditor role is v1.1+, behind a flag -- not surfaced in nav until customer needs it
-      // TODO: Add "audit" zone once auditor is exposed
-      return [];
+      return ["surveys"];
     case "people_leader":
       // No nav zone yet -- a People Leader reaches their scoped results via
       // a direct link (same v1.1+ posture as auditor above), never the
       // full surveys/people/workspace nav (people_leader must never see
       // the employee directory beyond their own subtree).
+      return [];
+    case "integration_admin":
+    case "compliance_reviewer":
       return [];
     case "employee":
       return [];

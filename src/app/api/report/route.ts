@@ -4,9 +4,9 @@ import { getDatabasePool } from "@/lib/server/db/pool";
 import { getTenantPool, withTenantContext, type Queryable } from "@/lib/server/db/tenantPool";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import { ResponseRepository } from "@/lib/server/repositories/responseRepository";
-import type { ReportScope } from "@/lib/server/repositories/types";
+import type { ReportScope, UserRole } from "@/lib/server/repositories/types";
 import { getProtectedServerReport } from "@/lib/serverStore";
-import { canViewSurveyResults } from "@/lib/permissions";
+import { canViewComments, canViewSurveyResults } from "@/lib/permissions";
 
 /**
  * Resolves a People Leader's fixed report scope server-side -- never from
@@ -41,6 +41,7 @@ async function loadReportForCycle(
   tenantName?: string,
   department?: string | null,
   forcedScope?: ReportScope | null,
+  role?: UserRole,
 ) {
   // forcedScope (People Leader) overrides the department param entirely --
   // never let a client-supplied ?department= widen a scoped role's view.
@@ -75,7 +76,7 @@ async function loadReportForCycle(
   // yet -- rather than risk leaking beyond a People Leader's subtree,
   // both stay empty/protected for a forced (people_leader) scope, never
   // an org-wide fallback.
-  const textAnswers = result.cycle && !forcedScope
+  const textAnswers = result.cycle && !forcedScope && role && canViewComments(role)
     ? await repo.getProtectedOpenTextReport(tenantId, result.cycle.id, result.cycle.minGroupSize, department ?? undefined)
     : { protected: true as const, n: 0, rows: [] };
 
@@ -121,7 +122,7 @@ export async function GET(request: NextRequest) {
     const result = await withTenantContext(tenantPool, tenant.id, async (client) => {
       const identity = new IdentityRepository(client);
       const forcedScope = session.role === "people_leader" ? await resolvePeopleLeaderScope(identity, tenant.id, session.peopleLeaderRootEmployeeId) : null;
-      const report = await loadReportForCycle(client, new ResponseRepository(client), tenant.id, cycleId, tenant.name, department, forcedScope);
+      const report = await loadReportForCycle(client, new ResponseRepository(client), tenant.id, cycleId, tenant.name, department, forcedScope, session.role);
       // A People Leader's Response Rate needs their own subtree's
       // headcount, not the whole tenant's -- see countActiveEmployeesByTeams.
       const eligibleCount =
@@ -134,7 +135,7 @@ export async function GET(request: NextRequest) {
   if (adminPool) {
     const identity = new IdentityRepository(adminPool);
     const forcedScope = session.role === "people_leader" ? await resolvePeopleLeaderScope(identity, tenant.id, session.peopleLeaderRootEmployeeId) : null;
-    const report = await loadReportForCycle(adminPool, new ResponseRepository(adminPool), tenant.id, cycleId, tenant.name, department, forcedScope);
+    const report = await loadReportForCycle(adminPool, new ResponseRepository(adminPool), tenant.id, cycleId, tenant.name, department, forcedScope, session.role);
     const eligibleCount = forcedScope?.type === "team" ? await identity.countActiveEmployeesByTeams(tenant.id, forcedScope.teamLabels) : undefined;
     return NextResponse.json({ ok: true, tenant, ...report, eligibleCount });
   }

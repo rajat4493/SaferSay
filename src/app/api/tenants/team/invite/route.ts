@@ -9,7 +9,7 @@ import type { TeamRole } from "@/lib/server/repositories/types";
 // people_leader deliberately excluded -- it needs a real
 // identity.employees row to scope to, which this generic invite flow has
 // no way to collect. See IdentityRepository.setPeopleLeaderAssignment.
-const teamRoles: TeamRole[] = ["customer_admin", "survey_creator", "auditor"];
+const teamRoles: TeamRole[] = ["customer_admin", "survey_creator", "auditor", "integration_admin", "compliance_reviewer"];
 
 export async function POST(request: NextRequest) {
   const session = await getSessionContext();
