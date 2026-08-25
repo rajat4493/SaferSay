@@ -2,14 +2,25 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getSessionContext } from "@/lib/server/authSession";
 import { withTenantScopedDb } from "@/lib/server/db/tenantPool";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
-import { canAccessPeople, canImportEmployees } from "@/lib/permissions";
+import { canAccessPeople, canImportEmployees, canViewSurveyResults } from "@/lib/permissions";
 
 export async function GET(request: NextRequest) {
   const session = await getSessionContext();
   if (!session) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
-  if (!canAccessPeople(session.role)) return NextResponse.json({ ok: false, error: "You don't have permission to view employees." }, { status: 403 });
+  // Full roster access (names/emails) stays canAccessPeople-only. But the
+  // eligible headcount alone -- no names, just a number -- is also needed
+  // by any report-viewing role (auditor, people_leader) to compute a
+  // Response Rate figure on Overview/Results; without this, those roles'
+  // response-rate ring/trend silently broke (showed "?"/an empty-state)
+  // even though real report data existed. Report-viewer-only roles get
+  // `total` but an empty `employees` array -- never the roster itself.
+  const hasPeopleAccess = canAccessPeople(session.role);
+  const hasReportAccess = canViewSurveyResults(session.role);
+  if (!hasPeopleAccess && !hasReportAccess) {
+    return NextResponse.json({ ok: false, error: "You don't have permission to view employees." }, { status: 403 });
+  }
 
   const search = request.nextUrl.searchParams.get("search") ?? undefined;
   const team = request.nextUrl.searchParams.get("team") ?? undefined;
@@ -26,7 +37,7 @@ export async function GET(request: NextRequest) {
     new IdentityRepository(db).listEmployees(session.tenant.id, { search, team, limit, offset }),
   );
 
-  return NextResponse.json({ ok: true, employees, total });
+  return NextResponse.json({ ok: true, employees: hasPeopleAccess ? employees : [], total });
 }
 
 export async function POST(request: NextRequest) {
