@@ -1,17 +1,11 @@
 import { BackToAppLink } from "@/components/BackToAppLink";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
+import { securityControls } from "@/lib/securityControls";
 
 // Public, unauthenticated by design -- an HR admin forwards this link
 // straight to a DPO or works-council rep, who has no SaferSay account.
 // No tenant data on this page, generic architecture claims only.
-const controls = [
-  ["Identity store", "Sign-in, eligibility, reminder status, token issue state. No answers."],
-  ["Response store", "Answers, cycle id, safe tags only. No name, email, employee id, IP, or user agent."],
-  ["Minimum group size", "Reports and exports suppress groups below the threshold Settings sets for new surveys -- a survey already collecting responses keeps the threshold it launched with."],
-  ["Reminder isolation", "Reminders target unspent participation tokens only; they never read answers."],
-  ["Payment isolation", "Stripe receives billing metadata only, never employee answers or survey tokens."],
-  ["No emotion inference", "No psychological or emotional state classification, now or later."],
-];
+const controls = securityControls;
 
 export default function SecurityPage() {
   return (

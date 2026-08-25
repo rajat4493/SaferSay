@@ -1,15 +1,9 @@
 import { AppShell, Card } from "@/components/AppShell";
 import { ConfidentialitySeal } from "@/components/ConfidentialitySeal";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
+import { securityControls } from "@/lib/securityControls";
 
-const controls = [
-  ["Identity store", "Sign-in, eligibility, reminder status, token issue state. No answers."],
-  ["Response store", "Answers, cycle id, safe tags only. No name, email, employee id, IP, or user agent."],
-  ["Minimum group size", "Reports and exports suppress groups below the threshold set in Settings."],
-  ["Reminder isolation", "Reminders target unspent participation tokens only; they never read answers."],
-  ["Payment isolation", "Stripe receives billing metadata only, never employee answers or survey tokens."],
-  ["No emotion inference", "No psychological or emotional state classification, now or later."],
-];
+const controls = securityControls;
 
 export default function WorkspaceSecurityPage() {
   return (

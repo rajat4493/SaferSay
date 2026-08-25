@@ -1,20 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Calendar, CheckCircle2, FileEdit, Lock, Send } from "lucide-react";
-import { AppShell } from "@/components/AppShell";
+import { ArrowLeft, Calendar, CheckCircle2, FileEdit, Flag, Lock, Send, ThumbsUp } from "lucide-react";
+import { AppShell, Card } from "@/components/AppShell";
 import { CycleTrendPanel } from "@/components/CycleTrendPanel";
+import { IconBadge } from "@/components/IconBadge";
 import { ProtectedReportPanel } from "@/components/ProtectedReportPanel";
+import { RingStat } from "@/components/RingStat";
 import { ThemeReportCard } from "@/components/ThemeReportCard";
 import { SurveyStageTabs } from "@/components/SurveyStageTabs";
 import { useToast } from "@/components/ToastProvider";
 import { canRunSurvey } from "@/lib/permissions";
+import { getScoreTier } from "@/lib/scoreTier";
 import { titleCaseTeam } from "@/lib/textFormat";
 import type { UserRole } from "@/lib/server/repositories/types";
 
 type CycleSummary = { id: string; name: string };
+type ReportRow = { questionId: string; label?: string; n: number; average: number | null; scaleMax?: 5 | 10 };
+type ScopedReport = { report?: { protected: boolean; n: number; rows: ReportRow[] } };
 
 // Three states a survey's results page can be in -- the page framing
 // (banner + which actions are shown) follows this, not just the raw
@@ -39,6 +44,14 @@ export default function SurveyResultsPage() {
   const [departments, setDepartments] = useState<string[]>([]);
   const [selectedDepartment, setSelectedDepartment] = useState<string>("");
   const [notFound, setNotFound] = useState(false);
+  // Feeds the Response rate ring and Top strengths/priorities lists --
+  // scoped by department alongside ProtectedReportPanel's own separate
+  // fetch of the same endpoint, since those two cards need row-level data
+  // this page didn't previously fetch for itself.
+  const [scopedReport, setScopedReport] = useState<ScopedReport | null>(null);
+  const [employeeCount, setEmployeeCount] = useState<number | null>(null);
+  const [scopedEligibleCount, setScopedEligibleCount] = useState<number | null>(null);
+  const [, startTransition] = useTransition();
   // Read-only roles (auditor) can view this page but must never see the
   // mutating controls below -- the APIs those controls call already 403 an
   // auditor, but the buttons shouldn't render for them in the first place.
@@ -98,6 +111,26 @@ export default function SurveyResultsPage() {
   const resultsState: ResultsState | null =
     status === null || protectedReport === null ? null : status === "closed" ? "closed" : protectedReport ? "collecting" : "ready";
 
+  const scopedRows = scopedReport?.report && !scopedReport.report.protected ? scopedReport.report.rows : [];
+  // Normalized to /10 (matches the same pattern in Overview/ThemeReportCard)
+  // so a likert_5 question and an enps_0_10 question don't show
+  // inconsistent-looking numbers side by side in the same ranking.
+  const scoredRows = scopedRows
+    .filter((row) => row.average !== null)
+    .map((row) => ({ ...row, average10: (row.average! / (row.scaleMax ?? 5)) * 10 }));
+  // Same no-distinct-spread threshold as Overview's Top strengths/
+  // priorities: forcing a top-3/bottom-3 ranking on near-identical scores
+  // fabricates distinctions the data doesn't support.
+  const scoreSpread =
+    scoredRows.length > 0 ? Math.max(...scoredRows.map((r) => r.average10)) - Math.min(...scoredRows.map((r) => r.average10)) : 0;
+  const hasDistinctSpread = scoredRows.length >= 4 && scoreSpread >= 1.0;
+  const strengths = hasDistinctSpread ? [...scoredRows].sort((a, b) => b.average10 - a.average10).slice(0, 3) : [];
+  const priorities = hasDistinctSpread ? [...scoredRows].sort((a, b) => a.average10 - b.average10).slice(0, 3) : [];
+
+  const responseCount = scopedReport?.report && !scopedReport.report.protected ? scopedReport.report.n : null;
+  const eligibleCount = selectedDepartment ? scopedEligibleCount : employeeCount;
+  const responseRate = responseCount !== null && eligibleCount ? Math.round((responseCount / eligibleCount) * 100) : null;
+
   useEffect(() => {
     fetch("/api/cycles")
       .then((response) => response.json())
@@ -128,6 +161,45 @@ export default function SurveyResultsPage() {
       cancelled = true;
     };
   }, [surveyId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const params = new URLSearchParams({ cycleId: surveyId });
+    if (selectedDepartment) params.set("department", selectedDepartment);
+    fetch(`/api/report?${params.toString()}`)
+      .then((response) => response.json())
+      .then((data: ScopedReport) => {
+        if (!cancelled) setScopedReport(data);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [surveyId, selectedDepartment]);
+
+  useEffect(() => {
+    fetch("/api/employees?limit=1")
+      .then((response) => response.json())
+      .then((data: { ok?: boolean; total?: number }) => setEmployeeCount(data.ok ? (data.total ?? 0) : null))
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (!selectedDepartment) {
+      startTransition(() => setScopedEligibleCount(null));
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/employees?team=${encodeURIComponent(selectedDepartment)}&limit=1`)
+      .then((response) => response.json())
+      .then((data: { ok?: boolean; total?: number }) => {
+        if (!cancelled) setScopedEligibleCount(data.ok ? (data.total ?? 0) : null);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDepartment]);
 
   async function sendReminders() {
     setSendingReminders(true);
@@ -234,6 +306,68 @@ export default function SurveyResultsPage() {
         <SurveyStageTabs active="Results" status={status ?? undefined} />
 
         {resultsState ? <ResultsStateBanner state={resultsState} protectedReport={protectedReport} /> : null}
+
+        {scopedReport?.report && !scopedReport.report.protected ? (
+          <div className="grid gap-3 md:grid-cols-3">
+            <Card className="flex flex-col items-center justify-center">
+              <h2 className="section-title self-start text-[15px]">Response rate</h2>
+              <RingStat
+                ratio={responseRate !== null ? responseRate / 100 : 0}
+                color="var(--green)"
+                centerLabel={responseRate !== null ? `${responseRate}%` : "—"}
+                subLabel="responded"
+                size={120}
+              />
+              <p className="secondary-text">{responseCount !== null ? `${responseCount} of ${eligibleCount ?? "?"} eligible` : "No data yet"}</p>
+            </Card>
+
+            <Card>
+              <h2 className="section-title text-[15px]">Top strengths</h2>
+              <ol className="mt-2.5 space-y-2">
+                {strengths.map((row) => {
+                  const tier = getScoreTier(row.average10);
+                  return (
+                    <li key={row.questionId} className="flex items-center gap-2.5 text-[13px]">
+                      <IconBadge icon={ThumbsUp} tier={tier} />
+                      <span className="min-w-0 flex-1 truncate text-[var(--ink)]">{row.label}</span>
+                      <span className="font-semibold" style={{ color: tier.text }}>
+                        {row.average10.toFixed(1)}
+                      </span>
+                    </li>
+                  );
+                })}
+                {strengths.length === 0 ? (
+                  <li className="secondary-text">
+                    {scoredRows.length === 0 ? "No data yet." : "No distinct strengths emerged yet -- scores are close together."}
+                  </li>
+                ) : null}
+              </ol>
+            </Card>
+
+            <Card>
+              <h2 className="section-title text-[15px]">Top priorities</h2>
+              <ol className="mt-2.5 space-y-2">
+                {priorities.map((row) => {
+                  const tier = getScoreTier(row.average10);
+                  return (
+                    <li key={row.questionId} className="flex items-center gap-2.5 text-[13px]">
+                      <IconBadge icon={Flag} tier={tier} />
+                      <span className="min-w-0 flex-1 truncate text-[var(--ink)]">{row.label}</span>
+                      <span className="font-semibold" style={{ color: tier.text }}>
+                        {row.average10.toFixed(1)}
+                      </span>
+                    </li>
+                  );
+                })}
+                {priorities.length === 0 ? (
+                  <li className="secondary-text">
+                    {scoredRows.length === 0 ? "No data yet." : "No distinct priorities emerged yet -- scores are close together."}
+                  </li>
+                ) : null}
+              </ol>
+            </Card>
+          </div>
+        ) : null}
 
         <ProtectedReportPanel cycleId={surveyId} department={selectedDepartment || undefined} />
 

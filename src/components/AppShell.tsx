@@ -55,7 +55,7 @@ const foldedMenuItems: NavItemConfig[] = [
   { href: "/app/workspace/settings", label: "Settings", icon: Settings, hideForPureOwner: true, visible: canAccessWorkspace },
   { href: "/app/workspace/billing", label: "Billing", icon: CreditCard, hideForPureOwner: true, visible: canAccessWorkspace },
   { href: "/app/workspace/team", label: "Team", icon: UserPlus, hideForPureOwner: true, visible: canAccessWorkspace },
-  { href: "/security", label: "Security", icon: LockKeyhole, hideForPureOwner: true, visible: canAccessSecurityProof },
+  { href: "/app/workspace/security", label: "Security", icon: LockKeyhole, hideForPureOwner: true, visible: canAccessSecurityProof },
   { href: "/app/audit-log", label: "Audit log", icon: ScrollText, hideForPureOwner: true, visible: canAccessAuditLog },
 ];
 
