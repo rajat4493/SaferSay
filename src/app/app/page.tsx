@@ -107,7 +107,9 @@ export default function HomePage() {
             <SurveyStatusBadge status={liveSurvey.status} />
           </div>
           <p className="mt-2 secondary-text">
-            {liveSurvey.responseCount} of {liveSurvey.minGroupSize} responses
+            {resultsUnlocked
+              ? `${liveSurvey.responseCount} response${liveSurvey.responseCount === 1 ? "" : "s"} collected`
+              : `${liveSurvey.responseCount} of ${liveSurvey.minGroupSize} responses`}
           </p>
           <div className="progress-track mt-2.5">
             <div
