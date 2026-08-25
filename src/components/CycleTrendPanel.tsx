@@ -1,17 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { EyeOff, TrendingUp } from "lucide-react";
+import { TrendingUp } from "lucide-react";
 import { Card } from "@/components/AppShell";
+import { QuestionTrendLine, type TrendLinePoint } from "@/components/QuestionTrendLine";
+import { getScoreTier } from "@/lib/scoreTier";
 import { SkeletonText } from "@/components/Skeleton";
 import { ViewerCard } from "@/components/ViewerShell";
 
-type TrendPoint = { cycleId: string; cycleName: string; cycleCreatedAt: string; n: number; average: number | null; protected: boolean };
+type TrendPoint = {
+  cycleId: string;
+  cycleName: string;
+  cycleCreatedAt: string;
+  n: number;
+  average: number | null;
+  protected: boolean;
+  scaleMax?: 5 | 10;
+};
 type TrendQuestion = { questionText: string; points: TrendPoint[] };
-
-// Same convention as ProtectedReportPanel.tsx: black bars by default, red
-// only below this /5-normalized threshold.
-const ATTENTION_THRESHOLD = 3.25;
 
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 
@@ -89,53 +95,37 @@ export function CycleTrendPanel({ mode = "admin" }: { mode?: "admin" | "viewer" 
         ))}
       </div>
 
-      <div className="space-y-4">
-        {questions.map((question) => (
-          <div key={question.questionText}>
-            <p className="mb-1.5 text-[13px] text-[var(--ink-mid)]">{question.questionText}</p>
-            <div className="flex items-end gap-2.5">
-              {question.points.map((point) => {
-                const index = legendIndex.get(point.cycleId);
-                const indexBadge = (
-                  <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-[var(--bg-active)] text-[9.5px] font-semibold text-[var(--ink-mid)]">
-                    {index}
-                  </span>
-                );
-                if (point.protected || point.average === null) {
-                  return (
-                    <div
-                      key={point.cycleId}
-                      className="flex flex-col items-center gap-1"
-                      title={`${index}. ${point.cycleName} (${shortDate(point.cycleCreatedAt)}): hidden until the anonymity threshold is met`}
-                    >
-                      <div className="flex h-[44px] w-[26px] items-end justify-center rounded-t-[6px] bg-[var(--bg-active)]">
-                        <EyeOff size={12} strokeWidth={1.8} className="mb-2 text-[var(--ink-faint)]" />
-                      </div>
-                      {indexBadge}
-                    </div>
-                  );
-                }
-                const attention = point.average < ATTENTION_THRESHOLD;
-                const height = `${Math.max(10, Math.min(100, (point.average / 5) * 100))}%`;
-                return (
-                  <div
-                    key={point.cycleId}
-                    className="flex flex-col items-center gap-1"
-                    title={`${index}. ${point.cycleName} (${shortDate(point.cycleCreatedAt)}): ${point.average.toFixed(2)} (n=${point.n})`}
-                  >
-                    <div className="flex h-[44px] w-[26px] items-end rounded-t-[6px] bg-[var(--bg-active)]">
-                      <div className="w-full rounded-t-[6px]" style={{ height, background: attention ? "var(--red)" : "var(--ink)" }} />
-                    </div>
-                    {indexBadge}
-                    <span className="text-[10px] font-medium text-[var(--ink)]">
-                      {point.average.toFixed(1)} <span className="font-normal text-[var(--ink-faint)]">n={point.n}</span>
-                    </span>
-                  </div>
-                );
-              })}
+      <div className="space-y-5">
+        {questions.map((question) => {
+          // Normalized to /10 via each point's own scaleMax (5 for
+          // likert_5, 10 for enps_0_10) -- fixes the panel's old hardcoded
+          // /5 math, which mis-scaled enps_0_10 questions, and puts every
+          // question on the same visual scale so heights are actually
+          // comparable across the whole list.
+          const linePoints: TrendLinePoint[] = question.points.map((point) => {
+            const index = legendIndex.get(point.cycleId);
+            if (point.protected || point.average === null) {
+              return {
+                value10: null,
+                protected: true,
+                title: `${index}. ${point.cycleName} (${shortDate(point.cycleCreatedAt)}): hidden until the anonymity threshold is met`,
+              };
+            }
+            return {
+              value10: (point.average / (point.scaleMax ?? 5)) * 10,
+              protected: false,
+              title: `${index}. ${point.cycleName} (${shortDate(point.cycleCreatedAt)}): ${point.average.toFixed(2)} (n=${point.n})`,
+            };
+          });
+          const lastReal = [...linePoints].reverse().find((p) => p.value10 !== null);
+          const tier = getScoreTier(lastReal?.value10 ?? 0);
+          return (
+            <div key={question.questionText}>
+              <p className="mb-1.5 text-[13px] text-[var(--ink-mid)]">{question.questionText}</p>
+              <QuestionTrendLine points={linePoints} color={lastReal ? tier.text : "var(--ink-faint)"} />
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </ShellCard>
   );
