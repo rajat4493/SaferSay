@@ -4,15 +4,7 @@ import { withTenantScopedDb } from "@/lib/server/db/tenantPool";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import { canModifySettings } from "@/lib/permissions";
 import { logThresholdChanged } from "@/lib/server/auditLog";
-
-function isSlackWebhookUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === "https:" && parsed.hostname === "hooks.slack.com";
-  } catch {
-    return false;
-  }
-}
+import { isSlackWebhookUrl, isSmtpUpdateIncomplete, wantsSmtpUpdate } from "@/lib/server/tenantConfigValidation";
 
 export async function GET() {
   const session = await getSessionContext();
@@ -49,12 +41,8 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "That doesn't look like a Slack incoming-webhook URL (https://hooks.slack.com/services/...)." }, { status: 400 });
   }
 
-  // SMTP is set-together, not field-by-field: the admin resends the full
-  // config (including password) every time they change any part of it.
-  // No partial-update path exists, so there's no ambiguity about whether
-  // an omitted password means "keep the old one" or "clear it."
-  const wantsSmtpUpdate = typeof body.smtpHost === "string" && body.smtpHost.trim();
-  if (wantsSmtpUpdate && (!body.smtpPort || !body.smtpUsername?.trim() || !body.smtpPassword?.trim() || !body.smtpFromEmail?.trim())) {
+  const wantsSmtp = wantsSmtpUpdate(body);
+  if (wantsSmtp && isSmtpUpdateIncomplete(body)) {
     return NextResponse.json({ ok: false, error: "SMTP host, port, username, password, and from-address are all required together." }, { status: 400 });
   }
 
@@ -74,7 +62,7 @@ export async function PATCH(request: NextRequest) {
     }
     if (body.smtpClear) {
       await repo.setSmtpConfig(session.tenant.id, null);
-    } else if (wantsSmtpUpdate) {
+    } else if (wantsSmtp) {
       await repo.setSmtpConfig(session.tenant.id, {
         host: body.smtpHost!.trim(),
         port: body.smtpPort!,

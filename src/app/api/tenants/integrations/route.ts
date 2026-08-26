@@ -3,15 +3,7 @@ import { getSessionContext } from "@/lib/server/authSession";
 import { withTenantScopedDb } from "@/lib/server/db/tenantPool";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import { canManageIntegrations } from "@/lib/permissions";
-
-function isSlackWebhookUrl(value: string) {
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" && url.hostname === "hooks.slack.com";
-  } catch {
-    return false;
-  }
-}
+import { isSlackWebhookUrl, isSmtpUpdateIncomplete, wantsSmtpUpdate } from "@/lib/server/tenantConfigValidation";
 
 export async function GET() {
   const session = await getSessionContext();
@@ -34,8 +26,8 @@ export async function PATCH(request: NextRequest) {
     smtpHost?: string; smtpPort?: number; smtpUsername?: string; smtpPassword?: string; smtpFromEmail?: string; smtpClear?: boolean;
     slackWebhookUrl?: string; slackClear?: boolean;
   };
-  const wantsSmtp = typeof body.smtpHost === "string" && body.smtpHost.trim();
-  if (wantsSmtp && (!body.smtpPort || !body.smtpUsername?.trim() || !body.smtpPassword?.trim() || !body.smtpFromEmail?.trim())) {
+  const wantsSmtp = wantsSmtpUpdate(body);
+  if (wantsSmtp && isSmtpUpdateIncomplete(body)) {
     return NextResponse.json({ ok: false, error: "SMTP host, port, username, password, and from-address are all required together." }, { status: 400 });
   }
   if (typeof body.slackWebhookUrl === "string" && body.slackWebhookUrl.trim() && !isSlackWebhookUrl(body.slackWebhookUrl.trim())) {

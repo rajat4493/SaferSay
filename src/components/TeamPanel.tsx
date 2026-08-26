@@ -43,6 +43,7 @@ export function TeamPanel() {
   const [inviteRole, setInviteRole] = useState<TeamRole>("survey_creator");
   const [inviting, setInviting] = useState(false);
   const [removingId, setRemovingId] = useState("");
+  const [changingRoleId, setChangingRoleId] = useState("");
   const [peopleLeaderUserId, setPeopleLeaderUserId] = useState("");
   const [peopleLeaderEmail, setPeopleLeaderEmail] = useState("");
   const [assigningLeader, setAssigningLeader] = useState(false);
@@ -104,6 +105,24 @@ export function TeamPanel() {
     setPeopleLeaderEmail("");
     setTeam(data.team ?? null);
     toast.show({ variant: "success", message: "People Leader assigned." });
+  }
+
+  async function changeRole(member: TeamMember, role: TeamRole) {
+    if (role === member.role) return;
+    setChangingRoleId(member.id);
+    const response = await fetch(`/api/tenants/team/${member.id}/role`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ role }),
+    });
+    const data = (await response.json().catch(() => ({ ok: false }))) as { ok?: boolean; team?: TeamMember[]; error?: string };
+    setChangingRoleId("");
+    if (!data.ok) {
+      toast.show({ variant: "error", message: data.error ?? "Couldn't change that teammate's role." });
+      return;
+    }
+    setTeam(data.team ?? null);
+    toast.show({ variant: "success", message: `${member.email} is now ${roleLabels[role] ?? role}.` });
   }
 
   async function remove(member: TeamMember) {
@@ -174,7 +193,23 @@ export function TeamPanel() {
                 >
                   {member.status === "pending" ? "Invited" : "Active"}
                 </span>
-                <span className="secondary-text">{roleLabels[member.role] ?? member.role}</span>
+                {member.id === selfId ? (
+                  <span className="secondary-text">{roleLabels[member.role] ?? member.role}</span>
+                ) : (
+                  <select
+                    value={member.role}
+                    onChange={(event) => void changeRole(member, event.target.value as TeamRole)}
+                    disabled={changingRoleId === member.id}
+                    aria-label={`Role for ${member.email}`}
+                    className="admin-input h-8 w-auto shrink-0 text-xs"
+                  >
+                    {inviteRoles.map((role) => (
+                      <option key={role.value} value={role.value}>
+                        {role.label}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 {member.id === selfId ? null : (
                   <button onClick={() => remove(member)} disabled={removingId === member.id} className="btn-secondary px-3 py-1.5 text-xs">
                     Remove

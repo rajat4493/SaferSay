@@ -43,6 +43,7 @@ export type AuditLogAction =
   | "settings_updated"
   | "team_invite_sent"
   | "team_member_removed"
+  | "team_member_role_changed"
   | "data_retention_purged"
   | "deletion_requested"
   | "commitment_published"
@@ -412,5 +413,28 @@ export async function logTeamMemberRemoved(
     action: "team_member_removed",
     targetType: "workspace",
     details: `role: ${removedRole}`,
+  });
+}
+
+/**
+ * Helper: Log a teammate's role changing, e.g. when an existing 'auditor'
+ * is moved to 'compliance_reviewer' after that permission was repointed --
+ * gives a tenant admin a visible trail of who moved whom, since there's no
+ * automatic migration of existing role assignments.
+ */
+export async function logTeamMemberRoleChanged(
+  tenantId: string,
+  actorRole: UserRole,
+  actorId: string,
+  fromRole: UserRole,
+  toRole: UserRole
+): Promise<void> {
+  await logAuditEvent({
+    tenantId,
+    actorRole,
+    actorId,
+    action: "team_member_role_changed",
+    targetType: "workspace",
+    details: `role: ${fromRole} -> ${toRole}`,
   });
 }

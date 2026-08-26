@@ -61,11 +61,21 @@ describe("tenant_slack_webhook migration", () => {
 });
 
 describe("Slack webhook URL validation", () => {
-  const source = readFileSync("src/app/api/tenants/settings/route.ts", "utf8");
+  // Shared by both /api/tenants/settings and /api/tenants/integrations --
+  // see tenantConfigValidation.ts's doc comment on why this lives in one
+  // place instead of being copy-pasted per route.
+  const source = readFileSync("src/lib/server/tenantConfigValidation.ts", "utf8");
 
   it("only accepts a real hooks.slack.com URL, not an arbitrary host (SSRF guard)", () => {
-    expect(source).toContain('parsed.hostname === "hooks.slack.com"');
-    expect(source).toContain('parsed.protocol === "https:"');
+    expect(source).toContain('url.hostname === "hooks.slack.com"');
+    expect(source).toContain('url.protocol === "https:"');
+  });
+
+  it("both tenant-settings and tenant-integrations routes use the shared validator", () => {
+    const settingsSource = readFileSync("src/app/api/tenants/settings/route.ts", "utf8");
+    const integrationsSource = readFileSync("src/app/api/tenants/integrations/route.ts", "utf8");
+    expect(settingsSource).toContain("isSlackWebhookUrl");
+    expect(integrationsSource).toContain("isSlackWebhookUrl");
   });
 });
 

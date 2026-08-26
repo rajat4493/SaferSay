@@ -293,6 +293,22 @@ export class IdentityRepository {
     return (userResult.rowCount ?? 0) > 0;
   }
 
+  /**
+   * Same "invite or real account, try invite first" shape as
+   * removeTeamMember -- `id` could be either a pending_invites row or a
+   * real identity.users row. Needed so a role's meaning can be repointed
+   * (e.g. auditor's permissions moving to compliance_reviewer) without
+   * forcing a delete-and-reinvite to move an existing teammate onto the
+   * new role.
+   */
+  async updateTeamMemberRole(tenantId: string, id: string, role: TeamRole): Promise<boolean> {
+    const inviteResult = await this.db.query(`update identity.pending_invites set role = $3 where id = $1 and tenant_id = $2`, [id, tenantId, role]);
+    if ((inviteResult.rowCount ?? 0) > 0) return true;
+
+    const userResult = await this.db.query(`update identity.users set role = $3 where id = $1 and tenant_id = $2`, [id, tenantId, role]);
+    return (userResult.rowCount ?? 0) > 0;
+  }
+
   async listTenants(): Promise<TenantRecord[]> {
     const result = await this.db.query<{ id: string; name: string; slug: string }>(
       "select id, name, slug from identity.tenants order by name asc",

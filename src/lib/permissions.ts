@@ -84,17 +84,28 @@ export function canManageIntegrations(role: UserRole): boolean {
   return role === "customer_admin" || role === "integration_admin";
 }
 
+/** Shared today by comments, cross-cycle trend, and export -- all three
+ * carry more re-identification/portability risk than a single in-app
+ * report view, so none of them extend to people_leader/compliance_reviewer
+ * yet. Kept as one predicate so a future split (e.g. letting one of the
+ * three diverge from the others) is a deliberate, visible change instead
+ * of editing one of three identical-looking functions and forgetting the
+ * other two. */
+function canViewRawReportContent(role: UserRole): boolean {
+  return role === "customer_admin" || role === "survey_creator" || role === "auditor";
+}
+
 /** Open text carries more re-identification risk than numeric aggregates. */
 export function canViewComments(role: UserRole): boolean {
-  return role === "customer_admin" || role === "survey_creator" || role === "auditor";
+  return canViewRawReportContent(role);
 }
 
 export function canViewCrossCycleTrend(role: UserRole): boolean {
-  return role === "customer_admin" || role === "survey_creator" || role === "auditor";
+  return canViewRawReportContent(role);
 }
 
 export function canExportReports(role: UserRole): boolean {
-  return role === "customer_admin" || role === "survey_creator" || role === "auditor";
+  return canViewRawReportContent(role);
 }
 
 export function isReadOnlyRole(role: UserRole): boolean {
