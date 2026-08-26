@@ -1,24 +1,22 @@
 import type { Metadata, Viewport } from "next";
-import { DM_Serif_Display, Inter } from "next/font/google";
+import { DM_Mono, Inter } from "next/font/google";
 import { BrandProvider } from "@/components/BrandProvider";
 import { DataProvider } from "@/components/DataProvider";
 import { ToastProvider } from "@/components/ToastProvider";
 import "./globals.css";
 
-// SaferSay UI Design System v1 §2: Inter for all UI (nav, buttons,
-// labels, body), DM Serif Display ONLY for H1s and emotionally-weighted
-// moments (survey question text, "You spoke, we heard"). Never used for
-// section/card titles -- the contrast between the two is deliberate.
+// Inter carries the full product hierarchy. DM Mono is deliberately
+// reserved for compact metadata, timestamps, badges, and section markers.
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
 });
 
-const dmSerifDisplay = DM_Serif_Display({
-  variable: "--font-dm-serif",
+const dmMono = DM_Mono({
+  variable: "--font-dm-mono",
   subsets: ["latin"],
-  weight: ["400"],
+  weight: ["400", "500"],
 });
 
 export const metadata: Metadata = {
@@ -44,7 +42,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${dmSerifDisplay.variable} h-full antialiased`}
+      className={`${inter.variable} ${dmMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <BrandProvider>

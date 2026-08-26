@@ -22,7 +22,7 @@ export function HealthBadge({ status }: { status: "ok" | "attention" | "at_risk"
   const isOk = status === "ok";
   return (
     <span
-      className={`inline-flex items-center rounded-[var(--radius-pill)] border px-2.5 py-0.5 text-[11px] font-semibold ${
+      className={`inline-flex items-center rounded-[var(--radius-pill)] border px-2.5 py-0.5 font-[family-name:var(--font-mono)] text-[10px] font-semibold tracking-[0.04em] ${
         isOk ? "border-[var(--green-border)] bg-[var(--green-bg)] text-[var(--green)]" : "border-[var(--red-border)] bg-[var(--red-bg)] text-[var(--red)]"
       }`}
     >
@@ -32,7 +32,7 @@ export function HealthBadge({ status }: { status: "ok" | "attention" | "at_risk"
 }
 
 export function PlanBadge({ tier }: { tier: string }) {
-  return <span className="inline-flex items-center rounded-[var(--radius-pill)] bg-[var(--bg-active)] px-2.5 py-0.5 text-[11px] font-semibold capitalize text-[var(--ink-mid)]">{tier}</span>;
+  return <span className="inline-flex items-center rounded-[var(--radius-pill)] bg-[var(--bg-active)] px-2.5 py-0.5 font-[family-name:var(--font-mono)] text-[10px] font-semibold tracking-[0.04em] capitalize text-[var(--ink-mid)]">{tier}</span>;
 }
 
 export function EmptyState({ title, description }: { title: string; description: string }) {

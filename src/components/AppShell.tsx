@@ -118,18 +118,18 @@ export function AppShell({
 
   const sidebarContent = (
     <>
-      <div className="flex items-center justify-between px-4 pt-4 pb-3">
+      <div className="flex items-center justify-between px-4 pb-4 pt-5">
         <Link href="/" className="flex items-center gap-2.5">
           <BrandMark />
-          <span className="truncate text-[16px] font-semibold leading-none text-[var(--sidebar-ink)]">{brand.name}</span>
+          <span className="truncate text-[14px] font-semibold leading-none text-[var(--sidebar-ink)]">{brand.name}</span>
         </Link>
         <button onClick={() => setMobileNavOpen(false)} aria-label="Close menu" className="text-[var(--sidebar-ink-mid)] lg:hidden">
           <X size={18} strokeWidth={1.8} />
         </button>
       </div>
 
-      <nav aria-label="Primary" className="flex-1 overflow-y-auto px-2.5 py-2">
-        <div className="space-y-0.5">
+      <nav aria-label="Primary" className="flex-1 overflow-y-auto px-2.5 py-1">
+        <div className="space-y-1">
           {visiblePrimaryItems.map((item) => (
             <NavLink key={item.href} item={item} active={pathname === item.href} onNavigate={() => setMobileNavOpen(false)} />
           ))}
@@ -217,23 +217,23 @@ export function AppShell({
           <button onClick={() => setMobileNavOpen(true)} aria-label="Open menu" className="shrink-0 text-[var(--ink-mid)] lg:hidden">
             <Menu size={18} strokeWidth={1.8} />
           </button>
-          <div className="hidden items-center justify-center gap-1.5 text-[13px] text-[#676A66] sm:flex">
+          <div className="hidden items-center justify-center gap-1.5 text-[12px] text-[#676A66] sm:flex">
             <Lock size={13} strokeWidth={1.8} />
             Confidential — you see numbers, never names
           </div>
-          <Link href="/app/pilot" className="col-start-3 justify-self-end whitespace-nowrap text-[13px] font-medium text-[var(--ink-mid)] hover:text-[var(--ink)]">
+          <Link href="/app/pilot" className="col-start-3 justify-self-end whitespace-nowrap text-[12px] font-medium text-[var(--ink-mid)] hover:text-[var(--ink)]">
             First-run guide
           </Link>
         </header>
 
-        <main id="main-content" className="flex-1 overflow-y-auto px-5 py-10 lg:px-12 lg:py-16">
-          <div className="mx-auto max-w-[1080px]">
-            <div className="mb-8 flex flex-wrap items-start justify-between gap-3">
+        <main id="main-content" className="flex-1 overflow-y-auto px-5 pb-10 pt-[33px] lg:px-20 lg:pb-16 lg:pt-[52px]">
+          <div className="mx-auto max-w-[1160px]">
+            <div className="mb-[37px] flex flex-wrap items-start justify-between gap-5">
               <div>
                 <h1 className="page-title">{title}</h1>
-                <p className="mt-2 secondary-text">{subtitle}</p>
+                <p className="mt-3 secondary-text">{subtitle}</p>
               </div>
-              {headerActions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{headerActions}</div> : null}
+              {headerActions ? <div className="flex shrink-0 flex-wrap items-center gap-2.5">{headerActions}</div> : null}
             </div>
             <ImpersonationBanner />
             {children}
@@ -250,7 +250,7 @@ function NavLink({ item, active, onNavigate }: { item: NavItemConfig; active: bo
       href={item.href}
       onClick={onNavigate}
       aria-current={active ? "page" : undefined}
-      className={`flex h-12 items-center gap-3 rounded-[10px] px-4 text-[15px] font-medium transition ${
+      className={`flex h-10 items-center gap-2.5 rounded-[10px] px-3.5 text-[13px] font-medium transition ${
         active
           ? "bg-[var(--sidebar-active-bg)] text-[var(--sidebar-active-ink)]"
           : "text-[var(--sidebar-ink-mid)] hover:bg-[var(--sidebar-active-bg)] hover:text-[var(--sidebar-ink)]"

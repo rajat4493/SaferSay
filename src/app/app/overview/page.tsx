@@ -127,19 +127,19 @@ export default function OverviewPage() {
 
   return (
     <AppShell title="Overview" subtitle="How things have changed across your surveys.">
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-5 md:grid-cols-3">
         <Card>
-          <h2 className="section-title text-[15px]">Surveys run</h2>
-          <p className="mt-2 text-[28px] font-semibold tracking-tight text-[var(--ink)]">{totalSurveys}</p>
+          <h2 className="meta-label">Surveys run</h2>
+          <p className="data-number mt-4">{totalSurveys}</p>
         </Card>
         <Card>
-          <h2 className="section-title text-[15px]">Responses collected</h2>
-          <p className="mt-2 text-[28px] font-semibold tracking-tight text-[var(--ink)]">{totalResponses}</p>
-          <p className="mt-1 secondary-text">all-time</p>
+          <h2 className="meta-label">Responses collected</h2>
+          <p className="data-number mt-4">{totalResponses}</p>
+          <p className="mt-2 secondary-text">all-time</p>
         </Card>
         <Card>
-          <h2 className="section-title text-[15px]">Score, first vs. latest</h2>
-          <p className="mt-2 flex items-center gap-1.5 text-[28px] font-semibold tracking-tight text-[var(--ink)]">
+          <h2 className="meta-label">Score, first vs. latest</h2>
+          <p className="data-number mt-4 flex items-center gap-2">
             {scoreDeltaAllTime === null ? (
               "—"
             ) : (
@@ -153,20 +153,20 @@ export default function OverviewPage() {
         </Card>
       </div>
 
-      <div className="mt-3 grid gap-3 md:grid-cols-2">
+      <div className="mt-[22px] grid gap-5 md:grid-cols-2">
         <Card
           className="border transition-[background-color,border-color] duration-300"
           style={scoreTier && overallByCycle.length >= 2 ? { background: scoreTier.bg, borderColor: scoreTier.border } : undefined}
         >
           <div className="flex items-center gap-1.5">
-            <h2 className="section-title text-[15px]">Score over time</h2>
+            <h2 className="section-title">Score over time</h2>
             <span title="Every scored question, each survey, normalized to a 0-10 scale and averaged.">
               <Info size={14} strokeWidth={1.8} className="text-[var(--ink-faint)]" />
             </span>
           </div>
           {overallByCycle.length >= 2 ? (
             <>
-              <p className="mt-2 flex items-center gap-1.5 text-[28px] font-semibold tracking-tight" style={{ color: scoreTier?.text }}>
+              <p className="data-number mt-4 flex items-center gap-2" style={{ color: scoreTier?.text }}>
                 {(scoreDelta ?? 0) >= 0 ? <TrendingUp size={22} strokeWidth={2} /> : <TrendingDown size={22} strokeWidth={2} />}
                 {(scoreDelta ?? 0) >= 0 ? "+" : ""}
                 {scoreDelta!.toFixed(1)}
@@ -184,14 +184,14 @@ export default function OverviewPage() {
           style={rateTier && responseRateByCycle.length >= 2 ? { background: rateTier.bg, borderColor: rateTier.border } : undefined}
         >
           <div className="flex items-center gap-1.5">
-            <h2 className="section-title text-[15px]">Response rate over time</h2>
+            <h2 className="section-title">Response rate over time</h2>
             <span title="Each survey's responses divided by today's eligible headcount -- an approximation, since headcount isn't tracked historically per survey.">
               <Info size={14} strokeWidth={1.8} className="text-[var(--ink-faint)]" />
             </span>
           </div>
           {responseRateByCycle.length >= 2 ? (
             <>
-              <p className="mt-2 flex items-center gap-1.5 text-[28px] font-semibold tracking-tight" style={{ color: rateTier?.text }}>
+              <p className="data-number mt-4 flex items-center gap-2" style={{ color: rateTier?.text }}>
                 {(rateDelta ?? 0) >= 0 ? <TrendingUp size={22} strokeWidth={2} /> : <TrendingDown size={22} strokeWidth={2} />}
                 {(rateDelta ?? 0) >= 0 ? "+" : ""}
                 {rateDelta}pts
@@ -205,7 +205,7 @@ export default function OverviewPage() {
         </Card>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-3">
+      <div className="mt-[22px] flex flex-wrap items-center gap-3">
         <Link href={`/app/${latestOpenOrRecent.id}/results`} className="btn-primary">
           View latest results
         </Link>

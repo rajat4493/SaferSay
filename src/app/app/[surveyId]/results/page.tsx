@@ -301,7 +301,7 @@ export default function SurveyResultsPage() {
         </>
       }
     >
-      <div className="space-y-[9px]">
+      <div className="space-y-[22px]">
         {notFound ? (
           <div className="card">
             <h2 className="section-title">Survey not found</h2>
@@ -318,9 +318,9 @@ export default function SurveyResultsPage() {
         {resultsState ? <ResultsStateBanner state={resultsState} protectedReport={protectedReport} /> : null}
 
         {scopedReport?.report && !scopedReport.report.protected ? (
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-5 md:grid-cols-3">
             <Card className="flex flex-col items-center justify-center">
-              <h2 className="section-title self-start text-[15px]">Response rate</h2>
+              <h2 className="meta-label self-start">Response rate</h2>
               <RingStat
                 ratio={responseRate !== null ? responseRate / 100 : 0}
                 color="var(--green)"
@@ -332,7 +332,7 @@ export default function SurveyResultsPage() {
             </Card>
 
             <Card>
-              <h2 className="section-title text-[15px]">Top strengths</h2>
+              <h2 className="section-title">Top strengths</h2>
               <ol className="mt-2.5 space-y-2">
                 {strengths.map((row) => {
                   const tier = getScoreTier(row.average10);
@@ -355,7 +355,7 @@ export default function SurveyResultsPage() {
             </Card>
 
             <Card>
-              <h2 className="section-title text-[15px]">Top priorities</h2>
+              <h2 className="section-title">Top priorities</h2>
               <ol className="mt-2.5 space-y-2">
                 {priorities.map((row) => {
                   const tier = getScoreTier(row.average10);
@@ -491,7 +491,7 @@ function ResultsStateBanner({ state, protectedReport }: { state: ResultsState; p
               accent: "var(--green)",
             };
   return (
-    <div className="card flex items-start gap-3 py-4" style={{ borderLeft: `3px solid ${accent}` }}>
+    <div className="card flex items-start gap-3 py-5" style={{ borderLeft: `3px solid ${accent}` }}>
       <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--bg-active)]" style={{ color: accent }}>
         <Icon size={15} strokeWidth={1.8} />
       </span>

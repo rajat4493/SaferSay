@@ -34,7 +34,7 @@ export function RoleTag() {
 function Pill({ tone, children }: { tone: "neutral" | "red"; children: React.ReactNode }) {
   return (
     <span
-      className={`mt-0.5 inline-flex rounded-[var(--radius-pill)] px-1.5 py-0.5 text-[10.5px] font-medium ${
+      className={`mt-0.5 inline-flex rounded-[var(--radius-pill)] px-1.5 py-0.5 font-[family-name:var(--font-mono)] text-[10px] font-medium tracking-[0.04em] ${
         tone === "red" ? "bg-[var(--red-bg)] text-[var(--red)]" : "bg-[var(--bg-active)] text-[var(--ink-mid)]"
       }`}
     >

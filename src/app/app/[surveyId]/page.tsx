@@ -199,7 +199,7 @@ function SurveyBuildContent({ surveyId }: { surveyId: string }) {
 
   return (
     <AppShell title={detail?.cycle.name ?? "Survey"} subtitle="Template and questions this survey was built with.">
-      <div className="space-y-[9px]">
+      <div className="space-y-[22px]">
         <SurveyStageTabs active="Build" status={detail?.cycle.status} />
 
         {notFound ? (

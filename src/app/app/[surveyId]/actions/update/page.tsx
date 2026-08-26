@@ -112,7 +112,7 @@ export default function DraftUpdatePage() {
 
   return (
     <AppShell title="Draft your update" subtitle="Use AI to craft a thoughtful response to your team.">
-      <div className="space-y-[9px]">
+      <div className="space-y-[22px]">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-[11.5px] font-semibold uppercase tracking-[0.05em] text-[var(--green)]">Close the loop</p>
           <button onClick={() => router.push(`/app/${surveyId}/results`)} className="btn-secondary">

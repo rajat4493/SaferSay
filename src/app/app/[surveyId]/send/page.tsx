@@ -30,7 +30,7 @@ export default function SurveySendPage() {
 
   return (
     <AppShell title="Send" subtitle="Prepare, queue, and send confidential invite links to your employees.">
-      <div className="space-y-[9px]">
+      <div className="space-y-[22px]">
         <SurveyStageTabs active="Send" status={status} />
 
         <InviteOutboxPanel cycleId={surveyId} />

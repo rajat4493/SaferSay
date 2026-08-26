@@ -1,9 +1,10 @@
 @import "tailwindcss";
 
-/* SAFERSAY UI DESIGN SYSTEM v1 -- locked spec. Calm, private, obvious,
-   human. Two fonts only (Inter for UI, DM Serif Display for emotional
-   emphasis -- H1s, question text, "You spoke, we heard" moments), a
-   muted institutional green (never bright SaaS green), warm off-white
+/* SAFERSAY UI DESIGN SYSTEM v1 -- calm, private, obvious, human. Inter
+   carries every product-facing hierarchy; DM Mono is reserved for small
+   metadata and markers. The palette remains unchanged; spacing and type
+   do the work of making the interface feel more considered. A muted
+   institutional green (never bright SaaS green), warm off-white
    canvas (never pure white), restrained radii/shadows. Admin tokens
    live at :root as the app-wide default; the taker surface re-scopes
    the same variable NAMES to slightly deeper warm values inside
@@ -78,11 +79,12 @@
   --sidebar-border: rgba(255, 255, 255, 0.14);
 
   --font-body: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: var(--font-dm-mono), "SFMono-Regular", Consolas, monospace;
 
   --radius-card: 14px;
-  --radius-input: 8px;
-  --radius-button: 8px;
-  --radius-shell: 16px;
+  --radius-input: 7px;
+  --radius-button: 7px;
+  --radius-shell: 15px;
   --radius-pill: 999px;
   --shadow-soft: 0 1px 2px rgba(20, 30, 24, 0.02), 0 4px 12px rgba(20, 30, 24, 0.025);
   --shadow-elevated: 0 6px 20px rgba(20, 30, 24, 0.06);
@@ -106,10 +108,7 @@
   --brand-glass-surface: #ffffff;
   --brand-glass-border: var(--border);
   --brand-glass-strong: #ffffff;
-  /* Serif display -- H1 and emotionally-weighted moments ONLY (survey
-     question text, "You spoke, we heard"). Never section/card titles --
-     the Inter/serif contrast is the point, per design system §2. */
-  --font-display: var(--font-dm-serif), Georgia, serif;
+  --font-display: var(--font-body);
 }
 
 @theme inline {
@@ -117,12 +116,15 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-inter);
   --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
 }
 
 body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.55;
 }
 
 button {
@@ -148,53 +150,68 @@ input[type="radio"] {
 /* ---- Admin type scale (design system §3) ---- */
 .page-title {
   font-family: var(--font-display);
-  font-size: 40px;
-  font-weight: 400;
-  letter-spacing: -0.02em;
-  line-height: 1.08;
+  font-size: 29px;
+  font-weight: 700;
+  letter-spacing: -2px;
+  line-height: 1.06;
   color: var(--ink);
 }
 @media (min-width: 640px) {
   .page-title {
-    font-size: 44px;
+    font-size: 36px;
   }
 }
 .section-title {
   font-family: var(--font-body);
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 1.35;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.35px;
+  line-height: 1.25;
   color: var(--ink);
 }
 .secondary-text {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 400;
   line-height: 1.55;
   color: var(--ink-mid);
 }
 .meta-label {
-  font-size: 13px;
+  font-family: var(--font-mono);
+  font-size: 10px;
   font-weight: 500;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ink-soft);
   line-height: 1.3;
 }
 .label-text {
   display: block;
-  font-size: 13px;
+  font-family: var(--font-mono);
+  font-size: 10px;
   font-weight: 500;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ink-mid);
   line-height: 1.3;
 }
 .data-number {
-  font-size: 24px;
+  font-size: 32px;
   font-weight: 700;
-  letter-spacing: -0.5px;
-  line-height: 1.1;
+  letter-spacing: -1.25px;
+  line-height: 1.05;
   color: var(--ink);
+}
+@media (min-width: 640px) {
+  .section-title {
+    font-size: 20px;
+  }
+  .data-number {
+    font-size: 38px;
+    letter-spacing: -1.6px;
+  }
+  .card {
+    padding: 28px;
+  }
 }
 
 /* ---- Admin components ---- */
@@ -202,7 +219,7 @@ input[type="radio"] {
   background: #ffffff;
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
-  padding: 28px;
+  padding: 25px;
   box-shadow: var(--shadow-soft);
   transition: all 160ms ease;
 }
@@ -220,14 +237,14 @@ input[type="radio"] {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  height: 48px;
+  height: 40px;
   background: var(--green);
   color: #ffffff;
   border: none;
   border-radius: var(--radius-button);
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
-  padding: 0 24px;
+  padding: 0 16px;
   transition: background-color 140ms ease, transform 140ms ease;
 }
 .btn-primary:hover {
@@ -244,14 +261,14 @@ input[type="radio"] {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  height: 48px;
+  height: 40px;
   background: #ffffff;
   color: var(--green-hover);
   border: 1px solid var(--border-hover);
   border-radius: var(--radius-button);
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
-  padding: 0 22px;
+  padding: 0 16px;
   transition: background-color 140ms ease, color 140ms ease;
 }
 .btn-secondary:hover {
@@ -267,14 +284,14 @@ input[type="radio"] {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  height: 48px;
+  height: 40px;
   background: #ffffff;
   color: var(--red);
   border: 1px solid var(--red-border);
   border-radius: var(--radius-button);
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
-  padding: 0 22px;
+  padding: 0 16px;
   transition: background-color 140ms ease;
 }
 .btn-destructive:hover {
@@ -286,12 +303,12 @@ input[type="radio"] {
 
 .admin-input {
   width: 100%;
-  height: 48px;
+  height: 40px;
   border: 1px solid var(--border);
   border-radius: var(--radius-input);
   background: #ffffff;
   padding: 0 14px;
-  font-size: 15px;
+  font-size: 13px;
   color: var(--ink);
   outline: none;
   transition: border-color 140ms ease, box-shadow 140ms ease;
@@ -305,9 +322,10 @@ input[type="radio"] {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.06em;
   color: var(--success);
   background: var(--success-bg);
   border: none;
@@ -399,9 +417,10 @@ input[type="radio"] {
 .badge-beta {
   display: inline-flex;
   align-items: center;
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.06em;
   color: var(--ss-green-700);
   background: var(--ss-green-100);
   border: none;
