@@ -3,6 +3,7 @@ import { getSessionContext } from "@/lib/server/authSession";
 import { withTenantScopedDb } from "@/lib/server/db/tenantPool";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import { canManageTeam } from "@/lib/permissions";
+import { logPeopleLeaderAssigned } from "@/lib/server/auditLog";
 
 /**
  * Assigns (or reassigns) an existing team member as a People Leader
@@ -37,5 +38,9 @@ export async function POST(request: NextRequest) {
   });
 
   if (!team) return NextResponse.json({ ok: false, error: "No employee with that email in this workspace." }, { status: 404 });
+
+  const assignee = team.find((member) => member.id === body.userId);
+  if (assignee) await logPeopleLeaderAssigned(session.tenant.id, session.role, session.email, assignee.id);
+
   return NextResponse.json({ ok: true, team });
 }

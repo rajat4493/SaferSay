@@ -44,6 +44,7 @@ export type AuditLogAction =
   | "team_invite_sent"
   | "team_member_removed"
   | "team_member_role_changed"
+  | "people_leader_assigned"
   | "data_retention_purged"
   | "deletion_requested"
   | "commitment_published"
@@ -436,5 +437,29 @@ export async function logTeamMemberRoleChanged(
     action: "team_member_role_changed",
     targetType: "workspace",
     details: `role: ${fromRole} -> ${toRole}`,
+  });
+}
+
+/**
+ * Helper: Log a People Leader assignment -- the assigned teammate's user
+ * id goes in targetId (an opaque identifier, same convention every other
+ * survey/workspace-targeted event here already uses), never in `details`
+ * -- logAuditEvent's own validateDetailsNoPII guard hard-rejects any
+ * email address in that field, and rightly caught this when the first
+ * version of this helper put one there directly.
+ */
+export async function logPeopleLeaderAssigned(
+  tenantId: string,
+  actorRole: UserRole,
+  actorId: string,
+  assigneeUserId: string
+): Promise<void> {
+  await logAuditEvent({
+    tenantId,
+    actorRole,
+    actorId,
+    action: "people_leader_assigned",
+    targetType: "workspace",
+    targetId: assigneeUserId,
   });
 }

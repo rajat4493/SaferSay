@@ -49,7 +49,12 @@ const nextConfig: NextConfig = {
       { source: "/app/participants", destination: "/app/people", permanent: false },
       { source: "/app/settings", destination: "/app/workspace/settings", permanent: false },
       { source: "/app/billing", destination: "/app/workspace/billing", permanent: false },
-      { source: "/app/security", destination: "/app/workspace/security", permanent: false },
+      { source: "/app/security", destination: "/app/security-proof", permanent: false },
+      // /app/workspace/security was itself retired -- it wrongly nested the
+      // security-proof page under the customer_admin-only workspace layout,
+      // silently blocking compliance_reviewer (and, before that, auditor)
+      // even though the page's own permission always allowed them.
+      { source: "/app/workspace/security", destination: "/app/security-proof", permanent: false },
       { source: "/app/readiness", destination: "/console/readiness", permanent: false },
       { source: "/app/workspace/go-live", destination: "/console/readiness", permanent: false },
       { source: "/app/reports", destination: "/app", permanent: false },

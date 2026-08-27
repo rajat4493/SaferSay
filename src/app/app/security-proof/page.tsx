@@ -5,7 +5,7 @@ import { securityControls } from "@/lib/securityControls";
 
 const controls = securityControls;
 
-export default function WorkspaceSecurityPage() {
+export default function SecurityProofPage() {
   return (
     <AppShell
       title="How we protect your team's answers"

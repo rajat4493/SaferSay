@@ -2,7 +2,7 @@
  * Plain-English trust/architecture claims shown on both the public
  * `/security` page (no SaferSay account needed -- an HR admin forwards the
  * link straight to a DPO or works-council rep) and the in-app
- * `/app/workspace/security` page (same content, inside the app shell for a
+ * `/app/security-proof` page (same content, inside the app shell for a
  * signed-in admin). Single source so the two copies can't drift apart.
  */
 export const securityControls: Array<[title: string, text: string]> = [
