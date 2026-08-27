@@ -3,23 +3,33 @@
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Calendar, CheckCircle2, FileEdit, Flag, Lock, Send, ThumbsUp } from "lucide-react";
+import { ArrowLeft, Calendar, CheckCircle2, FileEdit, Flag, Info, Lock, Send, ThumbsUp, TrendingDown, TrendingUp, Users } from "lucide-react";
 import { AppShell, Card } from "@/components/AppShell";
 import { CycleTrendPanel } from "@/components/CycleTrendPanel";
 import { IconBadge } from "@/components/IconBadge";
 import { ProtectedReportPanel } from "@/components/ProtectedReportPanel";
+import { PsychologicalSafetyCard } from "@/components/PsychologicalSafetyCard";
 import { RingStat } from "@/components/RingStat";
+import { Sparkline } from "@/components/Sparkline";
 import { ThemeReportCard } from "@/components/ThemeReportCard";
+import { TrendBaselineState } from "@/components/TrendBaselineState";
 import { SurveyStageTabs } from "@/components/SurveyStageTabs";
 import { useToast } from "@/components/ToastProvider";
 import { canExportReports, canRunSurvey, canViewComments, canViewCrossCycleTrend } from "@/lib/permissions";
+import { overallScoreByCycle, type TrendPoint } from "@/lib/reportTrend";
 import { getScoreTier } from "@/lib/scoreTier";
 import { titleCaseTeam } from "@/lib/textFormat";
 import type { UserRole } from "@/lib/server/repositories/types";
 
 type CycleSummary = { id: string; name: string };
 type ReportRow = { questionId: string; label?: string; n: number; average: number | null; scaleMax?: 5 | 10 };
-type ScopedReport = { report?: { protected: boolean; n: number; rows: ReportRow[] }; eligibleCount?: number };
+type EnpsSummary = { promoterPct: number; passivePct: number; detractorPct: number; score: number };
+type ScopedReport = {
+  report?: { protected: boolean; n: number; rows: ReportRow[] };
+  eligibleCount?: number;
+  enps?: { protected: boolean; n: number; rows: EnpsSummary[] };
+};
+type TrendResponse = { ok?: boolean; questions?: Array<{ questionText: string; points: TrendPoint[] }> };
 
 // Three states a survey's results page can be in -- the page framing
 // (banner + which actions are shown) follows this, not just the raw
@@ -37,9 +47,11 @@ export default function SurveyResultsPage() {
   // that theme pre-expanded instead of landing on a collapsed list.
   const themeParam = searchParams.get("theme") ?? undefined;
   const [status, setStatus] = useState<string | null>(null);
+  const [minGroupSize, setMinGroupSize] = useState<number>(5);
   const [closing, setClosing] = useState(false);
   const [sendingReminders, setSendingReminders] = useState(false);
   const [cycles, setCycles] = useState<CycleSummary[]>([]);
+  const [trend, setTrend] = useState<TrendResponse | null>(null);
   const [protectedReport, setProtectedReport] = useState<boolean | null>(null);
   const [departments, setDepartments] = useState<string[]>([]);
   const [selectedDepartment, setSelectedDepartment] = useState<string>("");
@@ -89,13 +101,14 @@ export default function SurveyResultsPage() {
     let cancelled = false;
     fetch(`/api/cycles/${surveyId}`)
       .then((response) => response.json())
-      .then((data: { ok?: boolean; cycle?: { status: string } }) => {
+      .then((data: { ok?: boolean; cycle?: { status: string; minGroupSize: number } }) => {
         if (cancelled) return;
         if (!data.ok || !data.cycle) {
           setNotFound(true);
           return;
         }
         setStatus(data.cycle.status);
+        setMinGroupSize(data.cycle.minGroupSize);
       })
       .catch(() => undefined);
     return () => {
@@ -149,6 +162,23 @@ export default function SurveyResultsPage() {
   const eligibleCount = scopedReport?.eligibleCount ?? (selectedDepartment ? scopedEligibleCount : employeeCount);
   const responseRate = responseCount !== null && eligibleCount ? Math.round((responseCount / eligibleCount) * 100) : null;
 
+  const overallScore10 = scoredRows.length ? scoredRows.reduce((sum, row) => sum + row.average10, 0) / scoredRows.length : null;
+  // eNPS has no department scope (see /api/report's doc comment) -- only
+  // shown org-wide, so a department-scoped merged score tile falls back to
+  // score-only rather than silently showing an unscoped number next to a
+  // scoped one.
+  const enpsSummary = !selectedDepartment && scopedReport?.enps && !scopedReport.enps.protected ? scopedReport.enps.rows[0] : null;
+
+  const scoreByCycle = overallScoreByCycle(trend?.questions ?? []);
+  const currentCycleIndex = scoreByCycle.findIndex((point) => point.cycleId === surveyId);
+  const previousCycleScore = currentCycleIndex > 0 ? scoreByCycle[currentCycleIndex - 1].value : null;
+  const currentCycleScore = currentCycleIndex >= 0 ? scoreByCycle[currentCycleIndex].value : null;
+  const scoreDeltaVsLast = currentCycleScore !== null && previousCycleScore !== null ? currentCycleScore - previousCycleScore : null;
+  // Sparkline shows history up to and including the currently viewed
+  // cycle -- a later cycle's score shouldn't appear on an earlier cycle's
+  // "change vs last survey" tile.
+  const trendUpToCurrent = currentCycleIndex >= 0 ? scoreByCycle.slice(0, currentCycleIndex + 1) : [];
+
   useEffect(() => {
     fetch("/api/cycles")
       .then((response) => response.json())
@@ -156,6 +186,17 @@ export default function SurveyResultsPage() {
         if (data.ok) setCycles(data.cycles ?? []);
       })
       .catch(() => undefined);
+  }, []);
+
+  // Org-wide only, same as Overview's cross-cycle trend card -- feeds the
+  // "Change vs last survey" tile. Fetched once (not per-surveyId): it
+  // returns every cycle's data in one response, and this page just reads
+  // the one relevant to the currently viewed surveyId below.
+  useEffect(() => {
+    fetch("/api/report/trend")
+      .then((response) => response.json())
+      .then((data: TrendResponse) => setTrend(data.ok ? data : { questions: [] }))
+      .catch(() => setTrend({ questions: [] }));
   }, []);
 
   useEffect(() => {
@@ -330,7 +371,15 @@ export default function SurveyResultsPage() {
         {resultsState ? <ResultsStateBanner state={resultsState} protectedReport={protectedReport} /> : null}
 
         {scopedReport?.report && !scopedReport.report.protected ? (
-          <div className="grid gap-5 md:grid-cols-3">
+          <div className="grid gap-5 md:grid-cols-4">
+            <PsychologicalSafetyCard
+              n={scopedReport.report.n}
+              minGroupSize={minGroupSize}
+              protectedState={false}
+              score={overallScore10}
+              enps={enpsSummary}
+            />
+
             <Card className="flex flex-col items-center justify-center">
               <h2 className="meta-label self-start">Response rate</h2>
               <RingStat
@@ -343,6 +392,49 @@ export default function SurveyResultsPage() {
               <p className="secondary-text">{responseCount !== null ? `${responseCount} of ${eligibleCount ?? "?"} eligible` : "No data yet"}</p>
             </Card>
 
+            <Card>
+              <div className="flex items-center gap-1.5">
+                <h2 className="section-title">Change vs last survey</h2>
+                <span title="Every scored question this cycle vs. this cycle's immediately preceding survey, normalized to a 0-10 scale.">
+                  <Info size={13} strokeWidth={1.8} className="text-[var(--ink-faint)]" />
+                </span>
+              </div>
+              {trendUpToCurrent.length >= 2 && scoreDeltaVsLast !== null ? (
+                <>
+                  <p className="data-number mt-4 flex items-center gap-2" style={{ color: getScoreTier(scoreDeltaVsLast >= 0 ? 10 : 0).text }}>
+                    {scoreDeltaVsLast >= 0 ? <TrendingUp size={20} strokeWidth={2} /> : <TrendingDown size={20} strokeWidth={2} />}
+                    {scoreDeltaVsLast >= 0 ? "+" : ""}
+                    {scoreDeltaVsLast.toFixed(1)}
+                  </p>
+                  <Sparkline points={trendUpToCurrent.map((point) => point.value)} color={getScoreTier(scoreDeltaVsLast >= 0 ? 10 : 0).text} />
+                </>
+              ) : (
+                <TrendBaselineState heading="Baseline established" body="This is this survey's first data point." />
+              )}
+            </Card>
+
+            <Card>
+              <div className="flex items-center gap-1.5">
+                <h2 className="section-title">About this view</h2>
+                <span title="Confirms exactly what scope and status this report reflects.">
+                  <Info size={13} strokeWidth={1.8} className="text-[var(--ink-faint)]" />
+                </span>
+              </div>
+              <ul className="mt-3 space-y-2 text-[12.5px] text-[var(--ink-mid)]">
+                <li className="flex items-center gap-2">
+                  <Users size={13} strokeWidth={1.8} className="shrink-0 text-[var(--ink-faint)]" />
+                  {selectedDepartment ? titleCaseTeam(selectedDepartment) : "All teams (company-wide)"}
+                </li>
+                <li>{eligibleCount ?? "—"} eligible employees</li>
+                <li>{responseCount ?? "—"} responses</li>
+                <li className="capitalize">{status ?? "—"}</li>
+              </ul>
+            </Card>
+          </div>
+        ) : null}
+
+        {scopedReport?.report && !scopedReport.report.protected ? (
+          <div className="grid gap-5 md:grid-cols-2">
             <Card>
               <h2 className="section-title">Top strengths</h2>
               <ol className="mt-2.5 space-y-2">
@@ -391,7 +483,7 @@ export default function SurveyResultsPage() {
           </div>
         ) : null}
 
-        <ProtectedReportPanel cycleId={surveyId} department={selectedDepartment || undefined} allowExport={role ? canExportReports(role) : false} />
+        <ProtectedReportPanel cycleId={surveyId} department={selectedDepartment || undefined} allowExport={role ? canExportReports(role) : false} hideScoreCard />
 
         <ThemeReportCard cycleId={surveyId} department={selectedDepartment || undefined} initialExpandedConstruct={themeParam} />
 

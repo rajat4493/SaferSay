@@ -5,61 +5,13 @@ import Link from "next/link";
 import { Info, TrendingDown, TrendingUp } from "lucide-react";
 import { AppShell, Card } from "@/components/AppShell";
 import { Sparkline } from "@/components/Sparkline";
+import { TrendBaselineState as BaselineState } from "@/components/TrendBaselineState";
 import { getScoreTier } from "@/lib/scoreTier";
+import { overallScoreByCycle, type TrendPoint } from "@/lib/reportTrend";
 
 type Cycle = { id: string; name: string; status: string; responseCount: number; minGroupSize: number; createdAt: string };
 
-type TrendPoint = { cycleId: string; cycleName: string; cycleCreatedAt: string; n: number; average: number | null; protected: boolean; scaleMax?: 5 | 10 };
 type TrendResponse = { ok?: boolean; questions?: Array<{ questionText: string; points: TrendPoint[] }> };
-
-/**
- * One overall-score-per-cycle series, derived client-side from the
- * existing per-question cross-cycle trend endpoint (no new endpoint --
- * see reportThemes.ts's overallAverage10 for the same normalize-then-
- * average approach applied to a single cycle's rows). Each cycle's value
- * is the average, across every question released for that cycle, of the
- * question's answer normalized to a common 0-10 scale via scaleMax -- so
- * a cycle mixing likert_5 and enps_0_10 questions (e.g. the eNPS Pulse
- * template) isn't skewed by averaging raw un-normalized scores together.
- */
-function overallScoreByCycle(questions: Array<{ points: TrendPoint[] }>): Array<{ cycleId: string; cycleName: string; value: number }> {
-  const byCycle = new Map<string, { cycleName: string; total: number; count: number }>();
-  for (const question of questions) {
-    for (const point of question.points) {
-      if (point.protected || point.average === null) continue;
-      const normalized = (point.average / (point.scaleMax ?? 5)) * 10;
-      const entry = byCycle.get(point.cycleId) ?? { cycleName: point.cycleName, total: 0, count: 0 };
-      entry.total += normalized;
-      entry.count += 1;
-      byCycle.set(point.cycleId, entry);
-    }
-  }
-  return Array.from(byCycle.entries())
-    .map(([cycleId, { cycleName, total, count }]) => ({ cycleId, cycleName, value: total / count }))
-    .sort((a, b) => {
-      // Points already arrive oldest-first per question; recover that
-      // order at the cycle level from the first question with >1 point.
-      const reference = questions.find((q) => q.points.length > 1);
-      if (!reference) return 0;
-      const order = new Map(reference.points.map((p, index) => [p.cycleId, index]));
-      return (order.get(a.cycleId) ?? 0) - (order.get(b.cycleId) ?? 0);
-    });
-}
-
-/** Same "no trend yet" designed empty state used for both trend cards
- * below -- a dashed flat placeholder line instead of blank space, plus a
- * headline explaining a second data point is what's missing. */
-function BaselineState({ heading, body }: { heading: string; body: string }) {
-  return (
-    <>
-      <p className="mt-2 text-[15px] font-semibold text-[var(--ink)]">{heading}</p>
-      <p className="mt-0.5 secondary-text">{body}</p>
-      <svg viewBox="0 0 280 60" className="mt-2 h-14 w-full" aria-hidden="true">
-        <path d="M0,30 L280,30" fill="none" stroke="var(--ink-faint)" strokeWidth={2} strokeDasharray="4 5" strokeLinecap="round" />
-      </svg>
-    </>
-  );
-}
 
 export default function OverviewPage() {
   const [cycles, setCycles] = useState<Cycle[] | null>(null);

@@ -48,11 +48,21 @@ export function ProtectedReportPanel({
   cycleId,
   department,
   allowExport = true,
+  // The Results page builds its own Engagement Score tile (with eNPS
+  // merged in) as part of a 4-tile dashboard row above this panel, fed
+  // from the same /api/report data this panel already fetches for itself
+  // -- so when true, this panel skips rendering its own copy of that
+  // score card and the standalone eNPS card (both would otherwise be
+  // duplicated), keeping only the per-question list, AI synthesis, and
+  // comments. The Viewer surface doesn't build that tile, so it leaves
+  // this false and keeps the original combined layout.
+  hideScoreCard = false,
 }: {
   mode?: "admin" | "viewer";
   cycleId?: string;
   department?: string;
   allowExport?: boolean;
+  hideScoreCard?: boolean;
 }) {
   const [result, setResult] = useState<ReportResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -220,16 +230,21 @@ export function ProtectedReportPanel({
 
   return (
     <>
-      <div className="grid gap-3 md:grid-cols-2">
-        <PsychologicalSafetyCard
-          n={report?.n ?? 0}
-          minGroupSize={minGroupSize}
-          protectedState={report?.protected ?? true}
-          score={overallScore}
-          genericUnavailable={Boolean(department) && (!report || report.protected)}
-        />
+      {hideScoreCard ? (
         <AiSynthesisCard cycleId={result?.cycle?.id} locked={!report || report.protected} />
-      </div>
+      ) : (
+        <div className="grid gap-3 md:grid-cols-2">
+          <PsychologicalSafetyCard
+            n={report?.n ?? 0}
+            minGroupSize={minGroupSize}
+            protectedState={report?.protected ?? true}
+            score={overallScore}
+            enps={showEnpsSection && enpsReport ? { ...enpsReport.rows[0] } : null}
+            genericUnavailable={Boolean(department) && (!report || report.protected)}
+          />
+          <AiSynthesisCard cycleId={result?.cycle?.id} locked={!report || report.protected} />
+        </div>
+      )}
 
       <ConfidentialitySeal />
 
@@ -305,7 +320,7 @@ export function ProtectedReportPanel({
         )}
       </ShellCard>
 
-      {showEnpsSection && enpsReport ? (
+      {!hideScoreCard && showEnpsSection && enpsReport ? (
         <ShellCard className="mt-[9px]">
           <h2 className="section-title">eNPS</h2>
           <p className="mt-1 secondary-text">% promoters (9-10) minus % detractors (0-6). A -100 to 100 scale.</p>

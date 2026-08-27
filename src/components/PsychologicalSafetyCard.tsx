@@ -1,16 +1,24 @@
 import { Info } from "lucide-react";
 
+export type EnpsSummary = { promoterPct: number; passivePct: number; detractorPct: number; score: number };
+
 /**
  * Visualizes the same protected/n/minGroupSize gate ProtectedReportPanel
  * already fetches from /api/report -- real data, not a mock. The ring
- * fills toward the minimum-response threshold; once unlocked it reads
- * the actual "Psychological Safety" construct average when present.
+ * fills toward the minimum-response threshold; once unlocked it reads the
+ * overall average across every scored question this cycle. Optionally
+ * shows an eNPS promoter/passive/detractor strip beneath the ring when the
+ * cycle has a releasable eNPS question -- merged into one card (rather
+ * than a separate eNPS section elsewhere on the page) so the two headline
+ * numbers read together, matching the reference dashboard's "Engagement
+ * Score" tile.
  */
 export function PsychologicalSafetyCard({
   n,
   minGroupSize,
   protectedState,
   score,
+  enps,
   // Department-scoped suppression deliberately reports n=0 regardless of
   // the department's real count (see responseRepository.ts's
   // getDepartmentReleasability) -- so "N of minGroupSize" / "N more
@@ -24,6 +32,7 @@ export function PsychologicalSafetyCard({
   minGroupSize: number;
   protectedState: boolean;
   score: number | null;
+  enps?: EnpsSummary | null;
   genericUnavailable?: boolean;
 }) {
   const radius = 62;
@@ -34,7 +43,7 @@ export function PsychologicalSafetyCard({
   return (
     <div className="card">
       <div className="flex items-center justify-between">
-        <h2 className="section-title">Psychological Safety</h2>
+        <h2 className="section-title">Engagement Score</h2>
         <Info size={15} strokeWidth={1.8} className="text-[var(--ink-faint)]" />
       </div>
 
@@ -79,6 +88,25 @@ export function PsychologicalSafetyCard({
                 : "Based on responses collected so far for this survey."}
           </p>
         </div>
+
+        {!protectedState && !genericUnavailable && enps ? (
+          <div className="mt-4 w-full border-t border-[var(--border)] pt-3.5">
+            <div className="flex items-center justify-between text-[12.5px]">
+              <span className="font-medium text-[var(--ink-mid)]">eNPS</span>
+              <span className="font-semibold text-[var(--ink)]">{Math.round(enps.score)}</span>
+            </div>
+            <div className="mt-1.5 flex h-[7px] overflow-hidden rounded-[var(--radius-pill)] bg-[var(--bg-active)]">
+              <div className="h-full bg-[var(--enps-promoter)]" style={{ width: `${enps.promoterPct}%` }} title={`Promoters: ${enps.promoterPct.toFixed(0)}%`} />
+              <div className="h-full bg-[var(--enps-passive)]" style={{ width: `${enps.passivePct}%` }} title={`Passives: ${enps.passivePct.toFixed(0)}%`} />
+              <div className="h-full bg-[var(--enps-detractor)]" style={{ width: `${enps.detractorPct}%` }} title={`Detractors: ${enps.detractorPct.toFixed(0)}%`} />
+            </div>
+            <div className="mt-1 flex justify-between text-[11px] text-[var(--ink-faint)]">
+              <span>{enps.promoterPct.toFixed(0)}% promoters</span>
+              <span>{enps.passivePct.toFixed(0)}% passives</span>
+              <span>{enps.detractorPct.toFixed(0)}% detractors</span>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );
