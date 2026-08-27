@@ -52,7 +52,6 @@ const nextConfig: NextConfig = {
       { source: "/app/security", destination: "/app/workspace/security", permanent: false },
       { source: "/app/readiness", destination: "/console/readiness", permanent: false },
       { source: "/app/workspace/go-live", destination: "/console/readiness", permanent: false },
-      { source: "/app/integrations", destination: "/app", permanent: false },
       { source: "/app/reports", destination: "/app", permanent: false },
       { source: "/app/templates", destination: "/app/surveys/new", permanent: false },
       { source: "/app/templates/:slug", destination: "/app/surveys/new", permanent: false },
