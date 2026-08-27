@@ -73,7 +73,7 @@ export function ThemeReportCard({
         <div className="mt-2 flex items-center gap-2 text-[14px] font-medium text-[var(--ink)]">
           <EyeOff size={16} strokeWidth={1.8} /> Not available
         </div>
-        <p className="mt-2 secondary-text">Not enough responses yet to show a theme breakdown.</p>
+        <p className="mt-2 secondary-text">Themes unlock at the same response threshold as group scores above -- not enough responses yet in this scope.</p>
       </Card>
     );
   }

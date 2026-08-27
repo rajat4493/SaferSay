@@ -57,13 +57,25 @@ export default function SurveyResultsPage() {
   // auditor, but the buttons shouldn't render for them in the first place.
   const [canManage, setCanManage] = useState(false);
   const [role, setRole] = useState<UserRole | null>(null);
-  // Reset the department picker to "All teams" when the cycle changes,
-  // without setState-in-effect -- adjusting state during render in
-  // response to a changed prop is the pattern React recommends for this.
+  // Reset per-survey state when the cycle changes, without setState-in-
+  // effect -- adjusting state during render in response to a changed prop
+  // is the pattern React recommends for this. Without this, navigating
+  // client-side from one survey's results page to another's (no full
+  // remount, since it's the same route component) left the PREVIOUS
+  // survey's status/protectedReport/notFound on screen until the new
+  // fetches resolved -- so a freshly-opened cycle could briefly render as
+  // "closed"/locked/not-found based on stale data, only a hard reload
+  // (which resets React state entirely) ever showed it correctly. Real bug
+  // found in live testing: opening a new cycle's Results page rendered a
+  // locked/generic state until manually reloaded.
   const [departmentResetKey, setDepartmentResetKey] = useState(surveyId);
   if (surveyId !== departmentResetKey) {
     setDepartmentResetKey(surveyId);
     setSelectedDepartment("");
+    setStatus(null);
+    setProtectedReport(null);
+    setNotFound(false);
+    setScopedReport(null);
   }
 
   // Client-side navigation between two surveys' results pages (e.g. the

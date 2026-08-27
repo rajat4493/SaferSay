@@ -941,6 +941,13 @@ export class IdentityRepository {
       );
       granted += result.rowCount ?? 0;
     }
+    // The displayed balance (billingTerms.surveyCredits) is a cached count,
+    // not the ledger itself -- openCycleWithSurveyCredit's callers already
+    // refresh it on the consuming side (see syncSurveyCreditBalance's other
+    // call sites), so the granting side needs the same refresh or the cache
+    // stays stale (showing 0) until the next unrelated cycle-open event,
+    // even though the ledger and every real usable credit are already correct.
+    if (granted > 0) await this.syncSurveyCreditBalance(tenantId);
     return granted;
   }
 

@@ -228,7 +228,7 @@ export function ProtectedReportPanel({
           score={overallScore}
           genericUnavailable={Boolean(department) && (!report || report.protected)}
         />
-        <AiSynthesisCard locked={!report || report.protected} />
+        <AiSynthesisCard cycleId={result?.cycle?.id} locked={!report || report.protected} />
       </div>
 
       <ConfidentialitySeal />
@@ -340,7 +340,13 @@ export function ProtectedReportPanel({
               <div className="flex items-center gap-2 text-[14px] font-medium text-[var(--ink)]">
                 <EyeOff size={16} strokeWidth={1.8} /> Comments hidden
               </div>
-              <p className="mt-2 secondary-text">Not enough responses yet to show comments without risking identifying someone.</p>
+              <p className="mt-2 secondary-text">
+                {/* Open text needs a higher bar than scores -- a sentence is more
+                    identifying than a number, so this unlocks later even on the
+                    same survey (minGroupSize + 3, not the bare threshold above). */}
+                Written comments need more responses than group scores to stay safely anonymous
+                {!department && textReport.n > 0 ? ` (${textReport.n} of ${minGroupSize + 3} so far)` : ""}.
+              </p>
             </div>
           ) : (
             <>
