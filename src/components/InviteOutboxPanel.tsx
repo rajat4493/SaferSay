@@ -5,6 +5,8 @@ import { Check, Copy, ExternalLink, Send } from "lucide-react";
 import { Card } from "@/components/AppShell";
 import { InlineSpinnerRow } from "@/components/Skeleton";
 import { useToast } from "@/components/ToastProvider";
+import { canRunSurvey } from "@/lib/permissions";
+import type { UserRole } from "@/lib/server/repositories/types";
 
 type OutboxResult = {
   ok?: boolean;
@@ -48,8 +50,22 @@ export function InviteOutboxPanel({ cycleId }: { cycleId?: string } = {}) {
   const [loading, setLoading] = useState("");
   const [copiedId, setCopiedId] = useState("");
   const [developerMode, setDeveloperMode] = useState(false);
+  // Read-only roles (auditor, people_leader, compliance_reviewer) can view
+  // the Send page but must never see the actual send/queue/prepare
+  // controls -- the underlying APIs already 403 them (canRunSurvey), but
+  // the buttons shouldn't render in the first place.
+  const [canManage, setCanManage] = useState(false);
   const [, startTransition] = useTransition();
   const toast = useToast();
+
+  useEffect(() => {
+    fetch("/api/tenants/current")
+      .then((response) => response.json())
+      .then((data: { ok?: boolean; role?: UserRole }) => {
+        if (data.ok && data.role) setCanManage(canRunSurvey(data.role));
+      })
+      .catch(() => undefined);
+  }, []);
 
   async function loadSendState() {
     if (!cycleId) return;
@@ -133,11 +149,15 @@ export function InviteOutboxPanel({ cycleId }: { cycleId?: string } = {}) {
       <h2 className="section-title mt-2">Invite outbox</h2>
       <p className="mt-1.5 max-w-2xl secondary-text">Sends confidential survey links by email, tracked here only by participation status — never by answer.</p>
 
-      <div className="mt-4">
-        <SendAction state={sendState} sending={sending} onSend={sendSmart} />
-      </div>
+      {canManage ? (
+        <div className="mt-4">
+          <SendAction state={sendState} sending={sending} onSend={sendSmart} />
+        </div>
+      ) : (
+        <p className="mt-4 secondary-text">You have read-only access to this survey and can&apos;t send or manage invites.</p>
+      )}
 
-      {developerMode && sendState?.cycleStatus !== "closed" ? (
+      {canManage && developerMode && sendState?.cycleStatus !== "closed" ? (
       <details className="mt-5 group">
         <summary className="cursor-pointer select-none text-[12px] font-medium text-[var(--ink-faint)] hover:text-[var(--ink-mid)]">Developer / test mode</summary>
 

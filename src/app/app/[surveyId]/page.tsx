@@ -8,6 +8,8 @@ import { SkeletonCard, SkeletonText } from "@/components/Skeleton";
 import { SurveyStageTabs } from "@/components/SurveyStageTabs";
 import { useToast } from "@/components/ToastProvider";
 import { QuestionOptionsEditor, type QuestionOption } from "@/components/QuestionOptionsEditor";
+import { canRunSurvey } from "@/lib/permissions";
+import type { UserRole } from "@/lib/server/repositories/types";
 
 type ShowIf = { attribute: "team" | "location"; op: "eq" | "neq"; value: string } | null;
 type QuestionType = "likert_5" | "enps_0_10" | "open_text" | "multiple_choice" | "ranking" | "matrix";
@@ -69,6 +71,20 @@ function SurveyBuildContent({ surveyId }: { surveyId: string }) {
   const [saving, setSaving] = useState(false);
   const [bankQuestions, setBankQuestions] = useState<BankQuestion[]>([]);
   const [bankPickerValue, setBankPickerValue] = useState("");
+  // Read-only roles (auditor, people_leader, compliance_reviewer) can view
+  // this page but must never see the question-editing controls -- the
+  // underlying PATCH already 403s them, but the button shouldn't render in
+  // the first place, matching the same gating already applied on Results.
+  const [canManage, setCanManage] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/tenants/current")
+      .then((response) => response.json())
+      .then((data: { ok?: boolean; role?: UserRole }) => {
+        if (data.ok && data.role) setCanManage(canRunSurvey(data.role));
+      })
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     fetch(`/api/cycles/${surveyId}`)
@@ -232,7 +248,7 @@ function SurveyBuildContent({ surveyId }: { surveyId: string }) {
             <div className="card">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="section-title">Questions</h2>
-                {detail.cycle.status === "draft" && !editing ? (
+                {canManage && detail.cycle.status === "draft" && !editing ? (
                   <button onClick={startEditing} className="btn-secondary px-3 py-1.5 text-xs">
                     <Pencil size={13} strokeWidth={1.8} />
                     Edit questions

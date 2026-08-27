@@ -47,7 +47,7 @@ type NavItemConfig = {
 const primaryNavItems: NavItemConfig[] = [
   { href: "/app", label: "Home", icon: Home, hideForPureOwner: true },
   { href: "/app/overview", label: "Overview", icon: BarChart3, hideForPureOwner: true, visible: canViewSurveyResults },
-  { href: "/app/surveys", label: "Surveys", icon: ClipboardList, hideForPureOwner: true },
+  { href: "/app/surveys", label: "Surveys", icon: ClipboardList, hideForPureOwner: true, visible: canViewSurveyResults },
   { href: "/app/people", label: "People", icon: Users, hideForPureOwner: true, visible: canAccessPeople },
   { href: "/app/integrations", label: "Integrations", icon: PlugZap, hideForPureOwner: true, visible: canManageIntegrations },
 ];
@@ -88,6 +88,28 @@ export function AppShell({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [mobileNavOpen]);
+
+  // Every page under this shell fetches its own tenant-scoped data via a
+  // plain useEffect-on-mount fetch (no server-embedded data, no client
+  // cache of our own) -- so a genuinely fresh navigation always shows
+  // fresh data. The one case that bypasses that: the browser restoring a
+  // whole previous page instance from the back/forward cache (bfcache) on
+  // a back/forward navigation, or Next's own client Router Cache serving
+  // an already-hydrated instance of this exact route. Neither re-runs
+  // mount effects, so whatever an earlier account/tenant's session had
+  // fetched can still be sitting in this component's state and paint
+  // first, however briefly, before anything corrects it -- unacceptable
+  // for a confidential multi-tenant app, and exactly the "stale previous
+  // list, then it corrects itself" symptom reported from testing (which
+  // routinely switches accounts within one browser tab). A hard reload on
+  // bfcache restore is the standard fix for this failure mode.
+  useEffect(() => {
+    function onPageShow(event: PageTransitionEvent) {
+      if (event.persisted) window.location.reload();
+    }
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, []);
 
   // Pure Owner mode: signed in as the platform's super admin, not currently
   // acting inside any customer's workspace. No survey-running nav belongs
