@@ -67,13 +67,15 @@ async function upsertTemplate(db: Queryable, template: SurveyTemplate) {
   for (const [index, question] of template.questions.entries()) {
     await db.query(
       `insert into responses.template_questions
-        (id, template_id, position, question_text, question_type, construct, is_optional)
-       values ($1, $2, $3, $4, $5, $6, $7)
+        (id, template_id, position, question_text, question_type, construct, is_optional, options, matrix_group_id)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        on conflict (template_id, position) do update
        set question_text = excluded.question_text,
            question_type = excluded.question_type,
            construct = excluded.construct,
-           is_optional = excluded.is_optional`,
+           is_optional = excluded.is_optional,
+           options = excluded.options,
+           matrix_group_id = excluded.matrix_group_id`,
       [
         stableUuidFromSlug(`question:${template.slug}:${question.id}`),
         templateId,
@@ -82,6 +84,8 @@ async function upsertTemplate(db: Queryable, template: SurveyTemplate) {
         question.type,
         question.construct,
         Boolean(question.optional),
+        question.options ? JSON.stringify(question.options) : null,
+        question.matrixGroup ? stableUuidFromSlug(`matrix:${template.slug}:${question.matrixGroup}`) : null,
       ],
     );
   }

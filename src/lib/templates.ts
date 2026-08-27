@@ -1,3 +1,5 @@
+export type TemplateQuestionOption = { key: string; label: string };
+
 export type SurveyTemplate = {
   slug: string;
   name: string;
@@ -7,13 +9,65 @@ export type SurveyTemplate = {
   questions: Array<{
     id: string;
     construct: string;
-    type: "likert_5" | "enps_0_10" | "open_text";
+    type: "likert_5" | "enps_0_10" | "open_text" | "multiple_choice" | "ranking" | "matrix";
     text: string;
     optional?: boolean;
+    /** multiple_choice/ranking: the choice list. matrix: the shared column
+     * set every row in the group answers against. Unused otherwise. */
+    options?: TemplateQuestionOption[];
+    /** Matrix rows sharing this key render as one grid on the taker
+     * surface and tally as one visual group in reports -- see
+     * db/migrations/0030_question_types_and_branching.sql's doc comment.
+     * A stable per-template UUID is derived from this key in
+     * surveyCycleService.ts, not stored here. */
+    matrixGroup?: string;
   }>;
 };
 
 export const surveyTemplates: SurveyTemplate[] = [
+  {
+    slug: "full-engagement-survey",
+    name: "Full Engagement Survey",
+    category: "Engagement",
+    duration: "22 questions · 10 minutes",
+    description:
+      "A complete engagement survey across seven themes, plus eNPS -- enough breadth for a real theme heatmap and strengths/priorities read, not just a handful of one-off questions.",
+    questions: [
+      // Two to three questions per theme -- a single question per construct
+      // can't produce a meaningful per-theme average, and a report with
+      // only 7-8 one-question "themes" reads as a flat list, not the
+      // heatmap this template is built to feed.
+      { id: "q1", construct: "Engagement", type: "likert_5", text: "I would recommend this company as a great place to work." },
+      { id: "q2", construct: "Engagement", type: "likert_5", text: "I feel motivated to go above and beyond in my role." },
+      { id: "q3", construct: "Purpose & Values", type: "likert_5", text: "I understand how my work connects to the company's mission." },
+      { id: "q4", construct: "Purpose & Values", type: "likert_5", text: "I am proud to work at this company." },
+      { id: "q5", construct: "Clarity & Autonomy", type: "likert_5", text: "I understand what is expected of me at work." },
+      { id: "q6", construct: "Clarity & Autonomy", type: "likert_5", text: "I have enough autonomy to do my job well." },
+      { id: "q7", construct: "Growth & Support", type: "likert_5", text: "I can see a path to learn and grow in my role." },
+      { id: "q8", construct: "Growth & Support", type: "likert_5", text: "I have the tools and resources I need to do good work." },
+      { id: "q9", construct: "Growth & Support", type: "likert_5", text: "I receive useful feedback on my performance." },
+      { id: "q10", construct: "Inclusion & Voice", type: "likert_5", text: "I can raise concerns here without it counting against me." },
+      { id: "q11", construct: "Inclusion & Voice", type: "likert_5", text: "People of all backgrounds are treated fairly here." },
+      { id: "q12", construct: "Inclusion & Voice", type: "likert_5", text: "My opinion seems to matter in decisions that affect my work." },
+      { id: "q13", construct: "Wellbeing & Reward", type: "likert_5", text: "My workload is manageable." },
+      { id: "q14", construct: "Wellbeing & Reward", type: "likert_5", text: "I am fairly compensated for the work I do." },
+      { id: "q15", construct: "Wellbeing & Reward", type: "likert_5", text: "I can maintain a healthy balance between work and life outside it." },
+      { id: "q16", construct: "Leadership & Direction", type: "likert_5", text: "I understand where the company is heading and why." },
+      { id: "q17", construct: "Leadership & Direction", type: "likert_5", text: "Senior leaders communicate clearly and often." },
+      // NOTE: multiple_choice/ranking/matrix answers are captured and can
+      // be suppression-aggregated (getProtectedOptionReport already
+      // exists), but that method has zero callers anywhere in the app --
+      // no API route, no UI. Using those question types here would collect
+      // real respondent data nobody could ever see in a report. Kept to
+      // likert_5 until that reporting surface actually exists; see the
+      // follow-up note where this template is documented.
+      { id: "q18", construct: "Leadership & Direction", type: "likert_5", text: "My manager is approachable when I need to talk." },
+      { id: "q19", construct: "Leadership & Direction", type: "likert_5", text: "My manager gives me feedback that helps me improve." },
+      { id: "q20", construct: "Leadership & Direction", type: "likert_5", text: "My manager treats decisions about my work fairly." },
+      { id: "q21", construct: "eNPS", type: "enps_0_10", text: "How likely are you to recommend this company as a place to work?" },
+      { id: "q22", construct: "Open text", type: "open_text", text: "What is the one thing we should change to make this a better place to work?", optional: true },
+    ],
+  },
   {
     slug: "engagement-check",
     name: "Engagement Check",
