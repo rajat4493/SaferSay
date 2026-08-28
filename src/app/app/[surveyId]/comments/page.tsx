@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useParams } from "next/navigation";
 import { EyeOff } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { CommentText, StrongLanguageBadge } from "@/components/CommentText";
+import type { CommentDisplayMode } from "@/lib/profanityFilter";
 import { titleCaseTeam } from "@/lib/textFormat";
 
 type TextRow = { questionId: string; label?: string; construct?: string | null; n: number; answers: string[] };
@@ -31,6 +33,38 @@ export default function CommentsPage() {
   const [result, setResult] = useState<ReportResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [, startTransition] = useTransition();
+  // A per-viewer reading preference, not a tenant policy -- stored only in
+  // this browser. Raw is the default everywhere: nothing is hidden or
+  // softened unless the person reading it chooses to. Different readers
+  // of the same anonymous comments genuinely have different tolerance for
+  // strong language (a named manager reading a comment about themselves
+  // is not the same experience as HR reading it), so this is deliberately
+  // individual, not organization-wide.
+  const [displayMode, setDisplayMode] = useState<CommentDisplayMode>("raw");
+
+  useEffect(() => {
+    // Deferred a tick, same reasoning as BrandProvider's cached-value
+    // effect: keeps this out of the synchronous effect body so it can't
+    // trigger a same-tick cascading render, and starting at "raw" matches
+    // what the server rendered, so hydration has nothing to mismatch.
+    try {
+      const saved = window.localStorage.getItem("safersay-comment-display-mode");
+      if (saved === "raw" || saved === "highlight" || saved === "filter") {
+        queueMicrotask(() => setDisplayMode(saved));
+      }
+    } catch {
+      // localStorage unavailable -- stay on the "raw" default.
+    }
+  }, []);
+
+  function changeDisplayMode(mode: CommentDisplayMode) {
+    setDisplayMode(mode);
+    try {
+      window.localStorage.setItem("safersay-comment-display-mode", mode);
+    } catch {
+      // Best-effort only -- the preference just won't persist across visits.
+    }
+  }
 
   useEffect(() => {
     fetch(`/api/report/departments?cycleId=${encodeURIComponent(surveyId)}`)
@@ -80,6 +114,16 @@ export default function CommentsPage() {
       subtitle="What people said, filterable by team and theme."
       headerActions={
         <>
+          <select
+            value={displayMode}
+            onChange={(e) => changeDisplayMode(e.target.value as CommentDisplayMode)}
+            className="pill-select"
+            title="How you'd like to read strong language in these comments -- only affects your own view."
+          >
+            <option value="raw">Raw clarity</option>
+            <option value="highlight">Highlight strong language</option>
+            <option value="filter">Filter strong language</option>
+          </select>
           <select value={selectedDepartment} onChange={(e) => setSelectedDepartment(e.target.value)} className="pill-select" title="Team-level comments still respect the anonymity threshold.">
             <option value="">All teams</option>
             {departments.map((department) => (
@@ -138,7 +182,8 @@ export default function CommentsPage() {
               <div className="mt-2 space-y-2">
                 {row.answers.map((answer, index) => (
                   <p key={index} className="rounded-[var(--radius-input)] border border-[var(--border)] bg-white p-3 text-[13px] leading-[1.5] text-[var(--ink)]">
-                    {answer}
+                    <CommentText text={answer} mode={displayMode} />
+                    {displayMode === "raw" ? <StrongLanguageBadge text={answer} /> : null}
                   </p>
                 ))}
               </div>
