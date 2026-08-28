@@ -34,3 +34,10 @@ export function wantsSmtpUpdate(body: SmtpUpdateFields): boolean {
 export function isSmtpUpdateIncomplete(body: SmtpUpdateFields): boolean {
   return !body.smtpPort || !body.smtpUsername?.trim() || !body.smtpPassword?.trim() || !body.smtpFromEmail?.trim();
 }
+
+/** A bare domain (no scheme, no "@", no path) -- what an admin types to
+ * register their company's IdP, and what a staff member's email is
+ * matched against at sign-in via supabase.auth.signInWithSSO({domain}). */
+export function isValidSsoDomain(value: string): boolean {
+  return /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/i.test(value.trim());
+}

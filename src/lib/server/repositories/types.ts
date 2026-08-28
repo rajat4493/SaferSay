@@ -181,6 +181,20 @@ export type TenantSelfSettings = {
   // Never the webhook URL itself -- just enough for the settings UI to
   // show "connected" vs "not connected", same convention as smtpConfigured.
   slackConnected: boolean;
+  // Enterprise SSO (SAML) for staff roles only -- never survey takers.
+  // ssoDomain is shown back to the admin for confirmation; the metadata
+  // URL/XML and Supabase provider id are not (write-only, like SMTP's
+  // password).
+  ssoConnected: boolean;
+  ssoDomain: string | null;
+};
+
+export type TenantSsoConfig = {
+  domain: string | null;
+  metadataUrl: string | null;
+  hasMetadataXml: boolean;
+  providerId: string | null;
+  enabled: boolean;
 };
 
 export type CycleAction = {

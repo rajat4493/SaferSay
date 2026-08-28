@@ -45,6 +45,8 @@ export type AuditLogAction =
   | "team_member_removed"
   | "team_member_role_changed"
   | "people_leader_assigned"
+  | "sso_connected"
+  | "sso_disconnected"
   | "data_retention_purged"
   | "deletion_requested"
   | "commitment_published"
@@ -461,5 +463,33 @@ export async function logPeopleLeaderAssigned(
     action: "people_leader_assigned",
     targetType: "workspace",
     targetId: assigneeUserId,
+  });
+}
+
+/**
+ * SSO connect/disconnect. A company domain (e.g. "frodo.com") is not an
+ * email address and doesn't match validateDetailsNoPII's guard, so it's
+ * safe in `details` -- unlike a person's email, it doesn't identify any
+ * individual, only the tenant's own organization, which the tenant_id
+ * column already identifies anyway.
+ */
+export async function logSsoConnected(tenantId: string, actorRole: UserRole, actorId: string, domain: string): Promise<void> {
+  await logAuditEvent({
+    tenantId,
+    actorRole,
+    actorId,
+    action: "sso_connected",
+    targetType: "workspace",
+    details: `domain: ${domain}`,
+  });
+}
+
+export async function logSsoDisconnected(tenantId: string, actorRole: UserRole, actorId: string): Promise<void> {
+  await logAuditEvent({
+    tenantId,
+    actorRole,
+    actorId,
+    action: "sso_disconnected",
+    targetType: "workspace",
   });
 }

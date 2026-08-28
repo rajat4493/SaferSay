@@ -28,6 +28,7 @@ import {
   TenantPlanTier,
   TenantRecord,
   TenantSelfSettings,
+  TenantSsoConfig,
   TenantSupportNote,
   UserRecord,
   UserRole,
@@ -635,6 +636,68 @@ export class IdentityRepository {
     );
   }
 
+  /** Staff-only enterprise SSO config. Never used or consulted by the
+   * respondent /s/[token] flow -- that surface has no Supabase Auth
+   * session, so nothing here is reachable from it. */
+  async getTenantSsoConfig(tenantId: string): Promise<TenantSsoConfig> {
+    const result = await this.db.query<{
+      sso_domain: string | null;
+      sso_metadata_url: string | null;
+      sso_metadata_xml_encrypted: string | null;
+      sso_provider_id: string | null;
+      sso_enabled: boolean;
+    }>(
+      `select sso_domain, sso_metadata_url, sso_metadata_xml_encrypted, sso_provider_id, sso_enabled
+       from identity.tenant_settings where tenant_id = $1`,
+      [tenantId],
+    );
+    const row = result.rows[0];
+    return {
+      domain: row?.sso_domain ?? null,
+      metadataUrl: row?.sso_metadata_url ?? null,
+      hasMetadataXml: Boolean(row?.sso_metadata_xml_encrypted),
+      providerId: row?.sso_provider_id ?? null,
+      enabled: row?.sso_enabled ?? false,
+    };
+  }
+
+  async setTenantSsoConfig(
+    tenantId: string,
+    config: { domain: string; metadataUrl: string | null; metadataXml: string | null; providerId: string; enabled: boolean }
+  ) {
+    await this.db.query(
+      `insert into identity.tenant_settings (tenant_id, sso_domain, sso_metadata_url, sso_metadata_xml_encrypted, sso_provider_id, sso_enabled)
+       values ($1, $2, $3, $4, $5, $6)
+       on conflict (tenant_id) do update set
+         sso_domain = excluded.sso_domain,
+         sso_metadata_url = excluded.sso_metadata_url,
+         sso_metadata_xml_encrypted = excluded.sso_metadata_xml_encrypted,
+         sso_provider_id = excluded.sso_provider_id,
+         sso_enabled = excluded.sso_enabled,
+         updated_at = now()`,
+      [
+        tenantId,
+        config.domain,
+        config.metadataUrl,
+        config.metadataXml ? encryptSecret(config.metadataXml) : null,
+        config.providerId,
+        config.enabled,
+      ],
+    );
+  }
+
+  /** Clears the tenant's SSO config after the provider is deregistered
+   * from Supabase (or when the operator couldn't reach Supabase but the
+   * tenant still wants their local record wiped). */
+  async clearTenantSsoConfig(tenantId: string) {
+    await this.db.query(
+      `update identity.tenant_settings
+       set sso_domain = null, sso_metadata_url = null, sso_metadata_xml_encrypted = null, sso_provider_id = null, sso_enabled = false, updated_at = now()
+       where tenant_id = $1`,
+      [tenantId],
+    );
+  }
+
   /**
    * The one deliberate, auditable, grep-able place identity is read for a
    * survey token outside the normal severed flow -- do NOT widen
@@ -819,6 +882,8 @@ export class IdentityRepository {
       smtp_host: string | null;
       smtp_from_email: string | null;
       slack_webhook_url_encrypted: string | null;
+      sso_enabled: boolean;
+      sso_domain: string | null;
     }>(
       `select
          coalesce(default_min_group_size, 5) as default_min_group_size,
@@ -828,7 +893,9 @@ export class IdentityRepository {
          safety_contact_email,
          smtp_host,
          smtp_from_email,
-         slack_webhook_url_encrypted
+         slack_webhook_url_encrypted,
+         sso_enabled,
+         sso_domain
        from identity.tenant_settings where tenant_id = $1`,
       [tenantId],
     );
@@ -845,6 +912,8 @@ export class IdentityRepository {
       smtpConfigured: Boolean(row?.smtp_host),
       smtpFromEmail: row?.smtp_from_email ?? null,
       slackConnected: Boolean(row?.slack_webhook_url_encrypted),
+      ssoConnected: Boolean(row?.sso_enabled),
+      ssoDomain: row?.sso_domain ?? null,
     };
   }
 
