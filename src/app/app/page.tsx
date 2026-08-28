@@ -52,6 +52,20 @@ export default function HomePage() {
           router.replace("/app/integrations");
           return;
         }
+        // Reporting personas do not have operational work to do on Home.
+        // Their focused landing page is the report list, where each cycle
+        // resolves into the role's server-enforced safe report scope.
+        if (data.role === "auditor" || data.role === "people_leader" || data.role === "compliance_reviewer") {
+          router.replace("/app/surveys");
+          return;
+        }
+        // Employees are respondents, not admin-app users.  This should not
+        // normally occur because they are never provisioned an app account,
+        // but fails closed if an identity is ever created accidentally.
+        if (data.role === "employee") {
+          router.replace("/login");
+          return;
+        }
         setCanCreate(canCreateSurvey(data.role as UserRole));
         setMode("home");
       })

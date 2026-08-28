@@ -51,10 +51,10 @@ const primaryNavItems: NavItemConfig[] = [
     label: "Home",
     icon: Home,
     hideForPureOwner: true,
-    visible: (role) => role !== "people_leader",
+    visible: (role) => role === "customer_admin" || role === "survey_creator",
   },
-  { href: "/app/overview", label: "Overview", icon: BarChart3, hideForPureOwner: true, visible: canViewSurveyResults },
-  { href: "/app/surveys", label: "Surveys", icon: ClipboardList, hideForPureOwner: true, visible: canViewSurveyResults },
+  { href: "/app/overview", label: "Overview", icon: BarChart3, hideForPureOwner: true, visible: (role) => role === "customer_admin" || role === "survey_creator" },
+  { href: "/app/surveys", label: "Surveys", icon: ClipboardList, hideForPureOwner: true, visible: (role) => role === "customer_admin" || role === "survey_creator" },
   { href: "/app/people", label: "People", icon: Users, hideForPureOwner: true, visible: canAccessPeople },
   { href: "/app/integrations", label: "Integrations", icon: PlugZap, hideForPureOwner: true, visible: canManageIntegrations },
 ];
@@ -66,6 +66,19 @@ const primaryNavItems: NavItemConfig[] = [
 // survey list, from which they can open only their server-scoped results.
 const peopleLeaderNavItems: NavItemConfig[] = [
   { href: "/app/surveys", label: "Reports", icon: BarChart3, hideForPureOwner: true, visible: canViewSurveyResults },
+];
+
+// Read-only reporting personas do not run the listening programme.  A
+// generic Home or programme Overview only creates dead-end calls to action
+// and, for compliance, can load cross-cycle widgets that are intentionally
+// unavailable.  The report list is their focused entry point; the report
+// itself supplies the safe links to comments, exports, and detail.
+const reportViewerNavItems: NavItemConfig[] = [
+  { href: "/app/surveys", label: "Reports", icon: BarChart3, hideForPureOwner: true, visible: canViewSurveyResults },
+];
+
+const integrationNavItems: NavItemConfig[] = [
+  { href: "/app/integrations", label: "Integrations", icon: PlugZap, hideForPureOwner: true, visible: canManageIntegrations },
 ];
 
 const foldedMenuItems: NavItemConfig[] = [
@@ -144,7 +157,19 @@ export function AppShell({
       return true;
     });
 
-  const navItems = info?.role === "people_leader" ? peopleLeaderNavItems : primaryNavItems;
+  const navItems = (() => {
+    switch (info?.role) {
+      case "people_leader":
+        return peopleLeaderNavItems;
+      case "auditor":
+      case "compliance_reviewer":
+        return reportViewerNavItems;
+      case "integration_admin":
+        return integrationNavItems;
+      default:
+        return primaryNavItems;
+    }
+  })();
   const visiblePrimaryItems = loaded ? filterItems(navItems) : [];
   const visibleFoldedItems = loaded ? filterItems(foldedMenuItems) : [];
 
