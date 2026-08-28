@@ -9,6 +9,8 @@ import { useToast } from "@/components/ToastProvider";
 import { useTenantSession } from "@/lib/useTenantSession";
 import { surveyTemplates } from "@/lib/templates";
 
+type ActionMode = "insights_only" | "tracked" | "tracked_with_rollup";
+
 type Settings = {
   minGroupSize: number;
   dataResidencyRegion: string;
@@ -18,6 +20,7 @@ type Settings = {
   smtpConfigured: boolean;
   smtpFromEmail: string | null;
   slackConnected: boolean;
+  actionMode: ActionMode;
 };
 
 type ApiKey = { id: string; label: string | null; createdAt: string; revokedAt: string | null };
@@ -42,6 +45,7 @@ export function TenantSettingsPanel() {
   // Same "draft until saved, then fall back to fresh settings" pattern as
   // sliderValue -- this is a plain text field though, so it commits on an
   // explicit Save click, not a drag-release.
+  const [savingActionMode, setSavingActionMode] = useState(false);
   const [safetyContactDraft, setSafetyContactDraft] = useState<string | null>(null);
   const [savingSafetyContact, setSavingSafetyContact] = useState(false);
   const [smtpHost, setSmtpHost] = useState("");
@@ -257,6 +261,23 @@ export function TenantSettingsPanel() {
     }
   }
 
+  async function saveActionMode(mode: ActionMode) {
+    setSavingActionMode(true);
+    const response = await fetch("/api/tenants/settings", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ actionMode: mode }),
+    });
+    const data = await response.json().catch(() => ({ ok: false }));
+    setSavingActionMode(false);
+    if (data.ok) {
+      setSettings(data.settings);
+      toast.show({ variant: "success", message: "Action-tracking mode updated." });
+    } else {
+      toast.show({ variant: "error", message: "Couldn't save that setting. Try again." });
+    }
+  }
+
   async function saveSafetyContact() {
     if (safetyContactDraft === null) return;
     setSavingSafetyContact(true);
@@ -393,6 +414,41 @@ export function TenantSettingsPanel() {
             className="flex-1"
           />
           <span className="data-number w-10 text-[16px]">{sliderValue ?? settings.minGroupSize}</span>
+        </div>
+      </Card>
+
+      <Card>
+        <h2 className="section-title">Recognize, recommend, act</h2>
+        <p className="mt-1.5 secondary-text">
+          Every report already includes free recognition and recommendations -- this only controls whether you can turn one into a
+          tracked, dated commitment. Nothing here is enforcement: a stale commitment is only ever visible to you.
+        </p>
+        <div className="mt-4 grid gap-2">
+          {(
+            [
+              { value: "insights_only" as const, label: "Insights only", description: "Recommendations, no tracking. Today's behavior." },
+              { value: "tracked" as const, label: "Track commitments", description: "Turn a recommendation into a commitment with a status and progress updates." },
+              { value: "tracked_with_rollup" as const, label: "Track + show me the rollup", description: "Also adds an org-wide view of every commitment's status across surveys, visible only to you." },
+            ]
+          ).map((option) => (
+            <label
+              key={option.value}
+              className={`flex cursor-pointer items-start gap-3 rounded-[var(--radius-input)] border p-3 ${settings.actionMode === option.value ? "border-[var(--ink)] bg-[var(--bg)]" : "border-[var(--border)]"}`}
+            >
+              <input
+                type="radio"
+                name="actionMode"
+                checked={settings.actionMode === option.value}
+                disabled={savingActionMode}
+                onChange={() => saveActionMode(option.value)}
+                className="mt-1"
+              />
+              <span>
+                <span className="block text-[13px] font-medium text-[var(--ink)]">{option.label}</span>
+                <span className="block text-[12px] text-[var(--ink-soft)]">{option.description}</span>
+              </span>
+            </label>
+          ))}
         </div>
       </Card>
 

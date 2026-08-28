@@ -8,9 +8,14 @@ export async function GET() {
   if (!session) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
-  const firstRunCompleted = await withTenantScopedDb(session.tenant.id, (db) =>
-    new IdentityRepository(db).getFirstRunState(session.tenant.id),
-  );
+  const { firstRunCompleted, actionMode } = await withTenantScopedDb(session.tenant.id, async (db) => {
+    const repo = new IdentityRepository(db);
+    // Sequential, not Promise.all -- may run on a single tenant-scoped
+    // connection, same reasoning as the note in /api/invites/send.
+    const firstRun = await repo.getFirstRunState(session.tenant.id);
+    const settings = await repo.getTenantSelfSettings(session.tenant.id);
+    return { firstRunCompleted: firstRun, actionMode: settings.actionMode };
+  });
   return NextResponse.json({
     ok: true,
     tenant: session.tenant,
@@ -20,6 +25,7 @@ export async function GET() {
     isSuperAdmin: session.isSuperAdmin,
     isImpersonating: isPlatformOwnerImpersonating(session),
     firstRunCompleted,
+    actionMode,
     source: "session",
   });
 }

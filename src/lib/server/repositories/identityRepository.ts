@@ -884,6 +884,7 @@ export class IdentityRepository {
       slack_webhook_url_encrypted: string | null;
       sso_enabled: boolean;
       sso_domain: string | null;
+      action_mode: TenantSelfSettings["actionMode"];
     }>(
       `select
          coalesce(default_min_group_size, 5) as default_min_group_size,
@@ -895,7 +896,8 @@ export class IdentityRepository {
          smtp_from_email,
          slack_webhook_url_encrypted,
          sso_enabled,
-         sso_domain
+         sso_domain,
+         coalesce(action_mode, 'insights_only') as action_mode
        from identity.tenant_settings where tenant_id = $1`,
       [tenantId],
     );
@@ -914,6 +916,7 @@ export class IdentityRepository {
       slackConnected: Boolean(row?.slack_webhook_url_encrypted),
       ssoConnected: Boolean(row?.sso_enabled),
       ssoDomain: row?.sso_domain ?? null,
+      actionMode: row?.action_mode ?? "insights_only",
     };
   }
 
@@ -942,59 +945,89 @@ export class IdentityRepository {
     }));
   }
 
+  private mapCommitmentRow(row: {
+    id: string; cycle_id: string; statement: string; target_date: string;
+    status: CycleCommitment["status"]; progress_update: string | null;
+    published_at: string; updated_at: string; source: CycleCommitment["source"];
+  }): CycleCommitment {
+    return {
+      id: row.id, cycleId: row.cycle_id, statement: row.statement, targetDate: row.target_date,
+      status: row.status, progressUpdate: row.progress_update, publishedAt: row.published_at,
+      updatedAt: row.updated_at, source: row.source,
+    };
+  }
+
+  private static readonly COMMITMENT_COLUMNS =
+    "id, cycle_id, statement, target_date::text as target_date, status, progress_update, published_at::text as published_at, updated_at::text as updated_at, source";
+
+  /** A cycle can carry any number of commitments (see 0048's constraint
+   * drop) -- newest first, matching how the panel and rollup both want to
+   * read them. */
   async listCycleCommitments(tenantId: string, cycleId: string): Promise<CycleCommitment[]> {
-    const result = await this.db.query<{
-      id: string; cycle_id: string; statement: string; target_date: string;
-      status: CycleCommitment["status"]; progress_update: string | null;
-      published_at: string; updated_at: string;
-    }>(
-      `select id, cycle_id, statement, target_date::text as target_date, status, progress_update,
-              published_at::text as published_at, updated_at::text as updated_at
-       from identity.cycle_commitments where tenant_id = $1 and cycle_id = $2`,
+    const result = await this.db.query<Parameters<typeof this.mapCommitmentRow>[0]>(
+      `select ${IdentityRepository.COMMITMENT_COLUMNS}
+       from identity.cycle_commitments where tenant_id = $1 and cycle_id = $2
+       order by published_at desc`,
       [tenantId, cycleId],
     );
-    return result.rows.map((row) => ({
-      id: row.id, cycleId: row.cycle_id, statement: row.statement, targetDate: row.target_date,
-      status: row.status, progressUpdate: row.progress_update, publishedAt: row.published_at, updatedAt: row.updated_at,
-    }));
+    return result.rows.map((row) => this.mapCommitmentRow(row));
   }
 
-  async publishCycleCommitment(tenantId: string, cycleId: string, statement: string, targetDate: string): Promise<CycleCommitment> {
-    const result = await this.db.query<{
-      id: string; cycle_id: string; statement: string; target_date: string;
-      status: CycleCommitment["status"]; progress_update: string | null;
-      published_at: string; updated_at: string;
-    }>(
-      `insert into identity.cycle_commitments
-         (id, tenant_id, cycle_id, statement, target_date, status, published_at, updated_at)
-       values ($1, $2, $3, $4, $5::date, 'published', now(), now())
-       on conflict (tenant_id, cycle_id) do update
-         set statement = excluded.statement, target_date = excluded.target_date, status = 'published',
-             progress_update = null, published_at = now(), updated_at = now()
-       returning id, cycle_id, statement, target_date::text as target_date, status, progress_update,
-                 published_at::text as published_at, updated_at::text as updated_at`,
-      [randomUUID(), tenantId, cycleId, statement, targetDate],
+  /** Always inserts a new row -- no more "one commitment per cycle"
+   * upsert. Multiple commitments (manual and insight-sourced alike) can
+   * coexist on the same cycle and are tracked independently. */
+  async createCommitment(
+    tenantId: string, cycleId: string, statement: string, targetDate: string, source: CycleCommitment["source"] = "manual"
+  ): Promise<CycleCommitment> {
+    const result = await this.db.query<Parameters<typeof this.mapCommitmentRow>[0]>(
+      `insert into identity.cycle_commitments (id, tenant_id, cycle_id, statement, target_date, status, source, published_at, updated_at)
+       values ($1, $2, $3, $4, $5::date, 'published', $6, now(), now())
+       returning ${IdentityRepository.COMMITMENT_COLUMNS}`,
+      [randomUUID(), tenantId, cycleId, statement, targetDate, source],
     );
-    const row = result.rows[0];
-    return { id: row.id, cycleId: row.cycle_id, statement: row.statement, targetDate: row.target_date,
-      status: row.status, progressUpdate: row.progress_update, publishedAt: row.published_at, updatedAt: row.updated_at };
+    return this.mapCommitmentRow(result.rows[0]);
   }
 
-  async updateCycleCommitment(tenantId: string, cycleId: string, status: Exclude<CycleCommitment["status"], "published">, progressUpdate: string): Promise<CycleCommitment | null> {
-    const result = await this.db.query<{
-      id: string; cycle_id: string; statement: string; target_date: string;
-      status: CycleCommitment["status"]; progress_update: string | null;
-      published_at: string; updated_at: string;
-    }>(
+  /** Updates one specific commitment by id (not "the cycle's commitment"
+   * -- there can be several now), still tenant-scoped so a request can
+   * never touch another tenant's row. */
+  async updateCommitment(
+    tenantId: string, commitmentId: string, status: Exclude<CycleCommitment["status"], "published">, progressUpdate: string
+  ): Promise<CycleCommitment | null> {
+    const result = await this.db.query<Parameters<typeof this.mapCommitmentRow>[0]>(
       `update identity.cycle_commitments set status = $3, progress_update = $4, updated_at = now()
-       where tenant_id = $1 and cycle_id = $2
-       returning id, cycle_id, statement, target_date::text as target_date, status, progress_update,
-                 published_at::text as published_at, updated_at::text as updated_at`,
-      [tenantId, cycleId, status, progressUpdate || null],
+       where tenant_id = $1 and id = $2
+       returning ${IdentityRepository.COMMITMENT_COLUMNS}`,
+      [tenantId, commitmentId, status, progressUpdate || null],
     );
-    const row = result.rows[0];
-    return row ? { id: row.id, cycleId: row.cycle_id, statement: row.statement, targetDate: row.target_date,
-      status: row.status, progressUpdate: row.progress_update, publishedAt: row.published_at, updatedAt: row.updated_at } : null;
+    return result.rows[0] ? this.mapCommitmentRow(result.rows[0]) : null;
+  }
+
+  /** Every commitment across every cycle for this tenant -- identity-only
+   * data (statement/status/dates), no response content, no participation
+   * data. cycle_id is returned as-is; the API route resolves cycle names
+   * via ResponseRepository separately (identity.cycle_commitments has no
+   * FK into responses.survey_cycles by design -- see 0023's no-cross-
+   * schema-FK note). "Stale" here just means "past its target date and
+   * not marked complete" -- a visibility signal for the workspace owner
+   * who opted into seeing it, never a flag shown to anyone else. */
+  async listAllCommitments(tenantId: string): Promise<CycleCommitment[]> {
+    const result = await this.db.query<Parameters<typeof this.mapCommitmentRow>[0]>(
+      `select ${IdentityRepository.COMMITMENT_COLUMNS}
+       from identity.cycle_commitments where tenant_id = $1
+       order by target_date asc`,
+      [tenantId],
+    );
+    return result.rows.map((row) => this.mapCommitmentRow(row));
+  }
+
+  async setActionMode(tenantId: string, mode: TenantSelfSettings["actionMode"]) {
+    await this.db.query(
+      `insert into identity.tenant_settings (tenant_id, action_mode)
+       values ($1, $2)
+       on conflict (tenant_id) do update set action_mode = excluded.action_mode, updated_at = now()`,
+      [tenantId, mode],
+    );
   }
 
   async grantSurveyCredits(tenantId: string, count: number, sourceReference: string): Promise<number> {

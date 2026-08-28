@@ -70,6 +70,7 @@ export default function SurveyResultsPage() {
   // auditor, but the buttons shouldn't render for them in the first place.
   const [canManage, setCanManage] = useState(false);
   const [role, setRole] = useState<UserRole | null>(null);
+  const [actionMode, setActionMode] = useState<"insights_only" | "tracked" | "tracked_with_rollup">("insights_only");
   // Reset per-survey state when the cycle changes, without setState-in-
   // effect -- adjusting state during render in response to a changed prop
   // is the pattern React recommends for this. Without this, navigating
@@ -203,11 +204,12 @@ export default function SurveyResultsPage() {
   useEffect(() => {
     fetch("/api/tenants/current")
       .then((response) => response.json())
-      .then((data: { ok?: boolean; role?: UserRole }) => {
+      .then((data: { ok?: boolean; role?: UserRole; actionMode?: "insights_only" | "tracked" | "tracked_with_rollup" }) => {
         if (data.ok) {
           const nextRole = data.role as UserRole;
           setRole(nextRole);
           setCanManage(canRunSurvey(data.role as UserRole));
+          if (data.actionMode) setActionMode(data.actionMode);
         }
       })
       .catch(() => undefined);
@@ -494,7 +496,7 @@ export default function SurveyResultsPage() {
           </Link>
         </p> : null}
 
-        {role === "customer_admin" && protectedReport === false ? <CycleCommitmentPanel cycleId={surveyId} /> : null}
+        {role === "customer_admin" && protectedReport === false && actionMode !== "insights_only" ? <CycleCommitmentPanel cycleId={surveyId} /> : null}
 
         {role && canViewCrossCycleTrend(role) && cycles.length > 1 ? <CycleTrendPanel /> : null}
 

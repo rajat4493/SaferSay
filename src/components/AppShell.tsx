@@ -7,6 +7,7 @@ import {
   CreditCard,
   Home,
   Library,
+  ListChecks,
   Lock,
   LockKeyhole,
   Menu,
@@ -57,6 +58,7 @@ const foldedMenuItems: NavItemConfig[] = [
   { href: "/app/workspace/settings", label: "Settings", icon: Settings, hideForPureOwner: true, visible: canAccessWorkspace },
   { href: "/app/workspace/billing", label: "Billing", icon: CreditCard, hideForPureOwner: true, visible: canAccessWorkspace },
   { href: "/app/workspace/team", label: "Team", icon: UserPlus, hideForPureOwner: true, visible: canAccessWorkspace },
+  { href: "/app/workspace/commitments", label: "Commitments", icon: ListChecks, hideForPureOwner: true, visible: canAccessWorkspace },
   { href: "/app/security-proof", label: "Security", icon: LockKeyhole, hideForPureOwner: true, visible: canAccessSecurityProof },
   { href: "/app/audit-log", label: "Audit log", icon: ScrollText, hideForPureOwner: true, visible: canAccessAuditLog },
 ];

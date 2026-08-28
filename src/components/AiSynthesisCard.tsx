@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { ArrowRight, EyeOff, Lock, Zap } from "lucide-react";
+import { ArrowRight, CheckCircle2, EyeOff, Lock, PlusCircle, Zap } from "lucide-react";
+import { useToast } from "@/components/ToastProvider";
 
 type AIInsights = {
   summary: string;
@@ -34,6 +35,44 @@ const SHELL_CLASS = "card border-dashed bg-[var(--bg)] shadow-none";
 export function AiSynthesisCard({ cycleId, locked = false }: { cycleId?: string; locked?: boolean }) {
   const [state, setState] = useState<FetchState>({ kind: "loading" });
   const [, startTransition] = useTransition();
+  const toast = useToast();
+  // "Track this" only appears when this tenant has opted into tracking
+  // (action_mode !== "insights_only") and the viewer is the one role that
+  // can publish a commitment -- matches /api/report/commitment's own
+  // customer_admin-only gate exactly, so this button never renders a
+  // request that would just 403.
+  const [canTrack, setCanTrack] = useState(false);
+  const [trackedItems, setTrackedItems] = useState<Set<string>>(new Set());
+  const [tracking, setTracking] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/tenants/current")
+      .then((response) => response.json())
+      .then((data: { ok?: boolean; role?: string; actionMode?: string }) => {
+        if (data.ok) setCanTrack(data.role === "customer_admin" && data.actionMode !== "insights_only");
+      })
+      .catch(() => undefined);
+  }, []);
+
+  async function trackItem(statement: string) {
+    if (!cycleId) return;
+    setTracking(statement);
+    const targetDate = new Date();
+    targetDate.setUTCDate(targetDate.getUTCDate() + 14);
+    const response = await fetch("/api/report/commitment", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ cycleId, statement, targetDate: targetDate.toISOString().slice(0, 10), source: "insight", sendUpdate: false }),
+    });
+    const data = (await response.json().catch(() => ({ ok: false }))) as { ok?: boolean; error?: string };
+    setTracking(null);
+    if (data.ok) {
+      setTrackedItems((current) => new Set(current).add(statement));
+      toast.show({ variant: "success", message: "Added to your tracked commitments -- set a real target date below." });
+    } else {
+      toast.show({ variant: "error", message: data.error ?? "Couldn't track that recommendation." });
+    }
+  }
 
   useEffect(() => {
     if (locked || !cycleId) return;
@@ -144,9 +183,12 @@ export function AiSynthesisCard({ cycleId, locked = false }: { cycleId?: string;
           <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--ink-faint)]">Quick wins</p>
           <ul className="mt-1 space-y-1">
             {insights.quickWins.map((item) => (
-              <li key={item} className="flex items-start gap-1.5 text-[12.5px] leading-[1.5] text-[var(--ink-mid)]">
-                <Zap size={13} strokeWidth={1.8} className="mt-[3px] shrink-0 text-[var(--green)]" />
-                {item}
+              <li key={item} className="flex items-start justify-between gap-1.5 text-[12.5px] leading-[1.5] text-[var(--ink-mid)]">
+                <span className="flex items-start gap-1.5">
+                  <Zap size={13} strokeWidth={1.8} className="mt-[3px] shrink-0 text-[var(--green)]" />
+                  {item}
+                </span>
+                <TrackButton item={item} canTrack={canTrack} tracked={trackedItems.has(item)} tracking={tracking === item} onTrack={trackItem} />
               </li>
             ))}
           </ul>
@@ -158,17 +200,21 @@ export function AiSynthesisCard({ cycleId, locked = false }: { cycleId?: string;
           <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--ink-faint)]">Deeper work</p>
           <ul className="mt-1 space-y-1">
             {insights.strategicWork.map((item) => (
-              <li key={item} className="text-[12.5px] leading-[1.5] text-[var(--ink-mid)]">
+              <li key={item} className="flex items-start justify-between gap-1.5 text-[12.5px] leading-[1.5] text-[var(--ink-mid)]">
                 {item}
+                <TrackButton item={item} canTrack={canTrack} tracked={trackedItems.has(item)} tracking={tracking === item} onTrack={trackItem} />
               </li>
             ))}
           </ul>
         </div>
       ) : null}
 
-      <div className="mt-3 flex items-start gap-1.5 border-t border-[var(--border)] pt-3 text-[12.5px] font-medium leading-[1.5] text-[var(--ink)]">
-        <ArrowRight size={13} strokeWidth={1.8} className="mt-[3px] shrink-0" />
-        {insights.nextAction}
+      <div className="mt-3 flex items-start justify-between gap-1.5 border-t border-[var(--border)] pt-3 text-[12.5px] font-medium leading-[1.5] text-[var(--ink)]">
+        <span className="flex items-start gap-1.5">
+          <ArrowRight size={13} strokeWidth={1.8} className="mt-[3px] shrink-0" />
+          {insights.nextAction}
+        </span>
+        <TrackButton item={insights.nextAction} canTrack={canTrack} tracked={trackedItems.has(insights.nextAction)} tracking={tracking === insights.nextAction} onTrack={trackItem} />
       </div>
 
       {aiUpgradeAvailable ? (
@@ -178,5 +224,32 @@ export function AiSynthesisCard({ cycleId, locked = false }: { cycleId?: string;
         </div>
       ) : null}
     </div>
+  );
+}
+
+/** Turns one recommendation into a tracked commitment, one click --
+ * only rendered for the workspace owner on a tenant that's opted into
+ * tracking (see canTrack above). Recognition itself never needs this;
+ * it's purely the bridge into the "your choice" tracking layer. */
+function TrackButton({
+  item, canTrack, tracked, tracking, onTrack,
+}: { item: string; canTrack: boolean; tracked: boolean; tracking: boolean; onTrack: (item: string) => void }) {
+  if (!canTrack) return null;
+  if (tracked) {
+    return (
+      <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-[var(--green)]">
+        <CheckCircle2 size={12} strokeWidth={1.8} /> Tracked
+      </span>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => onTrack(item)}
+      disabled={tracking}
+      className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-[var(--ink-faint)] hover:text-[var(--ink)] disabled:opacity-60"
+    >
+      <PlusCircle size={12} strokeWidth={1.8} /> {tracking ? "Tracking..." : "Track this"}
+    </button>
   );
 }

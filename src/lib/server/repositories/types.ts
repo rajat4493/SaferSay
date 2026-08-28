@@ -187,7 +187,19 @@ export type TenantSelfSettings = {
   // password).
   ssoConnected: boolean;
   ssoDomain: string | null;
+  // "we recognize and recommend, it's your choice" -- see ActionMode.
+  actionMode: ActionMode;
 };
+
+/**
+ * insights_only: free recognition/recommendation only (today's default),
+ * nothing to track. tracked: commitments become trackable items with a
+ * status and progress updates -- the tenant's opt-in choice. tracked_with_
+ * rollup: adds an org-wide, customer_admin-only view of every commitment's
+ * status across cycles -- visibility the workspace owner chose for
+ * themselves, never an enforcement mechanism aimed at anyone else.
+ */
+export type ActionMode = "insights_only" | "tracked" | "tracked_with_rollup";
 
 export type TenantSsoConfig = {
   domain: string | null;
@@ -213,6 +225,20 @@ export type CycleCommitment = {
   progressUpdate: string | null;
   publishedAt: string;
   updatedAt: string;
+  // 'insight' = created with one click from an AI Synthesis recommendation;
+  // 'manual' = written from scratch. Both are equally real commitments --
+  // this is provenance, not a quality signal.
+  source: "manual" | "insight";
+};
+
+/** One tenant-wide row for the customer_admin-only rollup view --
+ * everything a CycleCommitment has, plus which cycle it belongs to (by
+ * name, not just id -- identity.cycle_commitments deliberately has no FK
+ * to responses.survey_cycles, so the API route resolves this separately)
+ * and whether it's overdue. */
+export type CommitmentRollupItem = CycleCommitment & {
+  cycleName: string;
+  stale: boolean;
 };
 
 export type AvailableSurveyCredit = { id: string; expiresAt: string };

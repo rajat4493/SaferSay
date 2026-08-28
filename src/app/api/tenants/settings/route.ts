@@ -3,7 +3,7 @@ import { getSessionContext } from "@/lib/server/authSession";
 import { withTenantScopedDb } from "@/lib/server/db/tenantPool";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import { canModifySettings } from "@/lib/permissions";
-import { logThresholdChanged } from "@/lib/server/auditLog";
+import { logAuditEvent, logThresholdChanged } from "@/lib/server/auditLog";
 import { isSlackWebhookUrl, isSmtpUpdateIncomplete, wantsSmtpUpdate } from "@/lib/server/tenantConfigValidation";
 
 export async function GET() {
@@ -31,7 +31,12 @@ export async function PATCH(request: NextRequest) {
     smtpClear?: boolean;
     slackWebhookUrl?: string;
     slackClear?: boolean;
+    actionMode?: "insights_only" | "tracked" | "tracked_with_rollup";
   };
+
+  if (body.actionMode && !["insights_only", "tracked", "tracked_with_rollup"].includes(body.actionMode)) {
+    return NextResponse.json({ ok: false, error: "Unrecognized action mode." }, { status: 400 });
+  }
 
   if (typeof body.safetyContactEmail === "string" && body.safetyContactEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.safetyContactEmail.trim())) {
     return NextResponse.json({ ok: false, error: "Safety contact must be a valid email address." }, { status: 400 });
@@ -76,11 +81,17 @@ export async function PATCH(request: NextRequest) {
     } else if (typeof body.slackWebhookUrl === "string" && body.slackWebhookUrl.trim()) {
       await repo.setSlackWebhookUrl(session.tenant.id, body.slackWebhookUrl.trim());
     }
+    if (body.actionMode) {
+      await repo.setActionMode(session.tenant.id, body.actionMode);
+    }
     return repo.getTenantSelfSettings(session.tenant.id);
   });
 
   if (typeof body.minGroupSize === "number") {
     await logThresholdChanged(session.tenant.id, session.role, session.email, settings.minGroupSize);
+  }
+  if (body.actionMode) {
+    await logAuditEvent({ tenantId: session.tenant.id, actorRole: session.role, actorId: session.email, action: "settings_updated", targetType: "workspace", details: `action_mode: ${settings.actionMode}` });
   }
 
   return NextResponse.json({ ok: true, settings });

@@ -19,6 +19,12 @@ async function requireCustomerAdmin() {
   return { session };
 }
 
+/** A cycle can now carry any number of commitments (see 0048's constraint
+ * drop) -- this route is unchanged in shape (still cycleId-scoped
+ * GET/POST/PATCH) except POST always creates a new one instead of
+ * upserting "the" commitment, and PATCH now targets one specific
+ * commitment by id. */
+
 export async function GET(request: NextRequest) {
   const auth = await requireCustomerAdmin();
   if ("error" in auth) return NextResponse.json({ ok: false, error: auth.error }, { status: 403 });
@@ -33,11 +39,14 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const auth = await requireCustomerAdmin();
   if ("error" in auth) return NextResponse.json({ ok: false, error: auth.error }, { status: 403 });
-  const body = (await request.json().catch(() => ({}))) as { cycleId?: string; statement?: string; targetDate?: string; sendUpdate?: boolean };
+  const body = (await request.json().catch(() => ({}))) as {
+    cycleId?: string; statement?: string; targetDate?: string; sendUpdate?: boolean; source?: "manual" | "insight";
+  };
   const statement = body.statement?.trim();
   if (!body.cycleId || !statement || statement.length > 500 || !isIsoDate(body.targetDate)) {
     return NextResponse.json({ ok: false, error: "Provide a commitment of up to 500 characters and a valid target date." }, { status: 400 });
   }
+  const source = body.source === "insight" ? "insight" : "manual";
 
   const committed = await withTenantScopedDb(auth.session.tenant.id, async (db) => {
     const responses = new ResponseRepository(db);
@@ -46,7 +55,7 @@ export async function POST(request: NextRequest) {
     const report = await responses.getProtectedReportForTenant(auth.session.tenant.id, cycle.id, cycle.minGroupSize);
     if (report.protected) return { error: "Publish a commitment only after the protected report has unlocked." as const };
     const identity = new IdentityRepository(db);
-    const commitment = await identity.publishCycleCommitment(auth.session.tenant.id, cycle.id, statement, body.targetDate!);
+    const commitment = await identity.createCommitment(auth.session.tenant.id, cycle.id, statement, body.targetDate!, source);
     const recipients = body.sendUpdate === false ? [] : await identity.listCycleCommitmentRecipients(auth.session.tenant.id, cycle.id);
     const smtpConfig = body.sendUpdate === false ? null : await identity.getSmtpConfig(auth.session.tenant.id);
     return { commitment, recipients, smtpConfig };
@@ -66,14 +75,14 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   const auth = await requireCustomerAdmin();
   if ("error" in auth) return NextResponse.json({ ok: false, error: auth.error }, { status: 403 });
-  const body = (await request.json().catch(() => ({}))) as { cycleId?: string; status?: "in_progress" | "completed"; progressUpdate?: string };
-  if (!body.cycleId || (body.status !== "in_progress" && body.status !== "completed") || (body.progressUpdate?.length ?? 0) > 500) {
-    return NextResponse.json({ ok: false, error: "Provide a commitment status and an update of up to 500 characters." }, { status: 400 });
+  const body = (await request.json().catch(() => ({}))) as { commitmentId?: string; status?: "in_progress" | "completed"; progressUpdate?: string };
+  if (!body.commitmentId || (body.status !== "in_progress" && body.status !== "completed") || (body.progressUpdate?.length ?? 0) > 500) {
+    return NextResponse.json({ ok: false, error: "Provide a commitment id, a status, and an update of up to 500 characters." }, { status: 400 });
   }
   const commitment = await withTenantScopedDb(auth.session.tenant.id, (db) =>
-    new IdentityRepository(db).updateCycleCommitment(auth.session.tenant.id, body.cycleId!, body.status!, body.progressUpdate?.trim() ?? ""),
+    new IdentityRepository(db).updateCommitment(auth.session.tenant.id, body.commitmentId!, body.status!, body.progressUpdate?.trim() ?? ""),
   );
-  if (!commitment) return NextResponse.json({ ok: false, error: "No published commitment was found for this survey." }, { status: 404 });
-  await logAuditEvent({ tenantId: auth.session.tenant.id, actorRole: auth.session.role, actorId: auth.session.email, action: "commitment_updated", targetType: "survey", targetId: body.cycleId });
+  if (!commitment) return NextResponse.json({ ok: false, error: "No commitment was found with that id." }, { status: 404 });
+  await logAuditEvent({ tenantId: auth.session.tenant.id, actorRole: auth.session.role, actorId: auth.session.email, action: "commitment_updated", targetType: "survey", targetId: commitment.cycleId });
   return NextResponse.json({ ok: true, commitment });
 }
