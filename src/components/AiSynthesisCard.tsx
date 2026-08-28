@@ -13,18 +13,18 @@ type AIInsights = {
 type InsightsResponse = {
   ok?: boolean;
   error?: string;
-  locked?: boolean;
   insufficientData?: boolean;
   source?: "ai" | "deterministic";
   insights?: AIInsights;
+  aiUpgradeAvailable?: boolean;
+  aiTemporarilyUnavailable?: boolean;
 };
 
 type FetchState =
   | { kind: "loading" }
-  | { kind: "not-entitled" }
   | { kind: "insufficient-data" }
   | { kind: "error"; message: string }
-  | { kind: "ready"; source: "ai" | "deterministic"; insights: AIInsights };
+  | { kind: "ready"; source: "ai" | "deterministic"; insights: AIInsights; aiUpgradeAvailable: boolean; aiTemporarilyUnavailable: boolean };
 
 // Quieter than a plain .card (dashed border, page-tint background, no
 // shadow) -- illustrative/derived content, not the real safety-score data
@@ -40,13 +40,17 @@ export function AiSynthesisCard({ cycleId, locked = false }: { cycleId?: string;
     let cancelled = false;
     startTransition(() => setState({ kind: "loading" }));
     fetch(`/api/report/insights?cycleId=${encodeURIComponent(cycleId)}`)
-      .then((response) => response.json().then((data: InsightsResponse) => ({ status: response.status, data })))
-      .then(({ status, data }) => {
+      .then((response) => response.json() as Promise<InsightsResponse>)
+      .then((data) => {
         if (cancelled) return;
         if (data.ok && data.insights) {
-          setState({ kind: "ready", source: data.source ?? "deterministic", insights: data.insights });
-        } else if (status === 403 && data.locked) {
-          setState({ kind: "not-entitled" });
+          setState({
+            kind: "ready",
+            source: data.source ?? "deterministic",
+            insights: data.insights,
+            aiUpgradeAvailable: Boolean(data.aiUpgradeAvailable),
+            aiTemporarilyUnavailable: Boolean(data.aiTemporarilyUnavailable),
+          });
         } else if (data.insufficientData) {
           setState({ kind: "insufficient-data" });
         } else {
@@ -76,23 +80,6 @@ export function AiSynthesisCard({ cycleId, locked = false }: { cycleId?: string;
         </div>
         <p className="mt-2 text-[12px] leading-[1.5] text-[var(--ink-soft)]">
           AI interpretation will generate once enough responses exist to keep individuals unidentifiable.
-        </p>
-      </div>
-    );
-  }
-
-  if (state.kind === "not-entitled") {
-    return (
-      <div className={SHELL_CLASS}>
-        <div className="flex items-center justify-between">
-          <h2 className="text-[14.5px] font-semibold text-[var(--ink)]">AI Synthesis</h2>
-          <span className="badge-beta">Beta</span>
-        </div>
-        <div className="mt-3 flex items-center gap-2 text-[13px] font-medium text-[var(--ink-mid)]">
-          <Lock size={15} strokeWidth={1.8} /> Included with paid survey credits
-        </div>
-        <p className="mt-2 text-[12px] leading-[1.5] text-[var(--ink-soft)]">
-          Buy survey credits to unlock AI interpretation of this report&apos;s real, already-unlocked group scores.
         </p>
       </div>
     );
@@ -134,18 +121,20 @@ export function AiSynthesisCard({ cycleId, locked = false }: { cycleId?: string;
     );
   }
 
-  const { insights, source } = state;
+  const { insights, source, aiUpgradeAvailable, aiTemporarilyUnavailable } = state;
 
   return (
     <div className={SHELL_CLASS}>
       <div className="flex items-center justify-between">
         <h2 className="text-[14.5px] font-semibold text-[var(--ink)]">AI Synthesis</h2>
-        <span className="badge-beta">{source === "ai" ? "Beta" : "Estimate"}</span>
+        <span className="badge-beta">{source === "ai" ? "Beta" : "Free"}</span>
       </div>
       <p className="mt-1.5 text-[12px] text-[var(--ink-soft)]">
         {source === "ai"
           ? "Generated from this cycle's real, already-unlocked group scores."
-          : "A rules-based read of this cycle's real group scores -- no AI provider is configured yet."}
+          : aiTemporarilyUnavailable
+            ? "A rules-based read of this cycle's real group scores -- AI synthesis is temporarily unavailable, try again shortly."
+            : "A rules-based read of this cycle's real group scores. Recognition and recommendations are always included, on every plan."}
       </p>
 
       <p className="mt-3 text-[13px] leading-[1.5] text-[var(--ink)]">{insights.summary}</p>
@@ -181,6 +170,13 @@ export function AiSynthesisCard({ cycleId, locked = false }: { cycleId?: string;
         <ArrowRight size={13} strokeWidth={1.8} className="mt-[3px] shrink-0" />
         {insights.nextAction}
       </div>
+
+      {aiUpgradeAvailable ? (
+        <div className="mt-3 flex items-center gap-1.5 text-[11.5px] font-medium text-[var(--ink-faint)]">
+          <Lock size={12} strokeWidth={1.8} />
+          Add survey credits for AI-generated synthesis of these same numbers.
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Calendar, CheckCircle2, FileEdit, Flag, Info, Lock, Send, ThumbsUp, TrendingDown, TrendingUp, Users } from "lucide-react";
 import { AppShell, Card } from "@/components/AppShell";
+import { CycleCommitmentPanel } from "@/components/CycleCommitmentPanel";
 import { CycleTrendPanel } from "@/components/CycleTrendPanel";
 import { IconBadge } from "@/components/IconBadge";
 import { ProtectedReportPanel } from "@/components/ProtectedReportPanel";
@@ -492,6 +493,8 @@ export default function SurveyResultsPage() {
             View comments, filterable by team and theme
           </Link>
         </p> : null}
+
+        {role === "customer_admin" && protectedReport === false ? <CycleCommitmentPanel cycleId={surveyId} /> : null}
 
         {role && canViewCrossCycleTrend(role) && cycles.length > 1 ? <CycleTrendPanel /> : null}
 
