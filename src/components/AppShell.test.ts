@@ -24,4 +24,12 @@ describe("restricted sidebar navigation", () => {
     expect(source).toContain("if (!info) return false;");
     expect(source).toContain("const { info, loaded } = useTenantSession()");
   });
+
+  it("keeps the account menu and sign-out available to every role", () => {
+    const source = readFileSync("src/components/AppShell.tsx", "utf8");
+    expect(source).toContain("{accountMenuOpen ? (");
+    expect(source).toContain("<SignOutButton />");
+    expect(source).toContain('aria-label="Open account menu"');
+    expect(source).toContain("<RoleTag compact />");
+  });
 });

@@ -206,23 +206,27 @@ export function AppShell({
       </nav>
 
       <div className="relative mt-auto border-t border-[var(--sidebar-border)] px-2.5 py-2.5">
-        {accountMenuOpen && visibleFoldedItems.length > 0 ? (
-          <div className="absolute inset-x-2.5 bottom-[54px] rounded-[12px] border border-[var(--border)] bg-white p-1.5 shadow-[var(--shadow-elevated)]">
-            {visibleFoldedItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => {
-                  setAccountMenuOpen(false);
-                  setMobileNavOpen(false);
-                }}
-                className="flex items-center gap-2 rounded-[8px] px-2.5 py-[7px] text-[12.5px] text-[var(--ink-mid)] transition hover:bg-[var(--bg-hover)] hover:text-[var(--ink)]"
-              >
-                <item.icon size={14} strokeWidth={1.8} />
-                {item.label}
-              </Link>
-            ))}
-            <div className="my-1 border-t border-[var(--border)]" />
+        {accountMenuOpen ? (
+          <div className="absolute inset-x-2.5 bottom-[62px] z-20 rounded-[12px] border border-[var(--border)] bg-white p-1.5 shadow-[var(--shadow-elevated)]">
+            {visibleFoldedItems.length > 0 ? (
+              <>
+                {visibleFoldedItems.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => {
+                      setAccountMenuOpen(false);
+                      setMobileNavOpen(false);
+                    }}
+                    className="flex items-center gap-2 rounded-[8px] px-2.5 py-[7px] text-[12.5px] text-[var(--ink-mid)] transition hover:bg-[var(--bg-hover)] hover:text-[var(--ink)]"
+                  >
+                    <item.icon size={14} strokeWidth={1.8} />
+                    {item.label}
+                  </Link>
+                ))}
+                <div className="my-1 border-t border-[var(--border)]" />
+              </>
+            ) : null}
             <div className="px-1">
               <SignOutButton />
             </div>
@@ -231,13 +235,15 @@ export function AppShell({
 
         <button
           onClick={() => setAccountMenuOpen((current) => !current)}
-          className="flex w-full items-center gap-2.5 rounded-[10px] px-1.5 py-1.5 text-left transition hover:bg-[var(--sidebar-active-bg)]"
+          aria-expanded={accountMenuOpen}
+          aria-haspopup="menu"
+          aria-label="Open account menu"
+          className="flex w-full items-center gap-2.5 rounded-[10px] px-1.5 py-2 text-left transition hover:bg-[var(--sidebar-active-bg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sidebar-ink)]"
         >
           <Avatar label={info?.userName || info?.userEmail || brand.name} />
           <div className="min-w-0 flex-1">
             <div className="truncate text-[13px] font-medium text-[var(--sidebar-ink)]">{info?.userName || info?.userEmail || brand.name}</div>
-            <div className="truncate text-[11.5px] text-[var(--sidebar-ink-faint)]">{info?.tenantName ?? brand.name}</div>
-            <RoleTag />
+            <RoleTag compact />
           </div>
           <ChevronDown size={14} strokeWidth={1.8} className={`shrink-0 text-[var(--sidebar-ink-faint)] transition-transform ${accountMenuOpen ? "rotate-180" : ""}`} />
         </button>

@@ -12,7 +12,7 @@ const roleLabels: Record<string, string> = {
   employee: "Employee",
 };
 
-export function RoleTag() {
+export function RoleTag({ compact = false }: { compact?: boolean }) {
   const { info } = useTenantSession();
 
   if (!info) return null;
@@ -20,15 +20,12 @@ export function RoleTag() {
   // "Platform Owner" (SaferSay's own operator) is deliberately distinct
   // from "Workspace Owner" (a customer's tenant admin) -- same word for
   // both was a real source of confusion in QA.
-  if (info.isSuperAdmin && info.isImpersonating) {
-    return <Pill tone="red">Platform Owner → {info.tenantName}</Pill>;
+  const label = info.isSuperAdmin && info.isImpersonating ? `Platform Owner → ${info.tenantName}` : info.isSuperAdmin ? "Platform Owner" : roleLabels[info.role] ?? "Member";
+  if (compact) {
+    return <span className="block truncate font-[family-name:var(--font-mono)] text-[10px] font-medium tracking-[0.04em] text-[var(--sidebar-ink-faint)]">{label}</span>;
   }
 
-  if (info.isSuperAdmin) {
-    return <Pill tone="neutral">Platform Owner</Pill>;
-  }
-
-  return <Pill tone="neutral">{roleLabels[info.role] ?? "Member"}</Pill>;
+  return <Pill tone={info.isSuperAdmin && info.isImpersonating ? "red" : "neutral"}>{label}</Pill>;
 }
 
 function Pill({ tone, children }: { tone: "neutral" | "red"; children: React.ReactNode }) {

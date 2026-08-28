@@ -13,7 +13,7 @@ export function SignOutButton() {
   }
 
   return (
-    <button type="button" onClick={signOut} className="btn-secondary btn-pill">
+    <button type="button" onClick={signOut} className="btn-secondary btn-pill w-full justify-center">
       Sign out
     </button>
   );
