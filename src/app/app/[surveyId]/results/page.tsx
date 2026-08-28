@@ -28,6 +28,7 @@ type EnpsSummary = { promoterPct: number; passivePct: number; detractorPct: numb
 type ScopedReport = {
   report?: { protected: boolean; n: number; rows: ReportRow[] };
   eligibleCount?: number;
+  peopleLeaderRolledUp?: boolean;
   enps?: { protected: boolean; n: number; rows: EnpsSummary[] };
 };
 type TrendResponse = { ok?: boolean; questions?: Array<{ questionText: string; points: TrendPoint[] }> };
@@ -372,6 +373,12 @@ export default function SurveyResultsPage() {
         <SurveyStageTabs active="Results" status={status ?? undefined} />
 
         {resultsState ? <ResultsStateBanner state={resultsState} protectedReport={protectedReport} /> : null}
+
+        {scopedReport?.peopleLeaderRolledUp ? (
+          <div className="rounded-[11px] border border-[var(--line)] bg-[var(--panel)] px-4 py-3 text-sm text-[var(--ink-muted)]">
+            To protect confidentiality, this view is aggregated at the next reporting level.
+          </div>
+        ) : null}
 
         {scopedReport?.report && !scopedReport.report.protected ? (
           <div className="grid gap-5 md:grid-cols-4">

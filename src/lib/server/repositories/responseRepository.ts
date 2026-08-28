@@ -511,10 +511,11 @@ export class ResponseRepository {
    * (smallest-n) releasable sibling subtree is bundled into suppression
    * too, so at least two subtrees' worth of data stay ambiguous together --
    * exactly the guard the original (removed) manager-rollup feature
-   * lacked. v1 scope: no auto-climb to a wider ancestor subtree when the
-   * root's own subtree isn't releasable -- same "suppressed, try again
-   * once there's more data" UX department scope already has, not a richer
-   * fallback chain.
+   * lacked. The report route may instead select the directly-parent scope
+   * when the assigned subtree itself has fewer than k responses. That
+   * selection is made server-side before this method is called; this method
+   * still applies the same sibling complementary-suppression protection at
+   * whichever level was selected.
    */
   private async getManagerSubtreeProtectedReport(
     tenantId: string,
@@ -565,6 +566,22 @@ export class ResponseRepository {
         scaleMax: scaleMaxForQuestionType(row.question_type),
       })),
     };
+  }
+
+  /**
+   * Aggregate response count for a server-resolved manager scope. It is
+   * used only to select a confidentiality-preserving parent roll-up and is
+   * never returned to the client for a below-threshold group.
+   */
+  async countSubmissionsForTeamLabels(tenantId: string, cycleId: string, teamLabels: string[]): Promise<number> {
+    if (teamLabels.length === 0) return 0;
+    const result = await this.db.query<{ n: string }>(
+      `select count(*)::text as n
+       from responses.submissions
+       where tenant_id = $1 and cycle_id = $2 and segment_team = any($3)`,
+      [tenantId, cycleId, teamLabels],
+    );
+    return Number(result.rows[0]?.n ?? 0);
   }
 
   // SUPPRESSION ASSUMPTION -- see getProtectedReportForTenant above before

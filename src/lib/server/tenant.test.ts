@@ -5,7 +5,7 @@ describe("tenant foundation", () => {
   it("requires an authenticated session to resolve a report's tenant", () => {
     const reportRoute = readFileSync("src/app/api/report/route.ts", "utf8");
     expect(reportRoute).toContain("getSessionContext");
-    expect(reportRoute).toContain("getLatestProtectedReportForTenant");
+    expect(reportRoute).toContain("getLatestCycleForTenant");
   });
 
   it("adds a tenant bootstrap API and tenant database migration", () => {

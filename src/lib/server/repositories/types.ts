@@ -394,7 +394,10 @@ export type QuestionBankItem = {
  * -- the same differencing-attack guard department scope already has
  * (getDepartmentReleasability), one level up: if a viewer could see every
  * sibling subtree's report except one, they could back-calculate the
- * missing one by subtraction from the parent's own total.
+ * missing one by subtraction from the parent's own total. When a People
+ * Leader's assigned subtree has fewer than k responses, /api/report may
+ * resolve exactly one parent subtree instead; that fallback is still built
+ * as a normal team scope and is never client-selectable.
  */
 export type ReportScope =
   | { type: "org" }

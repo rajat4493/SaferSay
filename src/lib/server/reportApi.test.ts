@@ -6,7 +6,7 @@ describe("real protected report flow", () => {
     const route = readFileSync("src/app/api/report/route.ts", "utf8");
     expect(route).toContain("getSessionContext");
     expect(route).toContain("Unauthorized report access.");
-    expect(route).toContain("getLatestProtectedReportForTenant");
+    expect(route).toContain("getLatestCycleForTenant");
   });
 
   it("distinguishes an unavailable requested cycle from a real protected report", () => {
