@@ -11,6 +11,9 @@ export type TenantSessionInfo = {
   tenantName: string;
   userEmail: string;
   userName: string | null;
+  /** True once the workspace has launched its first survey. Used only to
+   * keep first-run education out of established workspaces. */
+  firstRunCompleted: boolean;
 };
 
 export function useTenantSession() {
@@ -29,6 +32,7 @@ export function useTenantSession() {
           tenantName: data.tenant?.name ?? "",
           userEmail: data.userEmail ?? "",
           userName: data.userName ?? null,
+          firstRunCompleted: Boolean(data.firstRunCompleted),
         });
       })
       .catch(() => undefined)

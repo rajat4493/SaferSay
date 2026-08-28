@@ -21,16 +21,18 @@ describe("first-run pilot guide", () => {
 
   it("tracks the core pilot steps", () => {
     const service = readFileSync("src/lib/server/pilotStateService.ts", "utf8");
-    expect(service).toContain("Upload employees");
-    expect(service).toContain("Create survey cycle");
-    expect(service).toContain("Prepare invite outbox");
-    expect(service).toContain("Review safe report");
+    expect(service).toContain("Add your people");
+    expect(service).toContain("Choose and create your first survey");
+    expect(service).toContain("Review people and send confidential invites");
+    expect(service).toContain("Review protected results");
   });
 
   it("adds a visible first-run route", () => {
     const appShell = readFileSync("src/components/AppShell.tsx", "utf8");
     const page = readFileSync("src/app/app/pilot/page.tsx", "utf8");
     expect(appShell).toContain("/app/pilot");
+    expect(appShell).toContain("!info.firstRunCompleted");
     expect(page).toContain("PilotGuide");
+    expect(page).toContain("data.firstRunCompleted");
   });
 });

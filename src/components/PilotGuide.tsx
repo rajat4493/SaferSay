@@ -39,9 +39,9 @@ export function PilotGuide({ compact = false }: { compact?: boolean }) {
     <Card>
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
         <div>
-          <p className="meta-label">First run</p>
-          <h2 className="section-title mt-2">Pilot guide</h2>
-          <p className="mt-1.5 max-w-2xl secondary-text">Follow this checklist to run one real confidential survey from upload to safe report.</p>
+          <p className="meta-label">Your first survey</p>
+          <h2 className="section-title mt-2">Launch in a few clear steps</h2>
+          <p className="mt-1.5 max-w-2xl secondary-text">Add your people, choose a survey, send it, then review results once they are safely protected.</p>
         </div>
         <button onClick={load} className="btn-secondary shrink-0">
           <RefreshCw size={13} strokeWidth={1.8} />

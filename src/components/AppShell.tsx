@@ -290,9 +290,11 @@ export function AppShell({
             <Lock size={13} strokeWidth={1.8} />
             Confidential — you see numbers, never names
           </div>
-          <Link href="/app/pilot" className="col-start-3 justify-self-end whitespace-nowrap text-[12px] font-medium text-[var(--ink-mid)] hover:text-[var(--ink)]">
-            First-run guide
-          </Link>
+          {info && !info.firstRunCompleted && canCreateSurvey(info.role) ? (
+            <Link href="/app/pilot" className="col-start-3 justify-self-end whitespace-nowrap text-[12px] font-medium text-[var(--ink-mid)] hover:text-[var(--ink)]">
+              First survey guide
+            </Link>
+          ) : null}
         </header>
 
         <main id="main-content" className="flex-1 overflow-y-auto px-5 pb-10 pt-[33px] lg:px-20 lg:pb-16 lg:pt-[52px]">
