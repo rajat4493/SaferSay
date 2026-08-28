@@ -67,7 +67,7 @@ describe("permissions", () => {
       expect(getVisibleNavZones("customer_admin")).toEqual(["surveys", "people", "workspace"]);
       expect(getVisibleNavZones("survey_creator")).toEqual(["surveys", "people"]);
       expect(getVisibleNavZones("auditor")).toEqual(["surveys"]);
-      expect(getVisibleNavZones("people_leader")).toEqual([]);
+      expect(getVisibleNavZones("people_leader")).toEqual(["surveys"]);
       expect(getVisibleNavZones("integration_admin")).toEqual([]);
       expect(getVisibleNavZones("compliance_reviewer")).toEqual([]);
       expect(getVisibleNavZones("employee")).toEqual([]);

@@ -46,11 +46,26 @@ type NavItemConfig = {
 // trust/audit pages) lives in the user-card menu instead of taking up
 // primary sidebar space -- same permission checks as before, just folded.
 const primaryNavItems: NavItemConfig[] = [
-  { href: "/app", label: "Home", icon: Home, hideForPureOwner: true },
+  {
+    href: "/app",
+    label: "Home",
+    icon: Home,
+    hideForPureOwner: true,
+    visible: (role) => role !== "people_leader",
+  },
   { href: "/app/overview", label: "Overview", icon: BarChart3, hideForPureOwner: true, visible: canViewSurveyResults },
   { href: "/app/surveys", label: "Surveys", icon: ClipboardList, hideForPureOwner: true, visible: canViewSurveyResults },
   { href: "/app/people", label: "People", icon: Users, hideForPureOwner: true, visible: canAccessPeople },
   { href: "/app/integrations", label: "Integrations", icon: PlugZap, hideForPureOwner: true, visible: canManageIntegrations },
+];
+
+// People Leaders have a deliberately narrow, read-only remit.  In
+// particular, Home is an operational/admin landing page and Overview has
+// org-wide trend affordances that are not meaningful for a manager whose
+// report is fixed to one protected subtree.  Their one entry point is the
+// survey list, from which they can open only their server-scoped results.
+const peopleLeaderNavItems: NavItemConfig[] = [
+  { href: "/app/surveys", label: "Reports", icon: BarChart3, hideForPureOwner: true, visible: canViewSurveyResults },
 ];
 
 const foldedMenuItems: NavItemConfig[] = [
@@ -76,7 +91,7 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const { brand } = useBrand();
-  const { info } = useTenantSession();
+  const { info, loaded } = useTenantSession();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
 
@@ -120,13 +135,18 @@ export function AppShell({
 
   const filterItems = (items: NavItemConfig[]) =>
     items.filter((item) => {
+      // Do not briefly paint links that a role cannot use while the client
+      // session is still resolving.  Besides looking like a sidebar glitch,
+      // that flash is especially confusing for restricted personas.
+      if (!info) return false;
       if (pureOwnerMode && item.hideForPureOwner) return false;
-      if (item.visible && info && !item.visible(info.role)) return false;
+      if (item.visible && !item.visible(info.role)) return false;
       return true;
     });
 
-  const visiblePrimaryItems = filterItems(primaryNavItems);
-  const visibleFoldedItems = filterItems(foldedMenuItems);
+  const navItems = info?.role === "people_leader" ? peopleLeaderNavItems : primaryNavItems;
+  const visiblePrimaryItems = loaded ? filterItems(navItems) : [];
+  const visibleFoldedItems = loaded ? filterItems(foldedMenuItems) : [];
 
   // Console/super-admin pages don't render AppShell at all (separate
   // shell), so this override never reaches that surface -- deliberately,

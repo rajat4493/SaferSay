@@ -121,11 +121,10 @@ export function getVisibleNavZones(role: UserRole): ("surveys" | "people" | "wor
     case "auditor":
       return ["surveys"];
     case "people_leader":
-      // No nav zone yet -- a People Leader reaches their scoped results via
-      // a direct link (same v1.1+ posture as auditor above), never the
-      // full surveys/people/workspace nav (people_leader must never see
-      // the employee directory beyond their own subtree).
-      return [];
+      // One read-only report entry point.  The survey list is the route
+      // that resolves the selected cycle into a server-scoped report; no
+      // people, workspace, Home, or technical navigation belongs here.
+      return ["surveys"];
     case "integration_admin":
     case "compliance_reviewer":
       return [];
