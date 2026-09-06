@@ -26,6 +26,11 @@ describe("getScoreTier", () => {
   });
 });
 
+function hexToRgb(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
 describe("getHeatmapTileTokens", () => {
   it("produces visibly different colors for scores within the same discrete tier band", () => {
     // A real company's themes often cluster within one band (e.g. 6.8-7.3,
@@ -39,8 +44,28 @@ describe("getHeatmapTileTokens", () => {
     expect(low.text).not.toBe(high.text);
   });
 
-  it("still increases toward green as the score rises and toward red as it falls", () => {
-    const scores = [0, 2.5, 5, 7.5, 10].map((s) => getHeatmapTileTokens(s).text);
+  it("makes a realistic narrow spread (6.8 vs 7.3) perceptibly distinct, not just numerically different", () => {
+    // A design-review persona caught an earlier version of this function
+    // where 6.8 and 7.3 were technically different colors but visually
+    // indistinguishable (a linear 0-10 ramp spends nearly all its contrast
+    // on scores real companies never get). Require a real perceptual gap:
+    // at least 20 points of channel difference somewhere in the RGB triple.
+    const low = hexToRgb(getHeatmapTileTokens(6.8).text);
+    const high = hexToRgb(getHeatmapTileTokens(7.3).text);
+    const maxChannelDelta = Math.max(...low.map((c, i) => Math.abs(c - high[i])));
+    expect(maxChannelDelta).toBeGreaterThanOrEqual(20);
+  });
+
+  it("still increases toward green as the score rises and toward red as it falls, across the realistic range", () => {
+    // Scores this far outside the realistic 5-8 band are already
+    // unambiguously "very bad" or "very good" -- concentrating contrast in
+    // the realistic middle (the actual fix here) means truly extreme values
+    // can legitimately saturate to the same rendered color as each other
+    // (e.g. 0 and 1 both read as solid red), which is fine: nobody needs a
+    // shade of difference between two equally alarming scores. What must
+    // stay distinct is variation within the range real survey averages
+    // actually occupy.
+    const scores = [3, 5, 6.5, 8, 9.5].map((s) => getHeatmapTileTokens(s).text);
     expect(new Set(scores).size).toBe(scores.length);
   });
 

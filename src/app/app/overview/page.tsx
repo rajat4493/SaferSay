@@ -69,12 +69,22 @@ export default function OverviewPage() {
   // still-unlaunched draft look like a second "survey run" for comparison
   // -- producing a misleading delta against the one real, active cycle
   // (e.g. "+68pts vs previous survey" when there's no real previous
-  // survey at all). Score-over-time doesn't have this problem because
-  // overallScoreByCycle only ever contains cycles with real scored
-  // answers to average -- filtering out drafts here matches that same
-  // "only count cycles that actually ran" standard.
+  // survey at all).
+  //
+  // A launched-but-still-zero-response cycle needs the same exclusion, for
+  // the same reason: it's still actively collecting, so its "0%" isn't a
+  // finished baseline to compare against -- it's just a survey that hasn't
+  // gotten a response back yet and may still climb. A persona review
+  // caught this exact case (two surveys created the same day, one with 15
+  // responses and one still live with 0) rendering as "+68pts vs previous
+  // survey," which reads as a real trend when it's actually just "one
+  // survey has responses and the other hasn't come in yet." Score-over-time
+  // doesn't have this problem because overallScoreByCycle only ever
+  // contains cycles with real scored answers to average -- requiring a
+  // real response count here (not just non-draft status) matches that same
+  // "only count cycles that actually have data" standard.
   const cyclesOldestFirst = [...cycles]
-    .filter((cycle) => cycle.status !== "draft")
+    .filter((cycle) => cycle.status !== "draft" && cycle.responseCount > 0)
     .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   const responseRateByCycle = employeeCount
     ? cyclesOldestFirst.map((cycle) => ({ cycleId: cycle.id, cycleName: cycle.name, value: Math.round((cycle.responseCount / employeeCount) * 100) }))

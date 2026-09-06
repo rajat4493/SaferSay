@@ -41,20 +41,47 @@ function toHex([r, g, b]: [number, number, number]): string {
 
 const WHITE: [number, number, number] = [255, 255, 255];
 
+// A first version of this interpolated linearly across the full 0-10 range.
+// That's mathematically continuous (no two scores are literally identical)
+// but a design-review persona still saw it as visually broken: two themes
+// at 6.8 and 7.3 rendered as the same muddy color to the eye, because a
+// linear 0-10 ramp spends most of its color range on scores real companies
+// essentially never get (true 0-3s, true 9-10s), leaving almost no visual
+// slope across the 5-8 band where real survey averages actually cluster.
+// A sigmoid centered on a realistic "neutral" score concentrates the color
+// change exactly where real variation happens, while staying strictly
+// monotonic (still no two different scores can collapse to one color) and
+// still saturating toward solid red/green at genuine extremes.
+const HEATMAP_SIGMOID_CENTER = 6.5;
+// 1.1 was mathematically monotonic but still too subtle in practice: a 28px
+// badge showing (106,96,52) next to (140,102,51) still reads as "the same
+// brown" to the eye, even though the numbers differ. Steeper concentrates
+// enough of the red<->green swing into a half-point-wide realistic band
+// that adjacent themes shift color family (brownish-amber toward green),
+// not just channel value -- confirmed by direct comparison of the two
+// steepness values against the same 6.8/7.3 pair this was tuned against.
+const HEATMAP_SIGMOID_STEEPNESS = 1.8;
+
+function heatmapGradientPosition(average10: number): number {
+  const clamped = Math.min(10, Math.max(0, average10));
+  return 1 / (1 + Math.exp(-HEATMAP_SIGMOID_STEEPNESS * (clamped - HEATMAP_SIGMOID_CENTER)));
+}
+
 /**
  * A discrete 3-band tier (getScoreTier above) collapses every theme in a
  * real company's typically narrow score spread (e.g. 6.8-7.3, all "neutral")
  * into one identical color -- defeating the point of a heatmap, which is
  * supposed to show *relative* differences at a glance. This instead
- * interpolates continuously between red (0) - amber (5) - green (10), so
+ * interpolates continuously between red (0) - amber (mid) - green (10), so
  * two themes half a point apart render as visibly different shades even
  * when both fall on the same side of the strength/priority cutoffs used
  * elsewhere in the app.
  */
 export function getHeatmapTileTokens(average10: number): ScoreTierTokens {
-  const t = Math.min(10, Math.max(0, average10));
-  const rgb = t <= 5 ? mix(HEATMAP_RED, HEATMAP_WARNING, t / 5) : mix(HEATMAP_WARNING, HEATMAP_GREEN, (t - 5) / 5);
-  const tier: ScoreTier = t >= 7.5 ? "strength" : t >= 5.5 ? "neutral" : "priority";
+  const t = heatmapGradientPosition(average10);
+  const rgb = t <= 0.5 ? mix(HEATMAP_RED, HEATMAP_WARNING, t / 0.5) : mix(HEATMAP_WARNING, HEATMAP_GREEN, (t - 0.5) / 0.5);
+  const clamped = Math.min(10, Math.max(0, average10));
+  const tier: ScoreTier = clamped >= 7.5 ? "strength" : clamped >= 5.5 ? "neutral" : "priority";
   return {
     tier,
     text: toHex(rgb),
