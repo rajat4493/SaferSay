@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { ChevronDown, EyeOff, TrendingDown, TrendingUp } from "lucide-react";
 import { Card } from "@/components/AppShell";
-import { getScoreTier } from "@/lib/scoreTier";
+import { getHeatmapTileTokens } from "@/lib/scoreTier";
 import { groupByConstruct, themeDeltasToOrg, type ThemeableRow } from "@/lib/reportThemes";
 
 type ReportRow = { questionId: string; label?: string; construct?: string | null; n: number; average: number | null; scaleMax?: 5 | 10 };
@@ -106,7 +106,7 @@ export function ThemeReportCard({
 
       <div className="mt-3.5 flex gap-2.5 overflow-x-auto pb-1">
         {groups.map((group) => {
-          const tier = getScoreTier(group.average10);
+          const tier = getHeatmapTileTokens(group.average10);
           const isOpen = expanded === group.construct;
           const delta = deltas?.get(group.construct);
           return (

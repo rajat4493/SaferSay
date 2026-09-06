@@ -20,7 +20,7 @@ type ReportResponse = {
   report?: {
     protected: boolean;
     n: number;
-    rows: Array<{ questionId: string; label?: string; n: number; average: number | null }>;
+    rows: Array<{ questionId: string; label?: string; n: number; average: number | null; scaleMax?: 5 | 10 }>;
   };
   textAnswers?: {
     protected: boolean;
@@ -36,12 +36,11 @@ type ReportResponse = {
 
 // Score bars are black by default, red only for scores needing attention
 // (design directive: "black for good scores, red for attention scores,
-// no green in report bars"). The directive's literal cutoff (<6.5) is
-// written for a 0-10 scale; this panel already normalizes every row
-// against /5 for the bar width (mixed 1-5 Likert and 0-10 eNPS rows,
-// no per-row scale in the API response to normalize precisely), so the
-// cutoff is scaled proportionally: 6.5/10 -> 3.25/5.
-const ATTENTION_THRESHOLD = 3.25;
+// no green in report bars"). The cutoff is on the same normalized 0-10
+// scale every row's bar width and the overall score above both use --
+// see row.scaleMax below (5 for likert_5, 10 for enps_0_10), which the
+// API already returns per row.
+const ATTENTION_THRESHOLD = 6.5;
 
 export function ProtectedReportPanel({
   mode = "admin",
@@ -201,7 +200,12 @@ export function ProtectedReportPanel({
   }
 
   const scoredRows = report?.rows.filter((row) => row.average !== null) ?? [];
-  const overallScore = scoredRows.length ? scoredRows.reduce((sum, row) => sum + (row.average ?? 0), 0) / scoredRows.length : null;
+  // Each row can be on a different native scale (5 for likert_5, 10 for
+  // enps_0_10) -- normalize every row to /10 before averaging, otherwise a
+  // survey mixing question types skews toward whichever scale dominates.
+  const overallScore = scoredRows.length
+    ? scoredRows.reduce((sum, row) => sum + ((row.average ?? 0) / (row.scaleMax ?? 5)) * 10, 0) / scoredRows.length
+    : null;
 
   const textReport = result?.textAnswers;
   // Only show the section at all if there's something to say about it --
@@ -302,13 +306,23 @@ export function ProtectedReportPanel({
           <div className="space-y-4">
             {report.rows.map((row) => {
               const value = row.average ?? 0;
-              const width = `${Math.min(100, Math.max(0, (value / 5) * 100))}%`;
-              const attention = value < ATTENTION_THRESHOLD;
+              const scaleMax = row.scaleMax ?? 5;
+              // Bar width and the attention cutoff both compare against a
+              // normalized 0-10 value, not the row's raw native scale --
+              // otherwise an enps_0_10 row (raw values up to 10) renders on
+              // the same width axis as a likert_5 row (raw values up to 5),
+              // making the eNPS bar look misleadingly close to full.
+              const normalized10 = (value / scaleMax) * 10;
+              const width = `${Math.min(100, Math.max(0, normalized10 * 10))}%`;
+              const attention = normalized10 < ATTENTION_THRESHOLD;
               return (
                 <div key={row.questionId}>
                   <div className="mb-2 flex justify-between gap-4 text-[13px] text-[var(--ink-mid)]">
                     <span>{row.label ?? row.questionId}</span>
-                    <span className="font-semibold text-[var(--ink)]">{value.toFixed(2)}</span>
+                    <span className="font-semibold text-[var(--ink)]">
+                      {value.toFixed(2)}
+                      <span className="ml-0.5 font-normal text-[var(--ink-faint)]">/{scaleMax}</span>
+                    </span>
                   </div>
                   <div className="h-[3px] rounded-[var(--radius-pill)] bg-[var(--bg-active)]">
                     <div className="h-full rounded-[var(--radius-pill)]" style={{ width, background: attention ? "var(--red)" : "var(--ink)" }} />

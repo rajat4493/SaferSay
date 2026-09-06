@@ -37,7 +37,22 @@ export function PsychologicalSafetyCard({
 }) {
   const radius = 62;
   const circumference = 2 * Math.PI * radius;
-  const ratio = genericUnavailable ? 0 : minGroupSize > 0 ? Math.min(n / minGroupSize, 1) : 0;
+  // Two different things the ring fills toward, depending on state: while
+  // still locked, progress toward the minimum-response threshold (n vs
+  // minGroupSize); once unlocked, the actual score out of 10 -- these are
+  // unrelated numbers and conflating them left the ring permanently full
+  // after unlock (n always exceeds minGroupSize once visible at all,
+  // clamping the old n/minGroupSize ratio to 1 forever), silently turning
+  // a real score gauge into a decorative solid circle.
+  const ratio = genericUnavailable
+    ? 0
+    : protectedState
+      ? minGroupSize > 0
+        ? Math.min(n / minGroupSize, 1)
+        : 0
+      : score !== null
+        ? Math.min(Math.max(score / 10, 0), 1)
+        : 0;
   const remaining = Math.max(minGroupSize - n, 0);
 
   return (

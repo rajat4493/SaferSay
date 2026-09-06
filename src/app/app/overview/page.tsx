@@ -63,7 +63,19 @@ export default function OverviewPage() {
   // today's headcount rather than that cycle's actual eligible count at the
   // time -- the same kind of approximation the score trend card already
   // makes (survey-cycle order, not a fully audited historical snapshot).
-  const cyclesOldestFirst = [...cycles].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  //
+  // Draft cycles are excluded: a draft was never opened, so it has no real
+  // response rate yet (always 0%), and counting it as a data point made an
+  // still-unlaunched draft look like a second "survey run" for comparison
+  // -- producing a misleading delta against the one real, active cycle
+  // (e.g. "+68pts vs previous survey" when there's no real previous
+  // survey at all). Score-over-time doesn't have this problem because
+  // overallScoreByCycle only ever contains cycles with real scored
+  // answers to average -- filtering out drafts here matches that same
+  // "only count cycles that actually ran" standard.
+  const cyclesOldestFirst = [...cycles]
+    .filter((cycle) => cycle.status !== "draft")
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   const responseRateByCycle = employeeCount
     ? cyclesOldestFirst.map((cycle) => ({ cycleId: cycle.id, cycleName: cycle.name, value: Math.round((cycle.responseCount / employeeCount) * 100) }))
     : [];
