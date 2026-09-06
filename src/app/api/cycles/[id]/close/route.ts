@@ -18,11 +18,6 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   const { tenant } = session;
 
   const result = await withTenantScopedDb(tenant.id, (db) => new ResponseRepository(db).closeCycle(tenant.id, cycleId));
-  // Diagnostic for a reported "close reports success but doesn't persist"
-  // bug -- logged so it's traceable in Vercel function logs by cycleId,
-  // and surfaced in the error response too so a report of what actually
-  // happened doesn't require direct DB access to confirm.
-  console.log(`cycles/close: tenant=${tenant.id} cycle=${cycleId} result=${JSON.stringify(result)}`);
 
   if (!result.closed) {
     const reason = !result.existing

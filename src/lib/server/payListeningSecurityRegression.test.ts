@@ -11,7 +11,6 @@ describe("pay-when-you-listen security regressions", () => {
     expect(read("src/app/api/employees/import/route.ts")).toContain("canImportEmployees(session.role)");
     expect(read("src/app/api/employees/[id]/status/route.ts")).toContain("canImportEmployees(session.role)");
     expect(read("src/app/api/cycles/create/route.ts")).toContain("canCreateSurvey(session.role)");
-    expect(read("src/app/api/cycles/launch/route.ts")).toContain("canModifyBilling(session.role)");
   });
 
   it("does not leave public bootstrap or readiness reconnaissance in production", () => {

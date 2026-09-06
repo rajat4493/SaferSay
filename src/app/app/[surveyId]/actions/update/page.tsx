@@ -9,16 +9,12 @@ import { canRunSurvey } from "@/lib/permissions";
 import type { UserRole } from "@/lib/server/repositories/types";
 
 type CycleDetail = { cycle: { id: string; name: string } };
-
-// STUB: no LLM summarization/drafting pipeline exists yet. This draft is a
-// static template seeded with the real cycle name, not model output --
-// swapping in a real "/api/report/draft" call is a data-only change once
-// that pipeline exists.
-const commitments = [
-  "We're reducing recurring meetings to protect focus time.",
-  "We're launching a weekly cross-team update to improve visibility.",
-  "We're clarifying priorities and the “why now” behind our roadmap.",
-];
+type InsightsResponse = {
+  ok?: boolean;
+  insufficientData?: boolean;
+  source?: "ai" | "deterministic";
+  insights?: { summary: string; strategicWork: string[]; quickWins: string[]; nextAction: string };
+};
 
 export default function DraftUpdatePage() {
   const params = useParams();
@@ -29,6 +25,14 @@ export default function DraftUpdatePage() {
   const [accessChecked, setAccessChecked] = useState(false);
   const [slackConnected, setSlackConnected] = useState(false);
   const [postingToSlack, setPostingToSlack] = useState(false);
+  // Real recognition/recommendation from this cycle's actual, already-
+  // unlocked group scores -- see AiSynthesisCard for the same source.
+  // "ai" means a real model wrote it; "deterministic" is a rules-based
+  // read of the same numbers with no model involved. Never a static,
+  // hand-authored template pretending to be either.
+  const [insightsSource, setInsightsSource] = useState<"ai" | "deterministic" | null>(null);
+  const [commitments, setCommitments] = useState<string[]>([]);
+  const [insightsLoaded, setInsightsLoaded] = useState(false);
 
   useEffect(() => {
     fetch("/api/tenants/current")
@@ -72,6 +76,22 @@ export default function DraftUpdatePage() {
       })
       .catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    fetch(`/api/report/insights?cycleId=${encodeURIComponent(surveyId)}`)
+      .then((response) => response.json())
+      .then((data: InsightsResponse) => {
+        setInsightsLoaded(true);
+        if (data.ok && data.insights) {
+          setInsightsSource(data.source ?? "deterministic");
+          // Concrete, actionable lines first (quick wins), then deeper
+          // work -- same ordering AiSynthesisCard uses -- capped at 3 to
+          // keep the draft skimmable.
+          setCommitments([...data.insights.quickWins, ...data.insights.strategicWork].slice(0, 3));
+        }
+      })
+      .catch(() => setInsightsLoaded(true));
+  }, [surveyId]);
 
   if (!accessChecked) return null;
 
@@ -149,21 +169,29 @@ export default function DraftUpdatePage() {
               </div>
               <span className="badge-beta">
                 <Sparkles size={11} strokeWidth={1.8} className="mr-1" />
-                AI generated
+                {insightsSource === "ai" ? "AI generated" : "Free · rules-based"}
               </span>
             </div>
 
             <div className="px-6 py-6">
               <h3 className="font-[family-name:var(--font-display)] text-[26px] font-normal leading-[1.3] text-[var(--ink)]">{title}</h3>
               <p className="mt-3 text-[13.5px] leading-[1.6] text-[var(--ink-mid)]">{body}</p>
-              <ul className="mt-3.5 space-y-1.5">
-                {commitments.map((line) => (
-                  <li key={line} className="flex items-start gap-2 text-[13.5px] text-[var(--ink)]">
-                    <Check size={15} strokeWidth={2} className="mt-0.5 shrink-0 text-[var(--green)]" />
-                    {line}
-                  </li>
-                ))}
-              </ul>
+              {commitments.length > 0 ? (
+                <ul className="mt-3.5 space-y-1.5">
+                  {commitments.map((line) => (
+                    <li key={line} className="flex items-start gap-2 text-[13.5px] text-[var(--ink)]">
+                      <Check size={15} strokeWidth={2} className="mt-0.5 shrink-0 text-[var(--green)]" />
+                      {line}
+                    </li>
+                  ))}
+                </ul>
+              ) : insightsLoaded ? (
+                <p className="mt-3.5 text-[13.5px] leading-[1.6] text-[var(--ink-soft)]">
+                  Not enough scored questions yet to suggest specific changes -- write your own below, or check back once this cycle has more data.
+                </p>
+              ) : (
+                <p className="mt-3.5 text-[13.5px] leading-[1.6] text-[var(--ink-soft)]">Loading recommendations from this cycle&apos;s results...</p>
+              )}
               <p className="mt-3.5 text-[13.5px] leading-[1.6] text-[var(--ink-mid)]">We&apos;ll keep listening and keep you updated on our progress.</p>
             </div>
           </div>
@@ -175,14 +203,14 @@ export default function DraftUpdatePage() {
 
               <button
                 onClick={shareToSlack}
-                disabled={!slackConnected || postingToSlack}
+                disabled={!slackConnected || postingToSlack || commitments.length === 0}
                 title={slackConnected ? undefined : "Connect Slack in workspace settings first"}
                 className="btn-secondary mt-4 w-full justify-center disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <BrandGridGlyph />
                 {postingToSlack ? "Posting..." : "Share with Slack"}
               </button>
-              <button onClick={copyAsEmail} className="btn-primary mt-2 w-full justify-center">
+              <button onClick={copyAsEmail} disabled={commitments.length === 0} className="btn-primary mt-2 w-full justify-center disabled:cursor-not-allowed disabled:opacity-60">
                 <Copy size={14} strokeWidth={1.8} />
                 Copy as email
               </button>
