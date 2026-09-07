@@ -10,7 +10,7 @@ export type AIInsights = {
 export type AIInsightsPayload = {
   n: number;
   minGroupSize: number;
-  questions: Array<{ label: string; average: number; scaleMax: 5 | 10 }>;
+  questions: Array<{ label: string; average: number; scaleMin: number; scaleMax: number }>;
 };
 
 const FORBIDDEN_KEYS = ["email", "name", "employeeid", "respondentid", "token", "userid", "answers", "textvalue", "submissionid", "ip", "useragent", "identity"];
@@ -45,15 +45,23 @@ export function buildInsightsPayload(report: Extract<ProtectedReport, { protecte
   return {
     n: report.n,
     minGroupSize,
-    questions: report.rows.map((row) => ({ label: row.label ?? "Untitled question", average: row.average ?? 0, scaleMax: row.scaleMax ?? 5 })),
+    questions: report.rows.map((row) => ({ label: row.label ?? "Untitled question", average: row.average ?? 0, scaleMin: row.scaleMin ?? 1, scaleMax: row.scaleMax ?? 5 })),
   };
 }
 
 /** Safe fallback when a customer has paid for insight but no AI provider is
  * configured. It consumes the same aggregate-only payload as the model. */
 export function buildDeterministicInsights(payload: AIInsightsPayload): AIInsights {
+  // Min-aware: a plain average/scaleMax ratio is only correct when a
+  // scale starts at 0 -- likert_5 starts at 1, so that would compress its
+  // real range into [0.2, 1.0] instead of [0, 1.0], skewing which question
+  // looks weakest/strongest whenever scales of different types are mixed.
   const scored = payload.questions
-    .map((question) => ({ ...question, normalized: question.average / question.scaleMax }))
+    .map((question) => {
+      const span = question.scaleMax - question.scaleMin;
+      const normalized = span > 0 ? (question.average - question.scaleMin) / span : 0;
+      return { ...question, normalized };
+    })
     .sort((a, b) => a.normalized - b.normalized);
   const lowest = scored[0];
   const highest = scored.at(-1);

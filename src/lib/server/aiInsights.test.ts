@@ -8,9 +8,9 @@ describe("AI insights confidentiality contract", () => {
     protected: false,
     n: 8,
     rows: [
-      { questionId: "q1", label: "I know what matters this quarter", n: 8, average: 3.1, scaleMax: 5 },
-      { questionId: "q2", label: "Workload feels sustainable", n: 8, average: 2.8, scaleMax: 5 },
-      { questionId: "q3", label: "How likely are you to recommend this company as a place to work?", n: 8, average: 5.33, scaleMax: 10 },
+      { questionId: "q1", label: "I know what matters this quarter", n: 8, average: 3.1, scaleMin: 1, scaleMax: 5 },
+      { questionId: "q2", label: "Workload feels sustainable", n: 8, average: 2.8, scaleMin: 1, scaleMax: 5 },
+      { questionId: "q3", label: "How likely are you to recommend this company as a place to work?", n: 8, average: 5.33, scaleMin: 0, scaleMax: 10 },
     ],
   };
 
@@ -20,9 +20,9 @@ describe("AI insights confidentiality contract", () => {
       n: 8,
       minGroupSize: 5,
       questions: [
-        { label: "I know what matters this quarter", average: 3.1, scaleMax: 5 },
-        { label: "Workload feels sustainable", average: 2.8, scaleMax: 5 },
-        { label: "How likely are you to recommend this company as a place to work?", average: 5.33, scaleMax: 10 },
+        { label: "I know what matters this quarter", average: 3.1, scaleMin: 1, scaleMax: 5 },
+        { label: "Workload feels sustainable", average: 2.8, scaleMin: 1, scaleMax: 5 },
+        { label: "How likely are you to recommend this company as a place to work?", average: 5.33, scaleMin: 0, scaleMax: 10 },
       ],
     });
     expect(JSON.stringify(payload)).not.toContain("questionId");
@@ -33,7 +33,7 @@ describe("AI insights confidentiality contract", () => {
       assertNoIndividualData({
         n: 8,
         minGroupSize: 5,
-        questions: [{ label: "Workload", average: 3, scaleMax: 5 }],
+        questions: [{ label: "Workload", average: 3, scaleMin: 1, scaleMax: 5 }],
       }),
     ).not.toThrow();
 
@@ -41,7 +41,7 @@ describe("AI insights confidentiality contract", () => {
       assertNoIndividualData({
         n: 8,
         minGroupSize: 5,
-        questions: [{ label: "Workload", average: 3, scaleMax: 5 }],
+        questions: [{ label: "Workload", average: 3, scaleMin: 1, scaleMax: 5 }],
         token: "should-never-be-here",
       } as never),
     ).toThrow(/forbidden key: token/);

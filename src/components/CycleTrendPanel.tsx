@@ -5,6 +5,7 @@ import { TrendingUp } from "lucide-react";
 import { Card } from "@/components/AppShell";
 import { QuestionTrendLine, type TrendLinePoint } from "@/components/QuestionTrendLine";
 import { getScoreTier } from "@/lib/scoreTier";
+import { normalizeToTen } from "@/lib/scaleRange";
 import { SkeletonText } from "@/components/Skeleton";
 import { ViewerCard } from "@/components/ViewerShell";
 
@@ -15,7 +16,8 @@ type TrendPoint = {
   n: number;
   average: number | null;
   protected: boolean;
-  scaleMax?: 5 | 10;
+  scaleMin?: number;
+  scaleMax?: number;
 };
 type TrendQuestion = { questionText: string; points: TrendPoint[] };
 
@@ -112,7 +114,7 @@ export function CycleTrendPanel({ mode = "admin" }: { mode?: "admin" | "viewer" 
               };
             }
             return {
-              value10: (point.average / (point.scaleMax ?? 5)) * 10,
+              value10: normalizeToTen(point.average, { min: point.scaleMin ?? 1, max: point.scaleMax ?? 5 }),
               protected: false,
               title: `${index}. ${point.cycleName} (${shortDate(point.cycleCreatedAt)}): ${point.average.toFixed(2)} (n=${point.n})`,
             };

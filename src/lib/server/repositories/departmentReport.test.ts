@@ -24,7 +24,7 @@ describe("department-scoped protected report", () => {
         { segment_team: "engineering", n: "6" },
         { segment_team: "sales", n: "8" },
       ],
-      scores: [{ question_id: "q1", question_text: "How supported do you feel?", n: 6, average: "4.1" }],
+      scores: [{ question_id: "q1", question_text: "How supported do you feel?", question_type: "likert_5", n: 6, average: "4.1" }],
     });
 
     const report = await new ResponseRepository(db).getProtectedReportForTenant(tenantId, cycleId, 5, {
@@ -35,7 +35,7 @@ describe("department-scoped protected report", () => {
     expect(report).toEqual({
       protected: false,
       n: 6,
-      rows: [{ questionId: "q1", label: "How supported do you feel?", n: 6, average: 4.1, scaleMax: 5 }],
+      rows: [{ questionId: "q1", label: "How supported do you feel?", construct: undefined, n: 6, average: 4.1, scaleMin: 1, scaleMax: 5 }],
     });
   });
 

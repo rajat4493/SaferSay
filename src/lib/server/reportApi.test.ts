@@ -23,7 +23,7 @@ describe("real protected report flow", () => {
     expect(repo).toContain("getLatestProtectedReportForTenant");
     expect(repo).toContain("responses.report_question_scores");
     expect(repo).toContain("q.question_type");
-    expect(repo).toContain("scaleMaxForQuestionType");
+    expect(repo).toContain("scaleRangeForRow");
     expect(repo).not.toContain("identity.employees");
     expect(repo).not.toContain("identity.survey_participants");
   });

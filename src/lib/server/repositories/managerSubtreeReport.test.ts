@@ -44,7 +44,7 @@ describe("manager-subtree (People Leader) scoped report", () => {
   it("returns real rows for a subtree at or above min_group_size with no differencing risk", async () => {
     const db = fakeDb({
       countsByLabelSet: { engineering: "6", sales: "8" },
-      scores: [{ question_id: "q1", question_text: "How supported do you feel?", construct: "Support", n: 6, average: "4.1" }],
+      scores: [{ question_id: "q1", question_text: "How supported do you feel?", question_type: "likert_5", construct: "Support", n: 6, average: "4.1" }],
     });
 
     const report = await new ResponseRepository(db).getProtectedReportForTenant(tenantId, cycleId, 5, teamScope({}));
@@ -52,7 +52,7 @@ describe("manager-subtree (People Leader) scoped report", () => {
     expect(report).toEqual({
       protected: false,
       n: 6,
-      rows: [{ questionId: "q1", label: "How supported do you feel?", construct: "Support", n: 6, average: 4.1, scaleMax: 5 }],
+      rows: [{ questionId: "q1", label: "How supported do you feel?", construct: "Support", n: 6, average: 4.1, scaleMin: 1, scaleMax: 5 }],
     });
   });
 

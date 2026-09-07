@@ -9,6 +9,7 @@ import { PsychologicalSafetyCard } from "@/components/PsychologicalSafetyCard";
 import { SkeletonCard, SkeletonText } from "@/components/Skeleton";
 import { useToast } from "@/components/ToastProvider";
 import { ViewerCard } from "@/components/ViewerShell";
+import { normalizeToTen } from "@/lib/scaleRange";
 
 type CycleAction = { id: string; authorEmail: string; actionText: string; createdAt: string };
 
@@ -20,7 +21,7 @@ type ReportResponse = {
   report?: {
     protected: boolean;
     n: number;
-    rows: Array<{ questionId: string; label?: string; n: number; average: number | null; scaleMax?: 5 | 10 }>;
+    rows: Array<{ questionId: string; label?: string; n: number; average: number | null; scaleMin?: number; scaleMax?: number }>;
   };
   textAnswers?: {
     protected: boolean;
@@ -200,11 +201,13 @@ export function ProtectedReportPanel({
   }
 
   const scoredRows = report?.rows.filter((row) => row.average !== null) ?? [];
-  // Each row can be on a different native scale (5 for likert_5, 10 for
-  // enps_0_10) -- normalize every row to /10 before averaging, otherwise a
-  // survey mixing question types skews toward whichever scale dominates.
+  // Each row can be on a different native scale (1-5 for likert_5, 0-10
+  // for enps_0_10, or a tenant-configured range for "scale" questions) --
+  // normalize every row to /10 before averaging, min-aware (see
+  // normalizeToTen -- a plain value/max ratio is wrong for any scale that
+  // doesn't start at 0, which includes likert_5's 1-5 range).
   const overallScore = scoredRows.length
-    ? scoredRows.reduce((sum, row) => sum + ((row.average ?? 0) / (row.scaleMax ?? 5)) * 10, 0) / scoredRows.length
+    ? scoredRows.reduce((sum, row) => sum + normalizeToTen(row.average ?? 0, { min: row.scaleMin ?? 1, max: row.scaleMax ?? 5 }), 0) / scoredRows.length
     : null;
 
   const textReport = result?.textAnswers;
@@ -306,13 +309,15 @@ export function ProtectedReportPanel({
           <div className="space-y-4">
             {report.rows.map((row) => {
               const value = row.average ?? 0;
+              const scaleMin = row.scaleMin ?? 1;
               const scaleMax = row.scaleMax ?? 5;
               // Bar width and the attention cutoff both compare against a
-              // normalized 0-10 value, not the row's raw native scale --
-              // otherwise an enps_0_10 row (raw values up to 10) renders on
-              // the same width axis as a likert_5 row (raw values up to 5),
-              // making the eNPS bar look misleadingly close to full.
-              const normalized10 = (value / scaleMax) * 10;
+              // min-aware normalized 0-10 value, not the row's raw native
+              // scale -- otherwise an enps_0_10 row (raw values up to 10)
+              // renders on the same width axis as a likert_5 row (raw
+              // values up to 5), making the eNPS bar look misleadingly
+              // close to full.
+              const normalized10 = normalizeToTen(value, { min: scaleMin, max: scaleMax });
               const width = `${Math.min(100, Math.max(0, normalized10 * 10))}%`;
               const attention = normalized10 < ATTENTION_THRESHOLD;
               return (

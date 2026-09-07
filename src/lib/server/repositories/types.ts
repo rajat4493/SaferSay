@@ -312,7 +312,7 @@ export type PilotIdentitySummary = {
   sentInvites: number;
 };
 
-export type QuestionType = "likert_5" | "enps_0_10" | "open_text" | "multiple_choice" | "ranking" | "matrix";
+export type QuestionType = "likert_5" | "enps_0_10" | "scale" | "open_text" | "multiple_choice" | "ranking" | "matrix";
 
 export type ResponseAnswerInput = {
   questionId: string;
@@ -328,6 +328,11 @@ export type ResponseAnswerInput = {
 
 /** A multiple_choice/ranking option, or one column of a matrix row. */
 export type QuestionOption = { key: string; label: string };
+
+/** A "scale"-type question's configured range + optional anchor labels --
+ * see src/lib/scaleRange.ts. Stored in the same `options` jsonb column as
+ * QuestionOption[], distinguished by question_type at read time. */
+export type ScaleConfig = { min: number; max: number; lowLabel?: string; highLabel?: string };
 
 /**
  * Structural-only skip-logic condition (Option B -- see plan history).
@@ -351,6 +356,10 @@ export type RespondentSurveyQuestion = {
   construct: string | null;
   optional: boolean;
   options: QuestionOption[] | null;
+  // Only set for a "scale"-type question -- its configured min/max/anchor
+  // labels, so the taker surface can render the right range instead of
+  // assuming a fixed likert_5/enps_0_10 shape.
+  scale: ScaleConfig | null;
   // Only set for matrix-row questions; rows sharing a matrix_group_id
   // render as one grid on the taker surface.
   matrixGroupId: string | null;
@@ -414,7 +423,7 @@ export type ProtectedReport =
   | {
       protected: false;
       n: number;
-      rows: Array<{ questionId: string; label?: string; construct?: string | null; n: number; average: number | null; scaleMax?: 5 | 10 }>;
+      rows: Array<{ questionId: string; label?: string; construct?: string | null; n: number; average: number | null; scaleMin?: number; scaleMax?: number }>;
     };
 
 /**
@@ -455,8 +464,9 @@ export type CycleTrendPoint = {
   // Lets a consumer normalize this point onto a common 0-10 scale before
   // averaging across questions of different types (see the Overview
   // dashboard's per-cycle overall-score derivation) -- see
-  // scaleMaxForQuestionType.
-  scaleMax: 5 | 10;
+  // src/lib/scaleRange.ts's resolveScale/normalizeToTen.
+  scaleMin: number;
+  scaleMax: number;
 };
 
 export type CycleTrendQuestion = {

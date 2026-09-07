@@ -29,6 +29,13 @@ export async function PATCH(request: NextRequest) {
   if (typeof body.presetId === "string" && body.presetId && !findBrandPreset(body.presetId)) {
     return NextResponse.json({ ok: false, error: "Unknown brand preset." }, { status: 400 });
   }
+  const MESSAGE_MAX_LENGTH = 600;
+  if (typeof body.introMessage === "string" && body.introMessage.length > MESSAGE_MAX_LENGTH) {
+    return NextResponse.json({ ok: false, error: `Intro message must be ${MESSAGE_MAX_LENGTH} characters or fewer.` }, { status: 400 });
+  }
+  if (typeof body.completionMessage === "string" && body.completionMessage.length > MESSAGE_MAX_LENGTH) {
+    return NextResponse.json({ ok: false, error: `Completion message must be ${MESSAGE_MAX_LENGTH} characters or fewer.` }, { status: 400 });
+  }
 
   const brand: BrandTheme = {
     name: typeof body.name === "string" && body.name.trim() ? body.name.trim() : defaultBrand.name,
@@ -37,6 +44,11 @@ export async function PATCH(request: NextRequest) {
     accentColor: typeof body.accentColor === "string" && body.accentColor ? body.accentColor : null,
     fontFamily: typeof body.fontFamily === "string" && body.fontFamily ? body.fontFamily : null,
     presetId: typeof body.presetId === "string" && body.presetId ? body.presetId : null,
+    // Rendered as plain text only (no dangerouslySetInnerHTML anywhere
+    // downstream -- see src/app/s/[token]/page.tsx), so no HTML/script
+    // sanitization is needed beyond the length cap above.
+    introMessage: typeof body.introMessage === "string" && body.introMessage.trim() ? body.introMessage.trim() : null,
+    completionMessage: typeof body.completionMessage === "string" && body.completionMessage.trim() ? body.completionMessage.trim() : null,
   };
 
   await withTenantScopedDb(session.tenant.id, (db) => new IdentityRepository(db).setBrand(session.tenant.id, brand));

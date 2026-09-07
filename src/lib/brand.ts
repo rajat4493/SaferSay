@@ -21,6 +21,18 @@ export type BrandTheme = {
   // preset is picked. null = today's look, unchanged (the default for
   // every existing tenant).
   presetId: string | null;
+  // Optional custom copy shown on the respondent-facing survey page (see
+  // src/app/s/[token]/page.tsx) -- introMessage on the intro/consent
+  // screen, completionMessage on the thank-you screen. null = the current
+  // generic copy, unchanged. Deliberately narrow: this is ADDITIONAL
+  // context a tenant can add (e.g. "this quarter we're focused on..."),
+  // never a replacement for the confidentiality-guarantee text itself --
+  // the three ConfidentialityRow entries and the "who can see your
+  // answers" paragraph on the done screen are NOT tenant-editable, so a
+  // workspace admin can't quietly soften or remove the anonymity promise
+  // respondents are relying on.
+  introMessage: string | null;
+  completionMessage: string | null;
 };
 
 export const defaultBrand: BrandTheme = {
@@ -30,6 +42,8 @@ export const defaultBrand: BrandTheme = {
   accentColor: null,
   fontFamily: null,
   presetId: null,
+  introMessage: null,
+  completionMessage: null,
 };
 
 /** Curated, not free-text -- keeps every tenant's chosen font readable and license-safe (all already loaded as next/font in layout.tsx, or a system stack). */

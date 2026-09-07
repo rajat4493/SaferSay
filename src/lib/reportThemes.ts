@@ -9,13 +9,15 @@
  * new suppression surface, so this module has no DB access and no
  * suppression logic of its own.
  */
+import { normalizeToTen } from "@/lib/scaleRange";
 
 export type ThemeableRow = {
   questionId: string;
   label?: string;
   construct?: string | null;
   average: number | null;
-  scaleMax?: 5 | 10;
+  scaleMin?: number;
+  scaleMax?: number;
 };
 
 export type ThemeBand = "strength" | "neutral" | "priority";
@@ -35,10 +37,6 @@ export type ThemeGroup = {
 const STRENGTH_THRESHOLD = 7.7;
 const PRIORITY_THRESHOLD = 6.8;
 
-function normalizeTo10(average: number, scaleMax: 5 | 10 = 5): number {
-  return (average / scaleMax) * 10;
-}
-
 function bandFor(average10: number): ThemeBand {
   if (average10 >= STRENGTH_THRESHOLD) return "strength";
   if (average10 < PRIORITY_THRESHOLD) return "priority";
@@ -51,7 +49,7 @@ export function groupByConstruct(rows: ThemeableRow[]): ThemeGroup[] {
   const byConstruct = new Map<string, Array<ThemeableRow & { average: number; average10: number }>>();
   for (const row of scored) {
     const key = row.construct?.trim() || "Other";
-    const normalized = { ...row, average10: normalizeTo10(row.average, row.scaleMax) };
+    const normalized = { ...row, average10: normalizeToTen(row.average, { min: row.scaleMin ?? 1, max: row.scaleMax ?? 5 }) };
     const entry = byConstruct.get(key);
     if (entry) entry.push(normalized);
     else byConstruct.set(key, [normalized]);
@@ -77,7 +75,7 @@ export function groupByConstruct(rows: ThemeableRow[]): ThemeGroup[] {
 export function overallAverage10(rows: ThemeableRow[]): number | null {
   const scored = rows.filter((row): row is ThemeableRow & { average: number } => row.average !== null);
   if (scored.length === 0) return null;
-  return scored.reduce((sum, row) => sum + normalizeTo10(row.average, row.scaleMax), 0) / scored.length;
+  return scored.reduce((sum, row) => sum + normalizeToTen(row.average, { min: row.scaleMin ?? 1, max: row.scaleMax ?? 5 }), 0) / scored.length;
 }
 
 /**

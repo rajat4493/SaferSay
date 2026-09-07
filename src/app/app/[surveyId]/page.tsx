@@ -8,11 +8,13 @@ import { SkeletonCard, SkeletonText } from "@/components/Skeleton";
 import { SurveyStageTabs } from "@/components/SurveyStageTabs";
 import { useToast } from "@/components/ToastProvider";
 import { QuestionOptionsEditor, type QuestionOption } from "@/components/QuestionOptionsEditor";
+import { ScaleConfigEditor } from "@/components/ScaleConfigEditor";
 import { canRunSurvey } from "@/lib/permissions";
+import type { ScaleConfig } from "@/lib/scaleRange";
 import type { UserRole } from "@/lib/server/repositories/types";
 
 type ShowIf = { attribute: "team" | "location"; op: "eq" | "neq"; value: string } | null;
-type QuestionType = "likert_5" | "enps_0_10" | "open_text" | "multiple_choice" | "ranking" | "matrix";
+type QuestionType = "likert_5" | "enps_0_10" | "scale" | "open_text" | "multiple_choice" | "ranking" | "matrix";
 
 type CycleQuestion = {
   id: string;
@@ -22,6 +24,7 @@ type CycleQuestion = {
   construct: string | null;
   optional: boolean;
   options: QuestionOption[] | null;
+  scale: ScaleConfig | null;
   showIf: ShowIf;
 };
 
@@ -31,11 +34,22 @@ type CycleDetail = {
   questions: CycleQuestion[];
 };
 
-type DraftQuestion = { text: string; type: QuestionType; construct: string | null; optional: boolean; options: QuestionOption[]; showIf: ShowIf };
+type DraftQuestion = {
+  text: string;
+  type: QuestionType;
+  construct: string | null;
+  optional: boolean;
+  options: QuestionOption[];
+  scale: ScaleConfig | null;
+  showIf: ShowIf;
+};
+
+const DEFAULT_SCALE: ScaleConfig = { min: 0, max: 10 };
 
 const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
   likert_5: "Rating scale (1-5)",
   enps_0_10: "eNPS scale (0-10)",
+  scale: "Configurable scale",
   open_text: "Open text",
   multiple_choice: "Multiple choice",
   ranking: "Ranking",
@@ -117,7 +131,7 @@ function SurveyBuildContent({ surveyId }: { surveyId: string }) {
     const type: QuestionType = bankQuestion.questionType === "scale" ? "likert_5" : bankQuestion.questionType;
     setDraftQuestions((current) => [
       ...current,
-      { text: bankQuestion.text, type, construct: bankQuestion.construct, optional: false, options: bankQuestion.options ?? [], showIf: null },
+      { text: bankQuestion.text, type, construct: bankQuestion.construct, optional: false, options: bankQuestion.options ?? [], scale: null, showIf: null },
     ]);
     setBankPickerValue("");
   }
@@ -134,6 +148,7 @@ function SurveyBuildContent({ surveyId }: { surveyId: string }) {
           construct: question.construct,
           optional: question.optional,
           options: question.options ?? [],
+          scale: question.scale ?? null,
           showIf: question.showIf,
         })),
     );
@@ -156,7 +171,16 @@ function SurveyBuildContent({ surveyId }: { surveyId: string }) {
 
   function editDraftType(index: number, type: QuestionType) {
     setDraftQuestions((current) =>
-      current.map((question, i) => (i === index ? { ...question, type, options: OPTION_TYPES.includes(type) ? question.options : [] } : question)),
+      current.map((question, i) =>
+        i === index
+          ? {
+              ...question,
+              type,
+              options: OPTION_TYPES.includes(type) ? question.options : [],
+              scale: type === "scale" ? (question.scale ?? DEFAULT_SCALE) : question.scale,
+            }
+          : question,
+      ),
     );
   }
 
@@ -168,12 +192,16 @@ function SurveyBuildContent({ surveyId }: { surveyId: string }) {
     setDraftQuestions((current) => current.map((question, i) => (i === index ? { ...question, options } : question)));
   }
 
+  function setDraftScale(index: number, scale: ScaleConfig) {
+    setDraftQuestions((current) => current.map((question, i) => (i === index ? { ...question, scale } : question)));
+  }
+
   function removeDraft(index: number) {
     setDraftQuestions((current) => current.filter((_, i) => i !== index));
   }
 
   function addDraft() {
-    setDraftQuestions((current) => [...current, { text: "", type: "likert_5", construct: null, optional: false, options: [], showIf: null }]);
+    setDraftQuestions((current) => [...current, { text: "", type: "likert_5", construct: null, optional: false, options: [], scale: null, showIf: null }]);
   }
 
   async function saveQuestions() {
@@ -186,13 +214,22 @@ function SurveyBuildContent({ surveyId }: { surveyId: string }) {
       toast.show({ variant: "error", message: "Multiple choice, ranking, and matrix questions need at least two options." });
       return;
     }
+    if (questions.some((question) => question.type === "scale" && (!question.scale || question.scale.max <= question.scale.min))) {
+      toast.show({ variant: "error", message: "Scale questions need a valid minimum and maximum (max greater than min)." });
+      return;
+    }
 
     setSaving(true);
     try {
       const response = await fetch(`/api/cycles/${surveyId}/questions`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ questions: questions.map((question) => ({ ...question, options: question.options.filter((option) => option.label.trim()) })) }),
+        body: JSON.stringify({
+          questions: questions.map((question) => ({
+            ...question,
+            options: question.type === "scale" ? question.scale : question.options.filter((option) => option.label.trim()),
+          })),
+        }),
       });
       const result = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string };
       if (!response.ok || !result.ok) {
@@ -321,6 +358,8 @@ function SurveyBuildContent({ surveyId }: { surveyId: string }) {
 
                         {OPTION_TYPES.includes(question.type) ? (
                           <QuestionOptionsEditor options={question.options} onChange={(options) => setDraftOptions(index, options)} idPrefix={`Question ${index + 1}`} />
+                        ) : question.type === "scale" ? (
+                          <ScaleConfigEditor scale={question.scale ?? DEFAULT_SCALE} onChange={(scale) => setDraftScale(index, scale)} idPrefix={`Question ${index + 1}`} />
                         ) : null}
                       </div>
                     ))}

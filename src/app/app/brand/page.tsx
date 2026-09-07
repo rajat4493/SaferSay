@@ -141,6 +141,38 @@ export default function BrandPage() {
       </Card>
 
       <Card className="mt-[9px]">
+        <h2 className="section-title">Respondent messages</h2>
+        <p className="mt-1.5 secondary-text">
+          Optional extra context shown to employees taking your survey -- e.g. why you&apos;re running this pulse, or what happens with the results. This is
+          added alongside our standard confidentiality guarantee, never in place of it -- the anonymity promise itself isn&apos;t editable here.
+        </p>
+        <div className="mt-4 grid gap-4 max-w-md">
+          <label className="label-text">
+            Intro message (shown before the survey starts)
+            <textarea
+              value={brand.introMessage ?? ""}
+              onChange={(event) => setBrand({ ...brand, introMessage: event.target.value || null })}
+              placeholder="e.g. This quarter we're focused on workload and growth -- your honest answers help us prioritise."
+              maxLength={600}
+              rows={3}
+              className="mt-2 admin-input normal-case"
+            />
+          </label>
+          <label className="label-text">
+            Completion message (shown after submitting)
+            <textarea
+              value={brand.completionMessage ?? ""}
+              onChange={(event) => setBrand({ ...brand, completionMessage: event.target.value || null })}
+              placeholder="e.g. We'll share what we heard and what we're doing about it within two weeks."
+              maxLength={600}
+              rows={3}
+              className="mt-2 admin-input normal-case"
+            />
+          </label>
+        </div>
+      </Card>
+
+      <Card className="mt-[9px]">
         <h2 className="section-title">Preview</h2>
         <div className="mt-4 flex items-center gap-3 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--bg)] p-4">
           <BrandMark size={40} />

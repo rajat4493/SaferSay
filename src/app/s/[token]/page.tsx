@@ -12,14 +12,18 @@ import { deriveAccentPalette } from "@/lib/brandTheme";
 
 type QuestionOption = { key: string; label: string };
 
+type ScaleConfig = { min: number; max: number; lowLabel?: string; highLabel?: string };
+
 type SurveyQuestion = {
   id: string;
   position: number;
   text: string;
-  type: "likert_5" | "enps_0_10" | "open_text" | "multiple_choice" | "ranking" | "matrix";
+  type: "likert_5" | "enps_0_10" | "scale" | "open_text" | "multiple_choice" | "ranking" | "matrix";
   construct: string | null;
   optional: boolean;
   options: QuestionOption[] | null;
+  // Only set for "scale" -- its configured min/max/anchor labels.
+  scale: ScaleConfig | null;
   matrixGroupId: string | null;
 };
 
@@ -66,6 +70,7 @@ export default function RespondentTokenPage() {
         construct: question.label,
         optional: false,
         options: null,
+        scale: null,
         matrixGroupId: null,
       })),
     [],
@@ -79,9 +84,9 @@ export default function RespondentTokenPage() {
   const current = answers.length;
   const question = questions[current];
   const progressPercent = questions.length ? Math.round((current / questions.length) * 100) : 0;
-  const isScaleQuestion = question?.type === "likert_5" || question?.type === "enps_0_10";
+  const isScaleQuestion = question?.type === "likert_5" || question?.type === "enps_0_10" || question?.type === "scale";
   const isOptionQuestion = question?.type === "multiple_choice" || question?.type === "ranking" || question?.type === "matrix";
-  const scaleOptions = isScaleQuestion ? scaleValues(question!.type) : [];
+  const scaleOptions = isScaleQuestion ? scaleValues(question!) : [];
   // Digit keys 0-9 map directly to a same-valued option (no letter badges
   // needed since the circle already shows its number). eNPS's 10 has no
   // single-digit key -- a reasonable trade-off, click/tap still works.
@@ -284,6 +289,7 @@ export default function RespondentTokenPage() {
               <ShieldCheck size={20} strokeWidth={1.8} />
             </div>
             <h2 className="font-[family-name:var(--font-display)] text-[30px] font-normal leading-[1.18] tracking-[-0.01em] text-[var(--ink)]">How your answers stay confidential</h2>
+            {brand.introMessage ? <p className="mt-3 text-[13.5px] leading-[1.5] text-[var(--ink-mid)]">{brand.introMessage}</p> : null}
 
             <div className="mt-6 space-y-2">
               <ConfidentialityRow
@@ -321,6 +327,7 @@ export default function RespondentTokenPage() {
             </div>
             <h2 className="mt-6 font-[family-name:var(--font-display)] text-[30px] font-normal tracking-[-0.01em] text-[var(--ink)]">That&apos;s everything — thank you.</h2>
             <p className="mt-3 text-[13.5px] leading-[1.5] text-[var(--ink-mid)]">Your participation was marked complete separately from your response content.</p>
+            {brand.completionMessage ? <p className="mt-3 text-[13.5px] leading-[1.5] text-[var(--ink-mid)]">{brand.completionMessage}</p> : null}
 
             <div className="mt-6 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--bg)] p-4 text-left text-[13.5px] leading-[1.5] text-[var(--ink-mid)]">
               Your employer will only ever see grouped scores once enough people respond. Nobody -- including us -- can trace this response back to you.
@@ -415,7 +422,7 @@ export default function RespondentTokenPage() {
                         data-selected={selected}
                         role="radio"
                         aria-checked={selected}
-                        aria-label={`${value} ${scaleLabel(question.type, value)}`}
+                        aria-label={`${value} ${scaleLabel(question, value)}`}
                       >
                         {value}
                       </button>
@@ -423,8 +430,8 @@ export default function RespondentTokenPage() {
                   })}
                 </div>
                 <div className="taker-scale-labels">
-                  <span>{scaleLabel(question.type, scaleOptions[0])}</span>
-                  <span>{scaleLabel(question.type, scaleOptions[scaleOptions.length - 1])}</span>
+                  <span>{scaleLabel(question, scaleOptions[0])}</span>
+                  <span>{scaleLabel(question, scaleOptions[scaleOptions.length - 1])}</span>
                 </div>
                 <button
                   disabled={selectedValue === null}
@@ -462,14 +469,26 @@ export default function RespondentTokenPage() {
   );
 }
 
-function scaleValues(type: SurveyQuestion["type"]) {
-  return type === "enps_0_10" ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] : [1, 2, 3, 4, 5];
+function scaleValues(question: SurveyQuestion) {
+  if (question.type === "enps_0_10") return [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  if (question.type === "scale" && question.scale) {
+    const { min, max } = question.scale;
+    const values: number[] = [];
+    for (let value = min; value <= max; value++) values.push(value);
+    return values;
+  }
+  return [1, 2, 3, 4, 5];
 }
 
-function scaleLabel(type: SurveyQuestion["type"], value: number) {
-  if (type === "enps_0_10") {
+function scaleLabel(question: SurveyQuestion, value: number) {
+  if (question.type === "enps_0_10") {
     if (value === 0) return "Not at all likely";
     if (value === 10) return "Extremely likely";
+    return "";
+  }
+  if (question.type === "scale" && question.scale) {
+    if (value === question.scale.min) return question.scale.lowLabel ?? "";
+    if (value === question.scale.max) return question.scale.highLabel ?? "";
     return "";
   }
   if (value === 1) return "Strongly disagree";

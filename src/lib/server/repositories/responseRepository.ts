@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import type { Queryable } from "@/lib/server/db/tenantPool";
+import { isScaleConfig, resolveScale } from "@/lib/scaleRange";
 import {
   ResponseAnswerInput,
   ProtectedReport,
@@ -10,6 +11,7 @@ import {
   QuestionBankQuestionType,
   QuestionOption,
   QuestionType,
+  ScaleConfig,
   ShowIfCondition,
   ReportScope,
   RespondentSurveySession,
@@ -24,8 +26,13 @@ function normalizeQuestionText(text: string): string {
   return text.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-function scaleMaxForQuestionType(type: QuestionType): 5 | 10 {
-  return type === "enps_0_10" ? 10 : 5;
+/** Resolves a row's normalized {min, max} regardless of question type --
+ * likert_5/enps_0_10 have a fixed range; "scale" reads it from the same
+ * `options` jsonb column multiple_choice/ranking/matrix already use. See
+ * src/lib/scaleRange.ts for the shared min-aware normalization this feeds. */
+function scaleRangeForRow(type: QuestionType, options: unknown): { scaleMin: number; scaleMax: number } {
+  const scale = resolveScale(type, options);
+  return { scaleMin: scale.min, scaleMax: scale.max };
 }
 
 /**
@@ -176,7 +183,9 @@ export class ResponseRepository {
       question_type: QuestionType;
       construct: string | null;
       is_optional: boolean;
-      options: Array<{ key: string; label: string }> | null;
+      // Holds an option list (multiple_choice/ranking/matrix) or a scale
+      // config (scale) depending on question_type -- split below.
+      options: unknown;
       matrix_group_id: string | null;
       show_if: ShowIfCondition | null;
     }>(
@@ -200,7 +209,12 @@ export class ResponseRepository {
         type: question.question_type,
         construct: question.construct,
         optional: question.is_optional,
-        options: question.options,
+        // Same jsonb column holds two different shapes depending on type --
+        // an option list for multiple_choice/ranking/matrix, or a scale
+        // config for "scale" -- split them into their own typed fields here
+        // so the taker UI never has to guess which shape it received.
+        options: question.question_type === "scale" ? null : (question.options as QuestionOption[] | null),
+        scale: question.question_type === "scale" && isScaleConfig(question.options) ? question.options : null,
         matrixGroupId: question.matrix_group_id,
         showIf: question.show_if,
       })),
@@ -266,8 +280,8 @@ export class ResponseRepository {
     const n = Number(countResult.rows[0]?.n ?? 0);
     if (n < minGroupSize) return { protected: true, n, rows: [] };
 
-    const result = await this.db.query<{ question_id: string; question_text: string; question_type: QuestionType; construct: string | null; n: number; average: string | null }>(
-      `select r.question_id, q.question_text, q.question_type, q.construct, r.n, r.average
+    const result = await this.db.query<{ question_id: string; question_text: string; question_type: QuestionType; options: unknown; construct: string | null; n: number; average: string | null }>(
+      `select r.question_id, q.question_text, q.question_type, q.options, q.construct, r.n, r.average
        from responses.report_question_scores($1, $2) r
        join responses.survey_cycles c on c.id = $1
        join responses.template_questions q on q.id = r.question_id
@@ -284,7 +298,7 @@ export class ResponseRepository {
         construct: row.construct,
         n: row.n,
         average: row.average === null ? null : Number(row.average),
-        scaleMax: scaleMaxForQuestionType(row.question_type),
+        ...scaleRangeForRow(row.question_type, row.options),
       })),
     };
   }
@@ -545,8 +559,8 @@ export class ResponseRepository {
     // suppressed to protect a sibling subtree, or genuinely empty.
     if (!entry || !entry.releasable || scope.teamLabels.length === 0) return { protected: true, n: 0, rows: [] };
 
-    const result = await this.db.query<{ question_id: string; question_text: string; question_type: QuestionType; construct: string | null; n: number; average: string | null }>(
-      `select r.question_id, q.question_text, q.question_type, q.construct, r.n, r.average
+    const result = await this.db.query<{ question_id: string; question_text: string; question_type: QuestionType; options: unknown; construct: string | null; n: number; average: string | null }>(
+      `select r.question_id, q.question_text, q.question_type, q.options, q.construct, r.n, r.average
        from responses.report_question_scores_by_departments($1, $2, $3) r
        join responses.survey_cycles c on c.id = $1
        join responses.template_questions q on q.id = r.question_id
@@ -563,7 +577,7 @@ export class ResponseRepository {
         construct: row.construct,
         n: row.n,
         average: row.average === null ? null : Number(row.average),
-        scaleMax: scaleMaxForQuestionType(row.question_type),
+        ...scaleRangeForRow(row.question_type, row.options),
       })),
     };
   }
@@ -604,8 +618,8 @@ export class ResponseRepository {
     // has zero responses at all.
     if (!entry || !entry.releasable) return { protected: true, n: 0, rows: [] };
 
-    const result = await this.db.query<{ question_id: string; question_text: string; question_type: QuestionType; construct: string | null; n: number; average: string | null }>(
-      `select r.question_id, q.question_text, q.question_type, q.construct, r.n, r.average
+    const result = await this.db.query<{ question_id: string; question_text: string; question_type: QuestionType; options: unknown; construct: string | null; n: number; average: string | null }>(
+      `select r.question_id, q.question_text, q.question_type, q.options, q.construct, r.n, r.average
        from responses.report_question_scores_by_department($1, $2, $3) r
        join responses.survey_cycles c on c.id = $1
        join responses.template_questions q on q.id = r.question_id
@@ -622,7 +636,7 @@ export class ResponseRepository {
         construct: row.construct,
         n: row.n,
         average: row.average === null ? null : Number(row.average),
-        scaleMax: scaleMaxForQuestionType(row.question_type),
+        ...scaleRangeForRow(row.question_type, row.options),
       })),
     };
   }
@@ -789,7 +803,10 @@ export class ResponseRepository {
       type: QuestionType;
       construct: string | null;
       optional: boolean;
-      options: { key: string; label: string }[] | null;
+      // An option list for multiple_choice/ranking/matrix, a ScaleConfig
+      // for "scale", or null otherwise -- both shapes go straight into the
+      // same jsonb column, distinguished by `type` at read time.
+      options: QuestionOption[] | ScaleConfig | null;
       showIf: ShowIfCondition | null;
       matrixGroupId: string | null;
     }>,
@@ -889,11 +906,12 @@ export class ResponseRepository {
       question_id: string;
       question_text: string;
       question_type: QuestionType;
+      options: unknown;
       n: number;
       average: string | null;
       protected: boolean;
     }>(
-      `select cycle_id, question_id, question_text, question_type, n, average, protected
+      `select cycle_id, question_id, question_text, question_type, options, n, average, protected
        from responses.report_question_trend($1, $2)`,
       [tenantId, cycleIds],
     );
@@ -926,7 +944,7 @@ export class ResponseRepository {
         n: row.protected ? 0 : row.n,
         average: row.protected || row.average === null ? null : Number(row.average),
         protected: row.protected,
-        scaleMax: scaleMaxForQuestionType(row.question_type),
+        ...scaleRangeForRow(row.question_type, row.options),
       });
     }
 

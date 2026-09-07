@@ -1,4 +1,6 @@
-export type TrendPoint = { cycleId: string; cycleName: string; cycleCreatedAt: string; n: number; average: number | null; protected: boolean; scaleMax?: 5 | 10 };
+import { normalizeToTen } from "@/lib/scaleRange";
+
+export type TrendPoint = { cycleId: string; cycleName: string; cycleCreatedAt: string; n: number; average: number | null; protected: boolean; scaleMin?: number; scaleMax?: number };
 
 /**
  * One overall-score-per-cycle series, derived client-side from the
@@ -25,7 +27,7 @@ export function overallScoreByCycle(questions: Array<{ points: TrendPoint[] }>):
   for (const question of questions) {
     for (const point of question.points) {
       if (point.protected || point.average === null) continue;
-      const normalized = (point.average / (point.scaleMax ?? 5)) * 10;
+      const normalized = normalizeToTen(point.average, { min: point.scaleMin ?? 1, max: point.scaleMax ?? 5 });
       const entry = byCycle.get(point.cycleId) ?? { cycleName: point.cycleName, cycleCreatedAt: point.cycleCreatedAt, total: 0, count: 0 };
       entry.total += normalized;
       entry.count += 1;
