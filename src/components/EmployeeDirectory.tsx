@@ -15,10 +15,13 @@ type Employee = {
   employmentStatus: string;
 };
 
+const PAGE_SIZE = 50;
+
 export function EmployeeDirectory({ refreshKey = 0, justImportedCount = 0 }: { refreshKey?: number; justImportedCount?: number }) {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState("");
   const [adding, setAdding] = useState(false);
@@ -36,11 +39,12 @@ export function EmployeeDirectory({ refreshKey = 0, justImportedCount = 0 }: { r
   if (loadKey.search !== search || loadKey.refreshKey !== refreshKey) {
     setLoadKey({ search, refreshKey });
     setLoading(true);
+    if (page !== 0) setPage(0);
   }
 
-  const load = useCallback(async (searchValue: string) => {
+  const load = useCallback(async (searchValue: string, pageValue: number) => {
     setLoading(true);
-    const params = new URLSearchParams({ limit: "50" });
+    const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(pageValue * PAGE_SIZE) });
     if (searchValue) params.set("search", searchValue);
     const response = await fetch(`/api/employees?${params.toString()}`);
     const result = (await response.json().catch(() => ({}))) as { ok?: boolean; employees?: Employee[]; total?: number };
@@ -52,9 +56,14 @@ export function EmployeeDirectory({ refreshKey = 0, justImportedCount = 0 }: { r
   }, []);
 
   useEffect(() => {
-    const timeout = setTimeout(() => load(search), 250);
+    // A large real roster (a director persona flagged this at ~116K rows)
+    // had no way to see past the first 50 -- the API already accepted
+    // `offset`, only the UI never sent one. Resetting to page 0 whenever
+    // the search term changes avoids landing on an out-of-range page for
+    // the new, narrower result set.
+    const timeout = setTimeout(() => load(search, page), 250);
     return () => clearTimeout(timeout);
-  }, [search, load, refreshKey]);
+  }, [search, load, refreshKey, page]);
 
   async function toggleStatus(employee: Employee) {
     const nextStatus = employee.employmentStatus === "active" ? "inactive" : "active";
@@ -64,7 +73,7 @@ export function EmployeeDirectory({ refreshKey = 0, justImportedCount = 0 }: { r
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ status: nextStatus }),
     });
-    await load(search);
+    await load(search, page);
     setUpdatingId("");
   }
 
@@ -89,7 +98,7 @@ export function EmployeeDirectory({ refreshKey = 0, justImportedCount = 0 }: { r
     setNewEmail("");
     setNewName("");
     setAddStatus(`${email} added.`);
-    load(search);
+    load(search, page);
   }
 
   return (
@@ -182,6 +191,26 @@ export function EmployeeDirectory({ refreshKey = 0, justImportedCount = 0 }: { r
           ))
         )}
       </div>
+
+      {!loading && total > PAGE_SIZE ? (
+        <div className="mt-3 flex items-center justify-between text-[12.5px] text-[var(--ink-mid)]">
+          <span>
+            {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} of {total}
+          </span>
+          <div className="flex gap-2">
+            <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} className="btn-secondary px-3 py-1.5 text-xs">
+              Previous
+            </button>
+            <button
+              onClick={() => setPage((p) => ((p + 1) * PAGE_SIZE < total ? p + 1 : p))}
+              disabled={(page + 1) * PAGE_SIZE >= total}
+              className="btn-secondary px-3 py-1.5 text-xs"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      ) : null}
     </Card>
   );
 }

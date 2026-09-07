@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDatabasePool } from "@/lib/server/db/pool";
 import { getTenantPool, withTenantContext } from "@/lib/server/db/tenantPool";
-import { submitWithSeveredRepositories } from "@/lib/server/confidentialSubmissionService";
+import { RespondentFacingError, submitWithSeveredRepositories } from "@/lib/server/confidentialSubmissionService";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import { submitServerResponse } from "@/lib/serverStore";
 import { hashServerToken } from "@/lib/server/tokenHashing";
@@ -50,15 +50,19 @@ export async function POST(request: NextRequest) {
 
       const tokenHash = hashServerToken(body.token);
       const participant = await new IdentityRepository(adminPool).findIssuedToken(tokenHash);
-      if (!participant) throw new Error("This link isn't valid.");
+      if (!participant) throw new RespondentFacingError("This link isn't valid.");
 
       const submission = await withTenantContext(tenantPool, participant.tenant_id, (client) =>
         submitWithSeveredRepositories({ db: client, rawToken: body.token, answers: body.answers }),
       );
       return NextResponse.json({ ok: true, submissionId: submission.submissionId });
     } catch (error) {
+      // Only a RespondentFacingError's text is safe to show an anonymous
+      // respondent verbatim -- anything else (a raw driver/SQL error, an
+      // unexpected exception) gets a generic message instead of leaking
+      // internals at the most anonymity-sensitive moment in the product.
       return NextResponse.json(
-        { ok: false, error: error instanceof Error ? error.message : "Response could not be submitted." },
+        { ok: false, error: error instanceof RespondentFacingError ? error.message : "Something went wrong submitting your response. Please try again." },
         { status: 400 },
       );
     }

@@ -54,7 +54,14 @@ export function InviteOutboxPanel({ cycleId }: { cycleId?: string } = {}) {
   // the Send page but must never see the actual send/queue/prepare
   // controls -- the underlying APIs already 403 them (canRunSurvey), but
   // the buttons shouldn't render in the first place.
-  const [canManage, setCanManage] = useState(false);
+  //
+  // null = "haven't heard back yet" -- distinct from a confirmed `false`.
+  // This used to default straight to `false`, so every page load (even for
+  // the account owner) flashed "You have read-only access ... can't send"
+  // for the second or so it took /api/tenants/current to resolve. A
+  // first-time user seeing that message before ever touching the page
+  // reasonably concludes the product is broken, not "still loading."
+  const [canManage, setCanManage] = useState<boolean | null>(null);
   const [, startTransition] = useTransition();
   const toast = useToast();
 
@@ -149,7 +156,9 @@ export function InviteOutboxPanel({ cycleId }: { cycleId?: string } = {}) {
       <h2 className="section-title mt-2">Invite outbox</h2>
       <p className="mt-1.5 max-w-2xl secondary-text">Sends confidential survey links by email, tracked here only by participation status — never by answer.</p>
 
-      {canManage ? (
+      {canManage === null ? (
+        <InlineSpinnerRow label="Checking access" />
+      ) : canManage ? (
         <div className="mt-4">
           <SendAction state={sendState} sending={sending} onSend={sendSmart} />
         </div>
