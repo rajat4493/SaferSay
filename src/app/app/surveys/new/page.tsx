@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AppShell, Card } from "@/components/AppShell";
 import { CreateSurveyCycle } from "@/components/CreateSurveyCycle";
 import { PageGuide } from "@/components/PageGuide";
@@ -9,7 +9,17 @@ import { surveyTemplates } from "@/lib/templates";
 
 export default function NewSurveyPage() {
   const router = useRouter();
-  const [selected, setSelected] = useState(surveyTemplates[0].slug);
+  const searchParams = useSearchParams();
+  // The Surveys list's template cards link here with `?template=<slug>` so
+  // clicking a specific template actually opens that one -- this used to be
+  // ignored entirely, silently defaulting to surveyTemplates[0] regardless
+  // of which card was clicked (found live: clicking the 8-question
+  // "Engagement Check" card landed on the 22-question "Full Engagement
+  // Survey" instead, with nothing on screen indicating the mismatch).
+  const requestedSlug = searchParams.get("template");
+  const [selected, setSelected] = useState(
+    () => surveyTemplates.find((item) => item.slug === requestedSlug)?.slug ?? surveyTemplates[0].slug,
+  );
   const template = surveyTemplates.find((item) => item.slug === selected) ?? surveyTemplates[0];
   const [, startTransition] = useTransition();
   const [accessChecked, setAccessChecked] = useState(false);

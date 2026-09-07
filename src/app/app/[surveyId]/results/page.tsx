@@ -370,7 +370,7 @@ export default function SurveyResultsPage() {
           </div>
         ) : (
           <>
-        <SurveyStageTabs active="Results" status={status ?? undefined} />
+        <SurveyStageTabs active="Results" status={status ?? undefined} surveyId={surveyId} />
 
         {resultsState ? <ResultsStateBanner state={resultsState} protectedReport={protectedReport} /> : null}
 

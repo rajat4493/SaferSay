@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
+import { useTenantSessionContext } from "@/components/TenantSessionProvider";
 import type { UserRole } from "@/lib/server/repositories/types";
 
 export type TenantSessionInfo = {
@@ -16,28 +15,8 @@ export type TenantSessionInfo = {
   firstRunCompleted: boolean;
 };
 
+// Backed by TenantSessionProvider (mounted once in src/app/app/layout.tsx)
+// rather than fetching independently per call site -- see that file for why.
 export function useTenantSession() {
-  const [info, setInfo] = useState<TenantSessionInfo | null>(null);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    fetch("/api/tenants/current")
-      .then((response) => response.json())
-      .then((data) => {
-        if (!data.ok) return;
-        setInfo({
-          role: data.role,
-          isSuperAdmin: data.isSuperAdmin,
-          isImpersonating: data.isImpersonating,
-          tenantName: data.tenant?.name ?? "",
-          userEmail: data.userEmail ?? "",
-          userName: data.userName ?? null,
-          firstRunCompleted: Boolean(data.firstRunCompleted),
-        });
-      })
-      .catch(() => undefined)
-      .finally(() => setLoaded(true));
-  }, []);
-
-  return { info, loaded };
+  return useTenantSessionContext();
 }

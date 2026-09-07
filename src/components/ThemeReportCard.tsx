@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { ChevronDown, EyeOff, TrendingDown, TrendingUp } from "lucide-react";
 import { Card } from "@/components/AppShell";
+import { SkeletonText } from "@/components/Skeleton";
 import { getHeatmapTileTokens } from "@/lib/scoreTier";
 import { groupByConstruct, themeDeltasToOrg, type ThemeableRow } from "@/lib/reportThemes";
 
@@ -36,9 +37,28 @@ export function ThemeReportCard({
   const [scopedRows, setScopedRows] = useState<ReportRow[] | null>(null);
   const [orgRows, setOrgRows] = useState<ReportRow[] | null>(null);
   const [protectedState, setProtectedState] = useState(true);
+  // Distinct from `protectedState` -- that defaulted to `true` before the
+  // fetch resolved, so this card always rendered "Not available / not
+  // enough responses" for a moment on every load, even for a fully
+  // releasable report (found live: a persona reported the heatmap "flashed
+  // not enough responses, then flipped to fully populated a few seconds
+  // later"). Only render the protected/empty state once loading actually
+  // confirms it; show a neutral skeleton in between.
+  const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(initialExpandedConstruct ?? null);
   const [, startTransition] = useTransition();
   const requestKeyRef = useRef<string>("");
+
+  // Reset loading during render, not inside the effect body, the moment
+  // cycleId/department changes -- same pattern EmployeeDirectory.tsx uses
+  // for its own stale-render window, and required here since setState
+  // synchronously inside an effect body triggers a lint error (cascading
+  // renders) rather than just being stylistically discouraged.
+  const [loadKey, setLoadKey] = useState({ cycleId, department });
+  if (loadKey.cycleId !== cycleId || loadKey.department !== department) {
+    setLoadKey({ cycleId, department });
+    setLoading(true);
+  }
 
   useEffect(() => {
     const requestKey = `${cycleId ?? ""}|${department ?? ""}`;
@@ -61,8 +81,20 @@ export function ThemeReportCard({
         setScopedRows(report && !report.protected ? report.rows : []);
         setOrgRows(org?.report && !org.report.protected ? org.report.rows : department ? [] : (report && !report.protected ? report.rows : []));
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => {
+        if (requestKeyRef.current === requestKey) setLoading(false);
+      });
   }, [cycleId, department, initialExpandedConstruct]);
+
+  if (loading) {
+    return (
+      <Card className="mt-[9px]">
+        <h2 className="section-title">Theme heatmap</h2>
+        <SkeletonText lines={2} />
+      </Card>
+    );
+  }
 
   if (protectedState || !scopedRows) {
     return (
