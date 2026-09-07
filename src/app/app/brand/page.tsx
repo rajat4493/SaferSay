@@ -1,15 +1,24 @@
 "use client";
 
-import { Upload } from "lucide-react";
+import { useState } from "react";
+import { Palette, Upload, X } from "lucide-react";
 import { AppShell, Card } from "@/components/AppShell";
 import { BrandMark } from "@/components/BrandMark";
 import { useBrand } from "@/components/BrandProvider";
 import { brandFontOptions } from "@/lib/brand";
 import { isValidHexColor } from "@/lib/brandTheme";
 import { BRAND_PRESETS } from "@/lib/brandPresets";
+import { suggestAccentColorFromImage } from "@/lib/logoColorExtraction";
 
 export default function BrandPage() {
   const { brand, setBrand, resetBrand } = useBrand();
+  // A suggestion, never applied automatically -- pixel-sampling a logo
+  // (see logoColorExtraction.ts) is deterministic but not infallible (a
+  // duotone logo, a shadow/gradient pixel, a logo that's mostly wordmark
+  // text can all throw off which color reads as "the" brand color to a
+  // human). Shown as a proposal the admin previews and explicitly accepts
+  // or dismisses -- accentColor is never overwritten silently.
+  const [suggestedColor, setSuggestedColor] = useState<string | null>(null);
 
   function applyPreset(presetId: string | null) {
     const preset = BRAND_PRESETS.find((candidate) => candidate.id === presetId) ?? null;
@@ -23,11 +32,22 @@ export default function BrandPage() {
 
   function uploadLogo(file: File | undefined) {
     if (!file) return;
+    setSuggestedColor(null);
     const reader = new FileReader();
     reader.onload = () => {
-      setBrand({ ...brand, logoDataUrl: String(reader.result) });
+      const dataUrl = String(reader.result);
+      setBrand({ ...brand, logoDataUrl: dataUrl });
+      suggestAccentColorFromImage(dataUrl)
+        .then((color) => setSuggestedColor(color))
+        .catch(() => setSuggestedColor(null));
     };
     reader.readAsDataURL(file);
+  }
+
+  function useSuggestedColor() {
+    if (!suggestedColor) return;
+    setBrand({ ...brand, accentColor: suggestedColor });
+    setSuggestedColor(null);
   }
 
   return (
@@ -56,6 +76,24 @@ export default function BrandPage() {
             Upload logo
             <input type="file" accept="image/*" className="hidden" onChange={(event) => uploadLogo(event.target.files?.[0])} />
           </label>
+          {suggestedColor ? (
+            <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--bg)] p-3">
+              <span className="h-8 w-8 shrink-0 rounded-full border border-[var(--border)]" style={{ background: suggestedColor }} aria-hidden="true" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] font-medium text-[var(--ink)]">Suggested accent color from your logo</p>
+                <p className="text-[12px] text-[var(--ink-faint)]">
+                  {suggestedColor} -- a starting point, not a guarantee it&apos;s the right shade. Preview it below before keeping it.
+                </p>
+              </div>
+              <button onClick={useSuggestedColor} className="btn-secondary shrink-0 px-3 py-1.5 text-xs">
+                <Palette size={12} strokeWidth={1.8} />
+                Use this color
+              </button>
+              <button onClick={() => setSuggestedColor(null)} className="shrink-0 rounded-[var(--radius-input)] p-1.5 text-[var(--ink-faint)] hover:bg-[var(--bg-hover)] hover:text-[var(--ink-mid)]" aria-label="Dismiss color suggestion">
+                <X size={14} strokeWidth={1.8} />
+              </button>
+            </div>
+          ) : null}
         </div>
       </Card>
 
