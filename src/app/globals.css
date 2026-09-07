@@ -482,26 +482,29 @@ input[type="radio"] {
   color: var(--ss-green-700);
 }
 
-/* Numbered-circle rating scale -- the number is the button, no
-   separate keyboard badge. Wraps to a second line for wide scales
-   (eNPS 0-10) rather than overflowing the card. */
+/* Numbered-circle rating scale -- the number is the button, no separate
+   keyboard badge. Always stays on one line, shrinking each circle to fit
+   (rather than wrapping to a second row) -- a wide scale (eNPS 0-10, or a
+   tenant-configured "scale" question with a similarly wide range) used to
+   wrap into an awkward 9-then-2 layout; the anchor labels below it don't
+   read as a single range once the row above has broken in two. */
 .taker-scale {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: center;
-  gap: 8px;
+  gap: clamp(4px, 1.2vw, 8px);
 }
 .taker-circle {
   display: grid;
   place-items: center;
-  flex-shrink: 0;
-  width: 48px;
-  height: 48px;
+  flex: 0 1 48px;
+  min-width: 0;
+  aspect-ratio: 1 / 1;
   border-radius: 50%;
   background: #ffffff;
   border: 1px solid var(--border);
   color: var(--ink);
-  font-size: 15px;
+  font-size: clamp(11px, 3vw, 15px);
   font-weight: 500;
   cursor: pointer;
   transition: border-color 140ms ease, transform 140ms ease, background-color 140ms ease, color 140ms ease;
