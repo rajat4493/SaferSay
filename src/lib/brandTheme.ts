@@ -26,6 +26,49 @@ export function deriveAccentPalette(hex: string): AccentPalette {
   };
 }
 
+export type SidebarPalette = {
+  "--sidebar-bg": string;
+  "--sidebar-ink": string;
+  "--sidebar-ink-mid": string;
+  "--sidebar-ink-faint": string;
+  "--sidebar-active-bg": string;
+  "--sidebar-active-ink": string;
+  "--sidebar-border": string;
+};
+
+/**
+ * A plain accent color (no preset chosen) previously only recolored
+ * buttons/links/badges via deriveAccentPalette above -- the sidebar stayed
+ * on SaferSay's own hardcoded dark-teal gradient regardless of what a
+ * tenant picked, so "set your brand color" visibly reskinned two or three
+ * small UI elements and nothing else. This derives a matching dark
+ * sidebar treatment from the SAME hue, structured the same way the
+ * hand-picked Calm Teal preset already is (a three-stop diagonal dark
+ * gradient + light, slightly hue-tinted ink colors) -- so accepting one
+ * accent color (typed in, or from the logo-color suggestion) reskins the
+ * whole visible chrome, not just the accent color itself.
+ *
+ * Deliberately ignores the input color's own saturation/lightness for the
+ * gradient itself (only its hue carries through) -- an accent color can be
+ * very light, very dark, or very saturated (a logo's dominant color is
+ * unconstrained), but a sidebar background must stay dark and low-enough
+ * saturation for light text to read on it regardless of what was picked.
+ */
+export function deriveSidebarPalette(hex: string): SidebarPalette {
+  const { h } = hexToHsl(hex);
+  const dark1 = hslToHex(h, 45, 14);
+  const dark2 = hslToHex(h, 42, 20);
+  return {
+    "--sidebar-bg": `linear-gradient(175deg, ${dark1} 0%, ${dark2} 65%, ${dark1} 100%)`,
+    "--sidebar-ink": hslToHex(h, 20, 96),
+    "--sidebar-ink-mid": hslToHex(h, 25, 85),
+    "--sidebar-ink-faint": hslToHex(h, 25, 70),
+    "--sidebar-active-bg": "rgba(255, 255, 255, 0.12)",
+    "--sidebar-active-ink": hslToHex(h, 25, 97),
+    "--sidebar-border": "rgba(255, 255, 255, 0.14)",
+  };
+}
+
 export function isValidHexColor(value: string): boolean {
   return /^#[0-9a-fA-F]{6}$/.test(value);
 }

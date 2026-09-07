@@ -31,7 +31,7 @@ import { useTenantSession } from "@/lib/useTenantSession";
 import { canAccessAuditLog, canAccessPeople, canAccessSecurityProof, canAccessWorkspace, canCreateSurvey, canManageIntegrations, canViewSurveyResults } from "@/lib/permissions";
 import type { UserRole } from "@/lib/server/repositories/types";
 import { brandFontOptions } from "@/lib/brand";
-import { deriveAccentPalette } from "@/lib/brandTheme";
+import { deriveAccentPalette, deriveSidebarPalette } from "@/lib/brandTheme";
 import { presetStyleOverrides } from "@/lib/brandPresets";
 
 type NavItemConfig = {
@@ -182,6 +182,14 @@ export function AppShell({
     // editable even after a preset is picked (see brandPresets.ts).
     ...(presetStyleOverrides(brand.presetId) as React.CSSProperties),
     ...(brand.accentColor ? (deriveAccentPalette(brand.accentColor) as React.CSSProperties) : {}),
+    // A plain accent color with no preset chosen used to only recolor
+    // buttons/links/badges, leaving the sidebar on SaferSay's own hardcoded
+    // dark teal -- "set your brand color" visibly changed two or three
+    // elements, not the platform. When no preset supplies its own sidebar
+    // treatment, derive one from the same accent hue so the whole visible
+    // chrome reskins together. A preset's own sidebar (if it defines one)
+    // always wins -- this only fills the gap a bare accent color leaves.
+    ...(brand.accentColor && !brand.presetId ? (deriveSidebarPalette(brand.accentColor) as React.CSSProperties) : {}),
     ...(brand.fontFamily ? ({ "--font-body": brandFontOptions.find((option) => option.value === brand.fontFamily)?.stack } as React.CSSProperties) : {}),
   };
 
