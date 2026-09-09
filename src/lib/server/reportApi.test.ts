@@ -48,22 +48,6 @@ describe("real protected report flow", () => {
     expect(viewerPage).toContain("ProtectedReportPanel");
   });
 
-  it("locks report notes once a survey is closed", () => {
-    const route = readFileSync("src/app/api/report/action/route.ts", "utf8");
-    const page = readFileSync("src/app/app/[surveyId]/results/page.tsx", "utf8");
-    expect(route).toContain('cycle.status === "closed"');
-    expect(route).toContain("Survey is closed and locked.");
-    expect(page).toContain("No further responses can be submitted");
-  });
-
-  it("blocks both reading and writing report actions while a platform owner impersonates a tenant", () => {
-    const route = readFileSync("src/app/api/report/action/route.ts", "utf8");
-    const getStart = route.indexOf("export async function GET");
-    const postStart = route.indexOf("export async function POST");
-    expect(route.slice(getStart, postStart)).toContain("isPlatformOwnerImpersonating(session)");
-    expect(route.slice(postStart)).toContain("isPlatformOwnerImpersonating(session)");
-  });
-
   it("does not keep a survey visually stuck in draft after launch or manual responses", () => {
     const inviteRoute = readFileSync("src/app/api/invites/send/route.ts", "utf8");
     const identityRepo = readFileSync("src/lib/server/repositories/identityRepository.ts", "utf8");

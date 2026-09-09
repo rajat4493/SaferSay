@@ -6,7 +6,6 @@ import { decryptSecret, encryptSecret } from "@/lib/server/secretCrypto";
 import type { BrandTheme } from "@/lib/brand";
 import {
   AuditLogRecord,
-  CycleAction,
   CycleCommitment,
   AvailableSurveyCredit,
   EmployeeImportRecord,
@@ -918,31 +917,6 @@ export class IdentityRepository {
       ssoDomain: row?.sso_domain ?? null,
       actionMode: row?.action_mode ?? "insights_only",
     };
-  }
-
-  async addCycleAction(tenantId: string, cycleId: string, authorEmail: string, actionText: string) {
-    await this.db.query(
-      `insert into identity.cycle_actions (id, tenant_id, cycle_id, author_email, action_text)
-       values ($1, $2, $3, $4, $5)`,
-      [randomUUID(), tenantId, cycleId, authorEmail, actionText],
-    );
-  }
-
-  async listCycleActions(tenantId: string, cycleId: string): Promise<CycleAction[]> {
-    const result = await this.db.query<{ id: string; author_email: string; action_text: string; created_at: string }>(
-      `select id, author_email, action_text, created_at::text as created_at
-       from identity.cycle_actions
-       where tenant_id = $1 and cycle_id = $2
-       order by created_at desc
-       limit 10`,
-      [tenantId, cycleId],
-    );
-    return result.rows.map((row) => ({
-      id: row.id,
-      authorEmail: row.author_email,
-      actionText: row.action_text,
-      createdAt: row.created_at,
-    }));
   }
 
   private mapCommitmentRow(row: {

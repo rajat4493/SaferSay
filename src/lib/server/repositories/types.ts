@@ -209,13 +209,6 @@ export type TenantSsoConfig = {
   enabled: boolean;
 };
 
-export type CycleAction = {
-  id: string;
-  authorEmail: string;
-  actionText: string;
-  createdAt: string;
-};
-
 export type CycleCommitment = {
   id: string;
   cycleId: string;

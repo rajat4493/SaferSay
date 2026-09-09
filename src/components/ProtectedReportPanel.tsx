@@ -11,8 +11,6 @@ import { useToast } from "@/components/ToastProvider";
 import { ViewerCard } from "@/components/ViewerShell";
 import { normalizeToTen } from "@/lib/scaleRange";
 
-type CycleAction = { id: string; authorEmail: string; actionText: string; createdAt: string };
-
 type ReportResponse = {
   ok?: boolean;
   error?: string;
@@ -67,9 +65,6 @@ export function ProtectedReportPanel({
   const [result, setResult] = useState<ReportResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [, startTransition] = useTransition();
-  const [actions, setActions] = useState<CycleAction[]>([]);
-  const [actionDraft, setActionDraft] = useState("");
-  const [savingAction, setSavingAction] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const toast = useToast();
@@ -99,11 +94,6 @@ export function ProtectedReportPanel({
     setResult(data);
     setLoading(false);
     if (data.error) toast.show({ variant: "error", message: data.error });
-    if (data.cycle?.id) {
-      const actionsResponse = await fetch(`/api/report/action?cycleId=${data.cycle.id}`);
-      const actionsData = (await actionsResponse.json().catch(() => ({}))) as { ok?: boolean; actions?: CycleAction[] };
-      if (requestKeyRef.current === requestKey && actionsData.ok) setActions(actionsData.actions ?? []);
-    }
   }
 
   useEffect(() => {
@@ -154,32 +144,12 @@ export function ProtectedReportPanel({
     }
   }
 
-  async function submitAction() {
-    if (!actionDraft.trim() || !result?.cycle?.id) return;
-    setSavingAction(true);
-    const response = await fetch("/api/report/action", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ cycleId: result.cycle.id, actionText: actionDraft.trim() }),
-    });
-    const data = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string; actions?: CycleAction[] };
-    setSavingAction(false);
-    if (data.ok) {
-      setActions(data.actions ?? []);
-      setActionDraft("");
-      toast.show({ variant: "success", message: "Committed. Shared with the team next time you export or share the score." });
-    } else {
-      toast.show({ variant: "error", message: data.error ?? "Couldn't save that commitment." });
-    }
-  }
-
   async function shareScore() {
     if (!report || report.protected) return;
     const lines = [
       `${result?.cycle?.name ?? "Survey"} results (n=${report.n}):`,
       ...report.rows.map((row) => `- ${row.label ?? row.questionId}: ${(row.average ?? 0).toFixed(2)}`),
-      actions[0] ? `\nOne change we're committing to: ${actions[0].actionText}` : "",
-    ].filter(Boolean);
+    ];
     await navigator.clipboard.writeText(lines.join("\n"));
     setShareCopied(true);
     setTimeout(() => setShareCopied(false), 2000);
@@ -407,34 +377,6 @@ export function ProtectedReportPanel({
         </ShellCard>
       ) : null}
 
-      {report && !report.protected ? (
-        <ShellCard className="mt-[9px]">
-          <h2 className="section-title">Commit to one change</h2>
-          <p className="mt-1 secondary-text">Close the loop with your team: share this score and name one thing you&apos;ll do about it.</p>
-          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-            <input
-              value={actionDraft}
-              onChange={(event) => setActionDraft(event.target.value)}
-              placeholder="e.g. Run a 15-min retro on workload next Friday"
-              aria-label="One change you're committing to"
-              className="admin-input flex-1"
-            />
-            <button onClick={submitAction} disabled={savingAction || !actionDraft.trim()} className="btn-primary shrink-0">
-              {savingAction ? "Saving..." : "Commit"}
-            </button>
-          </div>
-          {actions.length > 0 ? (
-            <div className="mt-4 space-y-2">
-              {actions.map((action) => (
-                <div key={action.id} className="rounded-[var(--radius-input)] border border-[var(--border)] bg-white p-3 text-[13px]">
-                  <p className="text-[var(--ink)]">{action.actionText}</p>
-                  <p className="mt-1 text-xs text-[var(--ink-faint)]">{action.authorEmail}</p>
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </ShellCard>
-      ) : null}
     </>
   );
 }
