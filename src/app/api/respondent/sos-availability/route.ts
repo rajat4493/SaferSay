@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "Token is required." }, { status: 400 });
   }
 
-  const { allowed } = await checkRateLimit(`sos-availability:${getClientIp(request)}`, 30, 60);
+  const { allowed } = await checkRateLimit(`sos-availability:${getClientIp(request.headers)}`, 30, 60);
   if (!allowed) {
     return NextResponse.json({ ok: false, error: "Too many attempts. Try again in a minute." }, { status: 429 });
   }

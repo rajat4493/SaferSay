@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
   // Guards against token-guessing, not against a single legitimate
   // respondent -- a real submission is a one-time action per person, so a
   // generous per-IP ceiling here only ever bites automated attempts.
-  const { allowed } = await checkRateLimit(`submit:${getClientIp(request)}`, 30, 60);
+  const { allowed } = await checkRateLimit(`submit:${getClientIp(request.headers)}`, 30, 60);
   if (!allowed) {
     return NextResponse.json({ ok: false, error: "Too many attempts. Try again in a minute." }, { status: 429 });
   }

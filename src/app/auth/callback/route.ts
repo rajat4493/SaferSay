@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   // NextRequest is actually in scope, so it's where abuse-rate-limiting on
   // account/tenant creation has to live. Generous limit: this also gates
   // ordinary returning-user logins, not just new signups.
-  const { allowed } = await checkRateLimit(`oauth-callback:${getClientIp(request)}`, 20, 600);
+  const { allowed } = await checkRateLimit(`oauth-callback:${getClientIp(request.headers)}`, 20, 600);
   if (!allowed) {
     const url = new URL("/login", request.url);
     url.searchParams.set("error", "rate_limited");

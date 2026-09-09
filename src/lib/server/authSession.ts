@@ -1,13 +1,29 @@
 import "server-only";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getRuntimeMode } from "@/lib/runtimeConfig";
+import { isDisposableEmailDomain } from "@/lib/disposableEmailDomains";
 import { devAuthCookieName, isDevAuthAllowed } from "@/lib/server/devAuth";
 import { getDatabasePool } from "@/lib/server/db/pool";
+import { checkRateLimit, getClientIp } from "@/lib/server/rateLimit";
 import { IdentityRepository } from "@/lib/server/repositories/identityRepository";
 import type { UserRecord, UserRole } from "@/lib/server/repositories/types";
 import { localTenant, resolveTenantContext } from "@/lib/server/tenant";
 import { createClient } from "@/utils/supabase/server";
+
+/**
+ * Thrown by resolveUserRecord's brand-new-tenant branch to block a
+ * self-serve signup before any tenant/user row is created -- never for an
+ * existing user or an invited teammate, since both return earlier. Caught
+ * by getSessionContext, which redirects to the login page with a reason
+ * the UI can explain (see LoginError.tsx) rather than silently creating
+ * (or silently refusing to create) a workspace.
+ */
+export class SignupBlockedError extends Error {
+  constructor(public readonly reason: "disposable_email" | "signup_rate_limited") {
+    super(`Signup blocked: ${reason}`);
+  }
+}
 
 export type SessionContext = {
   userId: string;
@@ -98,7 +114,19 @@ export async function getSessionContext(): Promise<SessionContext | null> {
   }
 
   const repo = new IdentityRepository(db);
-  const record = await resolveUserRecord(repo, authId, authEmail, authMetadata, authProvider);
+  let record: UserRecord;
+  try {
+    record = await resolveUserRecord(repo, authId, authEmail, authMetadata, authProvider);
+  } catch (error) {
+    if (error instanceof SignupBlockedError) {
+      // No tenant/user row was created -- the Supabase auth session cookie
+      // exists, but this app never provisioned an account for it, so
+      // every future request re-runs this same check and redirects again
+      // until the visitor signs in with a different, allowed email.
+      redirect(`/login?error=${error.reason}`);
+    }
+    throw error;
+  }
 
   const homeTenant = await repo.findTenantById(record.tenantId);
   if (!homeTenant) return null;
@@ -133,7 +161,9 @@ export async function getSessionContext(): Promise<SessionContext | null> {
   };
 }
 
-async function resolveUserRecord(
+// Exported for direct testing (authSignupGate.test.ts) -- getSessionContext
+// remains the only real caller in application code.
+export async function resolveUserRecord(
   repo: IdentityRepository,
   providerSubject: string,
   email: string,
@@ -170,6 +200,27 @@ async function resolveUserRecord(
     await repo.markPendingInviteAccepted(pendingTeamInvite.id);
     await repo.emitOnboardingEvent(pendingTeamInvite.tenantId, user.id, "signup");
     return user;
+  }
+
+  // The self-serve gate: only reachable here, on the "nobody has ever seen
+  // this email" path -- an existing user, an invited teammate, or the
+  // non-production dev-login bypass never hits this branch (dev-bypass
+  // uses authProvider "dev-bypass", never gated, since it's disabled
+  // outright in production -- see devAuth.ts).
+  if (authProvider === "supabase") {
+    if (isDisposableEmailDomain(email)) {
+      throw new SignupBlockedError("disposable_email");
+    }
+    // Stricter than the general per-IP OAuth-callback rate limit (20 per
+    // 10 minutes, guarding against credential-stuffing/brute-force login
+    // attempts) -- this one only counts brand-new-workspace creation, so
+    // it can afford to be tight without ever affecting a returning user's
+    // ordinary sign-in.
+    const ip = getClientIp((await headers()));
+    const { allowed } = await checkRateLimit(`new-tenant:${ip}`, 3, 86400);
+    if (!allowed) {
+      throw new SignupBlockedError("signup_rate_limited");
+    }
   }
 
   const displayName = typeof metadata?.full_name === "string" ? (metadata.full_name as string) : null;

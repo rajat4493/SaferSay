@@ -6,6 +6,7 @@ import { ShieldCheck } from "lucide-react";
 import { BrandMark } from "@/components/BrandMark";
 import { useBrand } from "@/components/BrandProvider";
 import { DevLoginPanel } from "@/components/DevLoginPanel";
+import { LoginError } from "@/components/LoginError";
 import { OAuthLoginButtons } from "@/components/OAuthLoginButtons";
 import { SsoLoginForm } from "@/components/SsoLoginForm";
 
@@ -40,6 +41,9 @@ export default function LoginPage() {
             </div>
           </div>
           <h2 className="hidden text-xl font-semibold lg:block">Sign in to launch a survey</h2>
+          <Suspense fallback={null}>
+            <LoginError />
+          </Suspense>
           <Suspense fallback={<div className="mt-8 h-28 rounded-3xl bg-[var(--brand-bg)]" />}>
             <OAuthLoginButtons />
           </Suspense>

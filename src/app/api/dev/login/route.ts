@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "Not found." }, { status: 404 });
   }
 
-  const { allowed } = await checkRateLimit(`dev-login:${getClientIp(request)}`, 20, 600);
+  const { allowed } = await checkRateLimit(`dev-login:${getClientIp(request.headers)}`, 20, 600);
   if (!allowed) {
     return NextResponse.json({ ok: false, error: "Too many attempts. Try again in a few minutes." }, { status: 429 });
   }

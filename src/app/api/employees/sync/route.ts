@@ -16,7 +16,7 @@ import { checkRateLimit, getClientIp } from "@/lib/server/rateLimit";
  * already uses (email is the match key either way).
  */
 export async function POST(request: NextRequest) {
-  const { allowed } = await checkRateLimit(`employee-sync:${getClientIp(request)}`, 20, 60);
+  const { allowed } = await checkRateLimit(`employee-sync:${getClientIp(request.headers)}`, 20, 60);
   if (!allowed) {
     return NextResponse.json({ ok: false, error: "Too many requests. Try again in a minute." }, { status: 429 });
   }

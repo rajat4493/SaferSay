@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
   // by IP (guards a script hammering the endpoint) and separately by the
   // token itself (guards one compromised/shared link from spamming the
   // safety contact repeatedly).
-  const ipCheck = await checkRateLimit(`sos-ip:${getClientIp(request)}`, 5, 300);
+  const ipCheck = await checkRateLimit(`sos-ip:${getClientIp(request.headers)}`, 5, 300);
   const tokenCheck = await checkRateLimit(`sos-token:${hashServerToken(body.token)}`, 3, 3600);
   if (!ipCheck.allowed || !tokenCheck.allowed) {
     return NextResponse.json({ ok: false, error: "Too many attempts. Try again later." }, { status: 429 });

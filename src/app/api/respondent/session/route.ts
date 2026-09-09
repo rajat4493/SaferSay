@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
   if (!token) return NextResponse.json({ ok: false, error: "Survey token is required." }, { status: 400 });
 
-  const { allowed } = await checkRateLimit(`session:${getClientIp(request)}`, 30, 60);
+  const { allowed } = await checkRateLimit(`session:${getClientIp(request.headers)}`, 30, 60);
   if (!allowed) {
     return NextResponse.json({ ok: false, error: "Too many attempts. Try again in a minute." }, { status: 429 });
   }

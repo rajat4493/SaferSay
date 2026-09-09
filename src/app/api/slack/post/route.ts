@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "You don't have permission to post to Slack." }, { status: 403 });
   }
 
-  const { allowed } = await checkRateLimit(`slack-post:${session.tenant.id}:${getClientIp(request)}`, 10, 60);
+  const { allowed } = await checkRateLimit(`slack-post:${session.tenant.id}:${getClientIp(request.headers)}`, 10, 60);
   if (!allowed) {
     return NextResponse.json({ ok: false, error: "Too many messages sent. Try again in a minute." }, { status: 429 });
   }
