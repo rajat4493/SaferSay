@@ -38,9 +38,12 @@ async function resolveTenantId(
   return { tenantId: session.tenant.id, actorRole: session.role, actorId: session.email };
 }
 
-function toCsv(rows: Array<{ label?: string; n: number; average: number | null }>) {
-  const header = ["Question", "Responses", "Average"];
-  const lines = [header, ...rows.map((row) => [row.label ?? "", String(row.n), row.average?.toFixed(2) ?? ""])];
+function toCsv(rows: Array<{ label?: string; n: number; average: number | null; scaleMin?: number; scaleMax?: number }>) {
+  const header = ["Question", "Responses", "Average", "Scale"];
+  const lines = [
+    header,
+    ...rows.map((row) => [row.label ?? "", String(row.n), row.average?.toFixed(2) ?? "", `${row.scaleMin ?? 1}-${row.scaleMax ?? 5}`]),
+  ];
   return lines.map((line) => line.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(",")).join("\n");
 }
 

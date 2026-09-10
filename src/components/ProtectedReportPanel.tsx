@@ -108,7 +108,15 @@ export function ProtectedReportPanel({
 
   function exportCsv() {
     if (!report || report.protected) return;
-    const rows = [["Question", "Responses", "Average"], ...report.rows.map((row) => [row.label ?? row.questionId, String(row.n), row.average?.toFixed(2) ?? ""])];
+    const rows = [
+      ["Question", "Responses", "Average", "Scale"],
+      ...report.rows.map((row) => [
+        row.label ?? row.questionId,
+        String(row.n),
+        row.average?.toFixed(2) ?? "",
+        `${row.scaleMin ?? 1}-${row.scaleMax ?? 5}`,
+      ]),
+    ];
     const csv = rows.map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -148,7 +156,7 @@ export function ProtectedReportPanel({
     if (!report || report.protected) return;
     const lines = [
       `${result?.cycle?.name ?? "Survey"} results (n=${report.n}):`,
-      ...report.rows.map((row) => `- ${row.label ?? row.questionId}: ${(row.average ?? 0).toFixed(2)}`),
+      ...report.rows.map((row) => `- ${row.label ?? row.questionId}: ${(row.average ?? 0).toFixed(2)}/${row.scaleMax ?? 5}`),
     ];
     await navigator.clipboard.writeText(lines.join("\n"));
     setShareCopied(true);

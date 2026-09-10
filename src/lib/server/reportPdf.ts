@@ -102,7 +102,12 @@ export async function renderReportPdf(params: {
     }
     const lastLineY = y + 14;
     page.drawText(String(row.n), { x: colResponses, y: lastLineY, size: 10.5, font: regular, color: INK });
-    page.drawText(row.average !== null ? row.average.toFixed(2) : "—", { x: colAverage, y: lastLineY, size: 10.5, font: regular, color: INK });
+    // Questions can mix scales within one report (likert_5 vs. enps_0_10)
+    // -- printing the bare number without its denominator would make a
+    // 6.81 read as an anomaly on what looks like everyone else's 1-5
+    // scale, instead of a normal score on its own 0-10 scale.
+    const averageText = row.average !== null ? `${row.average.toFixed(2)}/${row.scaleMax ?? 5}` : "—";
+    page.drawText(averageText, { x: colAverage, y: lastLineY, size: 10.5, font: regular, color: INK });
     y -= 12;
   }
 
