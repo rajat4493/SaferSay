@@ -194,13 +194,21 @@ export default function SurveyResultsPage() {
   // Org-wide only, same as Overview's cross-cycle trend card -- feeds the
   // "Change vs last survey" tile. Fetched once (not per-surveyId): it
   // returns every cycle's data in one response, and this page just reads
-  // the one relevant to the currently viewed surveyId below.
+  // the one relevant to the currently viewed surveyId below. The API
+  // itself 403s a people_leader (org-wide trend has no team-scope
+  // support for that role -- see /api/report/trend's own guard) -- wait
+  // for role to resolve and skip the fetch entirely for that role rather
+  // than firing a request that's guaranteed to fail on every page load.
   useEffect(() => {
+    // trend?.questions ?? [] downstream already treats "still null" the
+    // same as "loaded, nothing comparable" -- no need to set state just to
+    // record that this role isn't allowed to fetch it.
+    if (!role || !canViewCrossCycleTrend(role)) return;
     fetch("/api/report/trend")
       .then((response) => response.json())
       .then((data: TrendResponse) => setTrend(data.ok ? data : { questions: [] }))
       .catch(() => setTrend({ questions: [] }));
-  }, []);
+  }, [role]);
 
   useEffect(() => {
     fetch("/api/tenants/current")

@@ -35,6 +35,15 @@ export default function SurveysHome() {
   const [firstRunCompleted, setFirstRunCompleted] = useState(true);
   const [canCreate, setCanCreate] = useState(false);
   const [liveParticipation, setLiveParticipation] = useState<Participation | null>(null);
+  // A People Leader is scoped to their own manager subtree everywhere else
+  // in the app (see ProtectedReportPanel's fixed team scope) -- but
+  // /api/cycles' responseCount and this page's participation numbers are
+  // always org-wide, with no per-team variant. Rather than teach every
+  // count on this page a scope it doesn't support, hide the org-wide
+  // participation numbers for this role specifically; the accurate,
+  // correctly-scoped count is still shown once they open a survey's own
+  // Results page.
+  const [isPeopleLeader, setIsPeopleLeader] = useState(false);
 
   useEffect(() => {
     fetch("/api/tenants/current")
@@ -51,6 +60,7 @@ export default function SurveysHome() {
         }
         setFirstRunCompleted(Boolean(data.firstRunCompleted));
         setCanCreate(canCreateSurvey(data.role as UserRole));
+        setIsPeopleLeader(data.role === "people_leader");
         setMode("surveys");
       })
       .catch(() => setMode("surveys"));
@@ -117,7 +127,7 @@ export default function SurveysHome() {
 
   return (
     <AppShell title="Surveys" subtitle="Your active and past surveys. Open one to manage invites, responses, and results.">
-      {cycles !== null && cycles.length > 0 ? (
+      {cycles !== null && cycles.length > 0 && !isPeopleLeader ? (
         <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-3">
           <StatCard icon={Users} label="Active surveys" value={String(activeSurveyCount)} sub={activeSurveyCount === 1 ? "1 survey live now" : `${activeSurveyCount} surveys live now`} />
           <StatCard
@@ -179,11 +189,11 @@ export default function SurveysHome() {
           {liveSurvey ? (
             <div className="mt-6">
               <h2 className="section-title">Live survey</h2>
-              <SurveyCard cycle={liveSurvey} participation={liveParticipation} featured className="mt-2.5" />
+              <SurveyCard cycle={liveSurvey} participation={liveParticipation} featured className="mt-2.5" hideResponseCount={isPeopleLeader} />
               {additionalLiveCycles.length > 0 ? (
                 <div className="mt-2.5 space-y-2">
                   {additionalLiveCycles.map((cycle) => (
-                    <SurveyCard key={cycle.id} cycle={cycle} />
+                    <SurveyCard key={cycle.id} cycle={cycle} hideResponseCount={isPeopleLeader} />
                   ))}
                 </div>
               ) : null}
@@ -195,7 +205,7 @@ export default function SurveysHome() {
               <h2 className="section-title">Drafts</h2>
               <div className="mt-2.5 space-y-2">
                 {draftCycles.map((cycle) => (
-                  <SurveyCard key={cycle.id} cycle={cycle} />
+                  <SurveyCard key={cycle.id} cycle={cycle} hideResponseCount={isPeopleLeader} />
                 ))}
               </div>
             </div>
@@ -206,7 +216,7 @@ export default function SurveysHome() {
               <h2 className="section-title">Past surveys</h2>
               <div className="mt-2.5 space-y-2">
                 {pastSurveys.map((cycle) => (
-                  <SurveyCard key={cycle.id} cycle={cycle} />
+                  <SurveyCard key={cycle.id} cycle={cycle} hideResponseCount={isPeopleLeader} />
                 ))}
               </div>
             </div>
@@ -234,7 +244,22 @@ function StatCard({ icon: Icon, label, value, sub }: { icon: typeof Users; label
   );
 }
 
-function SurveyCard({ cycle, featured, participation, className = "" }: { cycle: SurveyCycle; featured?: boolean; participation?: Participation | null; className?: string }) {
+function SurveyCard({
+  cycle,
+  featured,
+  participation,
+  className = "",
+  hideResponseCount = false,
+}: {
+  cycle: SurveyCycle;
+  featured?: boolean;
+  participation?: Participation | null;
+  className?: string;
+  // These numbers are always org-wide (see the isPeopleLeader doc comment
+  // above) -- a People Leader only ever sees their own subtree's numbers,
+  // shown correctly scoped on the survey's own Results page instead.
+  hideResponseCount?: boolean;
+}) {
   const percent = participation && participation.issued > 0 ? Math.round((participation.spent / participation.issued) * 100) : null;
   return (
     <Link href={`/app/${cycle.id}`} className={`card card-interactive block ${className}`}>
@@ -245,10 +270,10 @@ function SurveyCard({ cycle, featured, participation, className = "" }: { cycle:
             <SurveyStatusBadge status={cycle.status} />
           </div>
           <p className="mt-1 secondary-text">
-            {cycle.responseCount} {cycle.responseCount === 1 ? "response" : "responses"} · Created{" "}
+            {hideResponseCount ? "Created" : `${cycle.responseCount} ${cycle.responseCount === 1 ? "response" : "responses"} · Created`}{" "}
             {new Date(cycle.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
           </p>
-          {featured && percent !== null ? (
+          {featured && percent !== null && !hideResponseCount ? (
             <div className="mt-3 max-w-xs">
               <div className="progress-track">
                 <div className="progress-fill" style={{ background: "var(--green)", width: `${Math.min(percent, 100)}%` }} />
